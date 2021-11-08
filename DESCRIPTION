@@ -1,0 +1,14 @@
+Package: bcb
+Title: Bayesian Causal Bandits
+Version: 0.0.0.9000
+Authors@R: 
+    person(given = "Jireh",
+           family = "Huang",
+           role = c("aut", "cre"),
+           email = "jirehhuang@ucla.edu")
+Description: Bayesian Causal Bandits
+License: TBD
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.1.1
