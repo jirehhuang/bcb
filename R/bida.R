@@ -9,16 +9,20 @@ build_bida <- function(debug = FALSE){
   check_os()
 
   ## make bida aps
+  start_time <- Sys.time()
   make <- sys::exec_internal(cmd = "make",
                              args = sprintf("--directory=%s",
                                             get_bida(dir = TRUE)))
+  end_time <- Sys.time()
+  make_time <- as.numeric(end_time - start_time, units = "secs")
 
   if (debug){
 
     if (length(make$stderr)){
 
       debug_cli_sprintf(debug, "success",
-                        "Successfully built bida aps")
+                        "Successfully built bida aps in %g secs",
+                        make_time)
     } else{
 
       debug_cli_sprintf(debug, "success",
