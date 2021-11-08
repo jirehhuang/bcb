@@ -15,4 +15,4 @@ RoxygenNote: 7.1.1
 LinkingTo: 
     Rcpp
 Imports: 
-    Rcpp
+    Rcpp, sys, cli
