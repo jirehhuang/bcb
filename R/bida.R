@@ -3,7 +3,7 @@
 build_bida <- function(debug = FALSE){
 
   debug_cli_sprintf(debug, "info",
-                    "Building bida using github examples")
+                    "Building bida using make")
 
   ## check operating system
   check_os()
@@ -45,7 +45,7 @@ test_bida <- function(debug = FALSE){
   wd0 <- getwd()
   on.exit(setwd(wd0))
 
-  setwd(file.path(find.package("bcb"), "bida"))
+  setwd(file.path(find.package("bcb", lib.loc = .libPaths()), "bida"))
 
   data <- read.csv(file = 'example_data/data_d10.txt', header = FALSE)
   true_effects <- as.matrix(read.csv(file = 'example_data/tce_d10.txt',
@@ -77,7 +77,7 @@ test_bida <- function(debug = FALSE){
 
 get_bida <- function(dir = FALSE){
 
-  package_dir <- find.package("bcb")
+  package_dir <- find.package("bcb", lib.loc = .libPaths())
   aps_dir <- file.path(package_dir, "bida", "aps-0.9.1", "aps")
 
   if (dir){
