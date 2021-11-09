@@ -1,6 +1,13 @@
 ## test generate_gnet()
 
-gnet <- generate_gnet(x = "asia")
+gnet <- generate_gnet(x = "asia", seed = 1, normalize = TRUE)
+
+
+
+## test ribn() for observational data, and normalize
+
+data <- ribn(x = gnet, n = 1e6)
+testthat::expect_true(all(abs(sapply(data, sd) - 1) < 1e-2))
 
 
 
