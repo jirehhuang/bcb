@@ -211,7 +211,7 @@ rename_bn.fit <- function(bn.fit,
   bnlearn::nodes(bn.fit) <- nodes
 
   ## if discrete, rename discrete categorical levels
-  if (categories && "bn.fit.dnet "%in% class(bn.fit)){
+  if (categories && "bn.fit.dnet" %in% class(bn.fit)){
 
     ## convert to bn_list
     bn_list <- bn.fit[seq_len(length(bn.fit))]
