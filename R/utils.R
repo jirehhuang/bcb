@@ -279,3 +279,29 @@ wamat <- function(bn.fit){
   }
   return(wa)
 }
+
+
+
+# Extract information from bn.fit for data_row
+
+bn.fit2data_row <- function(bn.fit,
+                            data_row){
+
+  in_deg <- sapply(bn.fit, function(x) length(x$parents))
+  out_deg <- sapply(bn.fit, function(x) length(x$children))
+
+  data_row$avg_deg <- mean(in_deg + out_deg)
+  data_row$max_in_deg <- max(in_deg)
+  data_row$max_out_deg <- max(out_deg)
+
+  data_row$n_node <- bnlearn::nnodes(bn.fit)
+  data_row$n_edge <- nrow(bnlearn::directed.arcs(bn.fit))
+  data_row$n_within <- data_row$n_edge
+  data_row$n_between <- 0
+  data_row$n_compelled <- nrow(bnlearn::compelled.arcs(bn.fit))
+  data_row$n_reversible <- data_row$n_edge - data_row$n_compelled
+
+  data_row$n_params <- bnlearn::nparams(bn.fit)
+
+  return(data_row)
+}
