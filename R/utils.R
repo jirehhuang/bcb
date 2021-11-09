@@ -77,8 +77,12 @@ debug_cli_sprintf <- function(debug,
 dir_check <- function(dir,
                       min_depth = 2){
 
+  ## append dir to getwd() if home directory not included
+  if (! grepl(path.expand("~"), dir)){
+    dir <- file.path(getwd(), dir)
+  }
   folders <- strsplit(dir, split = .Platform$file.sep)[[1]]
-  folders <- folders[folders != ""]  # end(s)
+  folders <- folders[folders != ""]  # trim blank "" from the end(s)
 
   ## stop if not enough folders
   if (length(folders) < min_depth)
