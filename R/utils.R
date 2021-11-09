@@ -191,3 +191,43 @@ reorder_bn.fit <- function(bn.fit,
 
   return(bn.fit)
 }
+
+
+
+# Rename bn.fit
+
+rename_bn.fit <- function(bn.fit,
+                          nodes = "V",
+                          categories = TRUE){
+
+  ## default names
+  if (is.null(nodes))
+    nodes <- "V"
+  if (is.character(nodes) && length(nodes) == 1)
+    nodes <- sprintf("%s%s", nodes[1], seq_len(length(bn.fit)))
+
+  ## rename nodes
+  original <- bnlearn::nodes(bn.fit)
+  bnlearn::nodes(bn.fit) <- nodes
+
+  ## if discrete, rename discrete categorical levels
+  if (categories && "bn.fit.dnet "%in% class(bn.fit)){
+
+    ## convert to bn_list
+    bn_list <- bn.fit[seq_len(length(bn.fit))]
+
+    for (node in nodes){
+
+      ## rename categories in prob to 0 to (r - 1)
+      dim_prob <- dim(bn_list[[node]]$prob)
+      dim_nms <- lapply(dim_prob, function(x) seq(0, x-1))
+      names(dim_nms) <- c(node, bn_list[[node]]$parents)
+      dimnames(bn_list[[node]]$prob) <- dim_nms
+    }
+    bn.fit <- bn_list2bn.fit(bn_list = bn_list)
+  }
+
+  attr(bn.fit, "original") <- original
+
+  return(bn.fit)
+}
