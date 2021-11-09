@@ -1,9 +1,3 @@
-# Width of function portion of debugging output
-
-DEBUG_WIDTH <- 18
-
-
-
 # Print debugging output
 #
 # Convenience function for printing debugging output.
