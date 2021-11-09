@@ -305,3 +305,68 @@ bn.fit2data_row <- function(bn.fit,
 
   return(data_row)
 }
+
+
+
+# Extract pairwise causal effects
+
+bn.fit2effects <- function(bn.fit,
+                           debug = FALSE){
+
+  bnlearn:::check.bn.or.fit(bn.fit)
+
+  debug_cli_sprintf(! class(bn.fit)[2] %in% c("bn.fit.gnet", "bn.fit.dnet"),
+                    "abort", "Currently only bn.fit.gnet and bn.fit.dnet supported for determining true causal effects")
+
+  nodes <- bnlearn::nodes(bn.fit)
+  effects_list <- sapply(nodes, function(node){
+
+    sapply(nodes, function(x) 0)
+
+  }, simplify = FALSE, USE.NAMES = TRUE)
+
+  if (class(bn.fit)[2] == "bn.fit.gnet"){
+
+    bn_list0 <- bn.fit[seq_len(length(bn.fit))]
+    for (node in names(bn_list0)){
+
+      ## set intercepts and sds to 0
+      bn_list0[[node]]$coefficients["(Intercept)"] <- 0
+      bn_list0[[node]]$sd <- 0
+    }
+    bn.fit0 <- bn_list2bn.fit(bn_list0)
+
+    ## initialize interventions
+    intervene <- lapply(nodes, function(node){
+
+      int <- list(1, 1)
+      names(int) <- c(node, "n")
+
+      return(int)
+    })
+    for (int in intervene){
+
+      data <- ribn(x = bn.fit0, fix = TRUE,
+                   intervene = list(int), debug = debug)
+      effects_list[[node]][-match(node,
+                                  nodes)] <- unlist(data[-match(node, nodes)])
+    }
+
+  } else if (class(bn.fit[2]) == "bn.fit.dnet"){
+
+    ## TODO: discrete version
+
+    browser()
+
+    ## initialize interventions
+    intervene <- do.call(c, lapply(bn.fit, function(node){
+      lapply(seq_len(dim(node$prob)[1]), function(value){
+        temp <- list()
+        temp[[node$node]] <- value
+        return(temp)
+      })
+    }))
+    intervene <- unname(intervene)
+  }
+  return(effects_list)
+}
