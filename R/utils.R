@@ -261,3 +261,21 @@ load_bn.fit <- function(x,
 
   return(bn.fit)
 }
+
+
+
+# Get weighted adjacency matrix
+
+wamat <- function(bn.fit){
+
+  debug_cli_sprintf(!"bn.fit.gnet" %in% class(bn.fit),
+                    "abort", "bn.fit must be of class bn.fit.gnet")
+
+  wa <- bnlearn::amat(bn.fit)
+
+  for (node in bn.fit){
+
+    wa[node$parents, node$node] <- node$coefficients[-1]  # exclude intercept
+  }
+  return(wa)
+}
