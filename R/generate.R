@@ -298,3 +298,105 @@ generate_gnet <- function(x,
 
   return(gnet)
 }
+
+
+
+# Simulate random interventional Bayesian network data
+#' @export
+
+ribn <- function(x,
+                 n = 0,
+                 fix = TRUE,
+                 intervene = list(),
+                 seed = NULL,
+                 debug = FALSE){
+
+  if (!is.null(seed))
+    set.seed(seed)
+
+  bnlearn:::check.bn.or.fit(x)
+
+  ## generate observational data if no intervention specified
+  if (missing(intervene) || is.null(intervene) || length(intervene) == 0){
+
+    return(bnlearn:::rbn.backend(x = x, n = n, fix = fix, debug = debug))
+  }
+
+  debug_cli_sprintf(! class(x)[2] %in% c("bn.fit.gnet", "bn.fit.dnet"),
+                    "abort", "Currently only bn.fit.gnet and bn.fit.dnet supported for generationg interventional data")
+
+  ## TODO: check intervene
+
+  nodes <- bnlearn::nodes(x)
+  n_int <- sum(sapply(intervene, `[[`, "n"))
+  n_obs <- ifelse(n > n_int, n - n_int, 0)
+  intervene[[length(intervene) + 1]] <-
+    list(n = n_obs)  # observational intervention
+
+  ## for each intervention
+  data <- lapply(intervene, function(int){
+
+    debug_cli_sprintf(debug, "",
+                      "Generating %g samples with %g interventions",
+                      int$n, sum(names(int) %in% nodes))
+
+    ## convert to bn_list
+    xi <- lapply(x, function(y) lapply(y, function(z) z))
+
+    ## for each intervened node
+    for (node in intersect(names(int), nodes)){
+
+      if (class(x)[2] == "bn.fit.gnet"){
+
+        ## mutilate xi, cutting off parents to node
+        xi[[node]]$parents <- character(0)
+
+        ## set the intercept to the intervention value
+        xi[[node]]$coefficients <- c(`(Intercept)` = int[[node]])
+
+        ## remove error variance
+        xi[[node]]$sd <- 0
+
+      } else if (class(x)[2] == "bn.fit.dnet"){
+
+        ## mutilate xi, cutting off parents to node
+        xi[[node]]$parents <- character(0)
+
+        ## initialize discrete probabilities as 0
+        dim_nms <- dimnames(xi[[node]]$prob)[1]
+        xi[[node]]$prob <- rep(0, r <- dim(xi[[node]]$prob)[1])
+
+        if (is.character(int[[node]]) &&
+            int[[node]] %in% dim_nms[[1]]){
+
+          ## intervention is a character value indicating category
+          xi[[node]]$prob[match(int[[node]], dim_nms[[1]])] <- 1
+
+        } else if (is.numeric(int[[node]])  &&
+                   int[[node]] %% 1 == 0 &&
+                   int[[node]] >= 1 && int[[node]] <= r){
+
+          ## intervention is a numeric value indicating index
+          xi[[node]]$prob[int[[node]]] <- 1
+
+        } else if (int[[node]] == "dirichlet"){
+
+          ## dirichlet intervention
+          xi[[node]]$prob <- c(DirichletReg::rdirichlet(1, alpha = rep(1/r, r)))
+        }
+        ## update dimensions and names
+        dim(xi[[node]]$prob) <- length(xi[[node]]$prob)
+        dimnames(xi[[node]]$prob) <- dim_nms
+      }
+    }
+    xi <- bn_list2bn.fit(xi)
+
+    ## return interventional data
+    bnlearn:::rbn.backend(x = xi, n = int$n, fix = fix, debug = debug)
+  })
+
+  ## generally faster than do.call(rbind, )
+  data <- as.data.frame(data.table::rbindlist(data))
+
+  return(data)
+}
