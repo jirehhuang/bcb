@@ -54,7 +54,7 @@ debug_cli_sprintf <- function(debug,
 
     ## message
     msg <- sprintf("%s%s\n",
-                   stringr::str_pad(fn, width = DEBUG_WIDTH,
+                   stringr::str_pad(fn, width = max(DEBUG_WIDTH, nchar(fn) + 2),
                                     side = "right"),
                    sprintf(fmt, ...))
     fun(msg)
