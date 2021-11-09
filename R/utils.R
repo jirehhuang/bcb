@@ -65,3 +65,49 @@ debug_cli_sprintf <- function(debug,
     fun(msg)
   }
 }
+
+
+
+
+#' Check directory
+#'
+#' Checks if a directory exists, creating folder(s) if necessary.
+#'
+#' @param dir character value specifying a directory.
+#' @param min_depth numeric value indicating the minimum depth.
+#' @details If the first min_depth folders in the directory do not exist, there are likely typos in dir and an error will be thrown.
+#' @author Jireh Huang (\email{jirehhuang@@ucla.edu})
+#' @export
+
+dir_check <- function(dir,
+                      min_depth = 2){
+
+  folders <- strsplit(dir, split = .Platform$file.sep)[[1]]
+  folders <- folders[folders != ""]  # end(s)
+
+  ## stop if not enough folders
+  if (length(folders) < min_depth)
+    debug_cli_sprintf(TRUE, "abort", "%s only contains %s < %s folders",
+                      dir, length(folders), min_depth)
+
+  ## check directories from root upwards,
+  ## creating folder(s) if necessary
+  for (i in seq_len(length(folders))){
+
+    temp_dir <- do.call(file.path, c(list(""), as.list(folders[seq_len(i)])))
+
+    if (i < min_depth){
+
+      ## if root folder(s) do not exist, there was likely a typo in dir
+      if (!dir.exists(temp_dir))
+        debug_cli_sprintf(TRUE, "abort", "Cannot find path `%s` because it does not exist",
+                          temp_dir)
+
+    } else if (!dir.exists(temp_dir)) {
+
+      ## create directory if at least minimum depth and doesn't exist
+      dir.create(file.path(temp_dir))
+      debug_cli_sprintf(TRUE, "success", "Created folder `%s`", folders[i])
+    }
+  }
+}
