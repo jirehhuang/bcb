@@ -231,3 +231,33 @@ rename_bn.fit <- function(bn.fit,
 
   return(bn.fit)
 }
+
+
+
+# Load bn.fit
+# An extension of phsl::bnrepository() that includes
+# functionality for reordering and renaming
+#' @export
+
+load_bn.fit <- function(x,
+                        reorder = TRUE,
+                        rename = TRUE){
+
+  if (x %in% avail_bnrepository){
+
+    bn.fit <- phsl::bnrepository(x = x)
+
+  } else{
+
+    # TODO: manual structures
+    browser()
+  }
+
+  if (reorder)
+    bn.fit <- reorder_bn.fit(bn.fit = bn.fit, ordering = TRUE)
+
+  if (rename)
+    bn.fit <- rename_bn.fit(bn.fit = bn.fit, nodes = "V", categories = TRUE)
+
+  return(bn.fit)
+}
