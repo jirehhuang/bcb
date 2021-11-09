@@ -5,18 +5,18 @@
 \title{Build data grid.}
 \usage{
 build_data_grid(
-  network = "asia",
+  network = "survey",
   var_lb = 0.5,
   var_ub = 1,
   coef_lb = 0.5,
   coef_ub = 1,
-  scale = TRUE,
+  normalize = TRUE,
   copies = 1,
   debug = FALSE
 )
 }
 \arguments{
-\item{network}{logical value that activates printing debugging output.}
+\item{network}{character value indicating network name.}
 
 \item{debug}{logical value that activates printing debugging output.}
 }
@@ -27,6 +27,7 @@ data.frame with grid of network settings.
 Builds and formats a data grid of simulations.
 }
 \examples{
+## Default data_grid
 build_data_grid()
 }
 \author{

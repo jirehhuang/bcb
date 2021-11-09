@@ -3,3 +3,5 @@
 export(build_data_grid)
 export(debug_cli_sprintf)
 export(dir_check)
+export(generate_data_grid)
+export(generate_gnet)
