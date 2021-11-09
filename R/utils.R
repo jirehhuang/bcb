@@ -25,6 +25,7 @@ DEBUG_WIDTH <- 18
 #                     number, string)
 # }
 # fn(debug = TRUE)
+#' @export
 
 debug_cli_sprintf <- function(debug,
                               style = c("", "info", "success", "warning", "danger",
