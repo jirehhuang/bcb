@@ -111,3 +111,36 @@ dir_check <- function(path,
     }
   }
 }
+
+
+
+# Convert bn_list to bn.fit
+
+bn_list2bn.fit <- function(bn_list){
+
+  if (!is.null(bn_list[[1]]$prob)){
+
+    ## bn.fit.dnet if has prob
+    bn.fit <- bnlearn::custom.fit(sparsebnUtils::to_bn(bn.fit2edgeList(bn_list)),
+                                  lapply(bn_list, function(x) x$prob))
+
+  } else if (!is.null(bn_list[[1]]$coefficients)){
+
+    ## bn.fit.gnet if has coefficients
+    bn.fit <- bnlearn::custom.fit(sparsebnUtils::to_bn(bn.fit2edgeList(bn_list)),
+                                  lapply(bn_list, function(x)
+                                    list(coef = x$coefficients, sd = x$sd)))
+  }
+  return(bn.fit)
+}
+
+
+
+# Convert bn.fit to edgeList
+
+bn.fit2edgeList <- function(bn.fit){
+
+  eL <- lapply(bn.fit, function(x) match(x$parents, names(bn.fit)))
+
+  return(sparsebnUtils::edgeList(eL))
+}
