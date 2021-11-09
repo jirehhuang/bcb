@@ -136,11 +136,58 @@ bn_list2bn.fit <- function(bn_list){
 
 
 
-# Convert bn.fit to edgeList
+# Convert bn.fit (or bn_list) to edgeList
 
 bn.fit2edgeList <- function(bn.fit){
 
   eL <- lapply(bn.fit, function(x) match(x$parents, names(bn.fit)))
 
   return(sparsebnUtils::edgeList(eL))
+}
+
+
+
+# Reorder bn.fit
+
+reorder_bn.fit <- function(bn.fit,
+                           ordering = TRUE){
+
+  ## if bn_list, convert to bn.fit
+  if (is.list(bn.fit) && !"bn.fit" %in% class(bn.fit))
+    bn.fit <- bn_list2bn.fit(bn.fit)
+  nodes <- bnlearn::nodes(bn.fit)
+
+  ## get ordering
+  if (is.logical(ordering)){
+
+    ordered_nodes <- bnlearn::node.ordering(bn.fit)
+
+  } else if (is.numeric(ordering)){
+
+    ordered_nodes <- nodes[ordering]
+
+  } else if (is.character(ordering)){
+
+    ordered_nodes <- ordering
+  }
+  debug_cli_sprintf(!is.character(ordered_nodes) ||
+                      length(ordered_nodes) != length(nodes) ||
+                      !setequal(ordered_nodes, nodes),
+                    "abort", "Supplied ordering not compatible with nodes")
+
+  ## reverse ordering
+  ordering <- match(ordered_nodes, nodes)
+  revert <- match(seq_len(length(ordering)), ordering)
+
+  ## reorder bn.fit
+  if (any(seq_len(length(nodes)) != ordering)){
+
+    bn_list <- bn.fit[ordering]
+    bn.fit <- bn_list2bn.fit(bn_list)
+  }
+
+  attr(bn.fit, "ordering") <- ordering
+  attr(bn.fit, "revert") <- revert
+
+  return(bn.fit)
 }
