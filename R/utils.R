@@ -348,6 +348,7 @@ bn.fit2effects <- function(bn.fit,
 
       data <- ribn(x = bn.fit0, fix = TRUE,
                    intervene = list(int), debug = debug)
+      node <- intersect(names(int), nodes)
       effects_list[[node]][-match(node,
                                   nodes)] <- unlist(data[-match(node, nodes)])
     }
@@ -369,4 +370,27 @@ bn.fit2effects <- function(bn.fit,
     intervene <- unname(intervene)
   }
   return(effects_list)
+}
+
+
+
+# Convert effects_list to a matrix of pairwise effects
+
+effects_list2mat <- function(effects_list,
+                             level = 1){
+
+  if (! is.list(effects_list[[1]])){
+
+    ## if not list, gnet
+    effects_mat <- do.call(rbind, effects_list)
+
+  } else{
+
+    ## if list, dnet
+
+    ## TODO: discrete version
+
+    browser()
+  }
+  return(effects_mat)
 }
