@@ -4,10 +4,10 @@
 \alias{dir_check}
 \title{Check directory}
 \usage{
-dir_check(dir, min_depth = 2)
+dir_check(path, min_depth = 2)
 }
 \arguments{
-\item{dir}{character value specifying a directory.}
+\item{path}{character value specifying a directory.}
 
 \item{min_depth}{numeric value indicating the minimum depth.}
 }
@@ -15,7 +15,7 @@ dir_check(dir, min_depth = 2)
 Checks if a directory exists, creating folder(s) if necessary.
 }
 \details{
-If the first min_depth folders in the directory do not exist, there are likely typos in dir and an error will be thrown.
+If the first min_depth folders in the directory do not exist, there are likely typos in \code{path} and an error will be thrown.
 }
 \author{
 Jireh Huang (\email{jirehhuang@ucla.edu})

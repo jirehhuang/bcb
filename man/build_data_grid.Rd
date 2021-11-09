@@ -26,6 +26,9 @@ data.frame with grid of network settings.
 \description{
 Builds and formats a data grid of simulations.
 }
+\examples{
+build_data_grid()
+}
 \author{
 Jireh Huang (\email{jirehhuang@ucla.edu})
 }

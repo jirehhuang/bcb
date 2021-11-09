@@ -68,45 +68,46 @@ debug_cli_sprintf <- function(debug,
 #'
 #' Checks if a directory exists, creating folder(s) if necessary.
 #'
-#' @param dir character value specifying a directory.
+#' @param path character value specifying a directory.
 #' @param min_depth numeric value indicating the minimum depth.
-#' @details If the first min_depth folders in the directory do not exist, there are likely typos in dir and an error will be thrown.
+#' @details If the first min_depth folders in the directory do not exist, there are likely typos in \code{path} and an error will be thrown.
 #' @author Jireh Huang (\email{jirehhuang@@ucla.edu})
 #' @export
 
-dir_check <- function(dir,
+dir_check <- function(path,
                       min_depth = 2){
 
-  ## append dir to getwd() if home directory not included
-  if (! grepl(path.expand("~"), dir)){
-    dir <- file.path(getwd(), dir)
+  ## append path to getwd() if home directory not included
+  if (! grepl(path.expand("~"), path)){
+    path <- file.path(getwd(), path)
   }
-  folders <- strsplit(dir, split = .Platform$file.sep)[[1]]
+  folders <- strsplit(path, split = .Platform$file.sep)[[1]]
   folders <- folders[folders != ""]  # trim blank "" from the end(s)
 
   ## stop if not enough folders
   if (length(folders) < min_depth)
     debug_cli_sprintf(TRUE, "abort", "%s only contains %s < %s folders",
-                      dir, length(folders), min_depth)
+                      path, length(folders), min_depth)
 
   ## check directories from root upwards,
   ## creating folder(s) if necessary
   for (i in seq_len(length(folders))){
 
-    temp_dir <- do.call(file.path, c(list(""), as.list(folders[seq_len(i)])))
+    temp_path <- do.call(file.path, c(list(""), as.list(folders[seq_len(i)])))
 
     if (i < min_depth){
 
-      ## if root folder(s) do not exist, there was likely a typo in dir
-      if (!dir.exists(temp_dir))
+      ## if root folder(s) do not exist, there was likely a typo in path
+      if (!dir.exists(temp_path))
         debug_cli_sprintf(TRUE, "abort", "Cannot find path `%s` because it does not exist",
-                          temp_dir)
+                          temp_path)
 
-    } else if (!dir.exists(temp_dir)) {
+    } else if (!dir.exists(temp_path)) {
 
       ## create directory if at least minimum depth and doesn't exist
-      dir.create(file.path(temp_dir))
-      debug_cli_sprintf(TRUE, "success", "Created folder `%s`", folders[i])
+      dir.create(file.path(temp_path))
+      debug_cli_sprintf(TRUE, "success", "Created folder `%s`%s", folders[i],
+                        ifelse(i <= 1, "", sprintf(" in `%s`", folders[i-1])))
     }
   }
 }
