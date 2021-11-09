@@ -96,6 +96,6 @@ get_bida <- function(dir = FALSE){
 
 check_os <- function(){
 
-  if (.Platform$OS == "windows")
-    cli::cli_abort("bcb is not currently supported on Windows")
+  debug_cli_sprintf(.Platform$OS == "windows", "abort",
+                    "bcb is not currently supported on Windows")
 }

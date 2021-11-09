@@ -85,9 +85,9 @@ dir_check <- function(path,
   folders <- folders[folders != ""]  # trim blank "" from the end(s)
 
   ## stop if not enough folders
-  if (length(folders) < min_depth)
-    debug_cli_sprintf(TRUE, "abort", "%s only contains %s < %s folders",
-                      path, length(folders), min_depth)
+  debug_cli_sprintf(length(folders) < min_depth,
+                    "abort", "%s only contains %s < %s folders",
+                    path, length(folders), min_depth)
 
   ## check directories from root upwards,
   ## creating folder(s) if necessary
@@ -98,9 +98,9 @@ dir_check <- function(path,
     if (i < min_depth){
 
       ## if root folder(s) do not exist, there was likely a typo in path
-      if (!dir.exists(temp_path))
-        debug_cli_sprintf(TRUE, "abort", "Cannot find path `%s` because it does not exist",
-                          temp_path)
+      debug_cli_sprintf(!dir.exists(temp_path),
+                        "abort", "Cannot find path `%s` because it does not exist",
+                        temp_path)
 
     } else if (!dir.exists(temp_path)) {
 
