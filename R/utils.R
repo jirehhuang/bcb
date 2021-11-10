@@ -255,7 +255,8 @@ load_bn.fit <- function(x,
   } else if (grepl("parallel", x)){
 
     n_parents <- as.numeric(strsplit(x, "_")[[1]][2])
-    bn.fit <- parallel_bn.fit(n_parents = n_parents)
+    bn <- parallel_bn(n_parents = n_parents)
+    bn.fit <- bn2gnet(bn = bn)
 
   } else if (grepl("random", x)){
 
@@ -283,7 +284,7 @@ load_bn.fit <- function(x,
 
 # Create parallel graph structure
 
-parallel_bn.fit <- function(n_parents = 2){
+parallel_bn <- function(n_parents = 2){
 
   nodes <- sprintf("V%s", seq_len(n_parents + 1))
 
@@ -293,6 +294,15 @@ parallel_bn.fit <- function(n_parents = 2){
   a <- bnlearn::amat(bn)
   a[nodes[seq_len(n_parents)], nodes[n_parents + 1]] <- 1
   bnlearn::amat(bn) <- a
+
+  return(bn)
+}
+
+
+
+# Convert bn to a "default" bn.fit object
+
+bn2gnet <- function(bn){
 
   dist <- lapply(bn$nodes, function(node){
 
