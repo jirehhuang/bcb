@@ -116,3 +116,34 @@ dir_check <- function(path,
     }
   }
 }
+
+
+
+# Read directory
+# Convenience function for reading in the
+# .txt and .rds files in a directory
+#' @export
+
+read_dir <- function(dir,
+                     envir = sys.frame(-1)){
+
+  files <- list.files(dir)
+  files <- files[grepl(".txt|.rds", files)]
+
+  objs <- sapply(list.files(data_dir), function(x){
+
+    if (grepl(".txt", x)){
+
+      read.table(file.path(data_dir, x))
+
+    } else{
+
+      readRDS(file.path(data_dir, x))
+    }
+  }, simplify = FALSE, USE.NAMES = TRUE)
+
+  names(objs) <- gsub(".txt|.rds", "",
+                      names(objs))
+  list2env(x = objs,
+           envir = envir)
+}
