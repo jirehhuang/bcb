@@ -19,6 +19,7 @@ check_method_grid <- function(method_grid){
   method_grid$index <- stringr::str_pad(string = seq_len(nrow(method_grid)),
                                         width = nchar(nrow(method_grid)),
                                         side = "left", pad = "0")
+  data_grid$index <- sprintf("%s_", data_grid$index)
   if (is.null(method_grid$target))
     method_grid$target <- ""
   if (is.null(method_grid$c))
