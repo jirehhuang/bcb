@@ -16,6 +16,14 @@ testthat::expect_true(length(bnlearn::nodes(bn.fit)) == 10)
 
 
 
+## test chain graph in load_bn.fit
+
+bn.fit <- load_bn.fit(x = "chain_10")
+
+testthat::expect_true(length(bnlearn::nodes(bn.fit)) == 10)
+
+
+
 ## test random graph in load_bn.fit
 
 bn.fit <- load_bn.fit(x = "random_10_2_1")
