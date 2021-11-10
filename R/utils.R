@@ -270,6 +270,35 @@ load_bn.fit <- function(x,
 
 
 
+# Create parallel graph structure
+
+parallel_bn.fit <- function(n_parents = 2){
+
+  nodes <- sprintf("V%s", seq_len(n_parents + 1))
+
+  bn <- bnlearn::empty.graph(nodes = nodes)
+  bn$nodes[[n_parents + 1]]$parents <- nodes[seq_len(n_parents)]
+
+  a <- bnlearn::amat(bn)
+  a[nodes[seq_len(n_parents)], nodes[n_parents + 1]] <- 1
+  bnlearn::amat(bn) <- a
+
+  dist <- lapply(bn$nodes, function(node){
+
+    ## default coefficients and standard deviations
+    params <- list(coef = c(0, rep(1, length(node$parents))), sd = 1)
+    names(params$coef) <- c("(Intercept)", node$parents)
+
+    return(params)
+  })
+
+  bn.fit <- bnlearn::custom.fit(x = bn, dist = dist)
+
+  return(bn.fit)
+}
+
+
+
 # Get weighted adjacency matrix
 
 wamat <- function(bn.fit){
