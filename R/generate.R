@@ -356,7 +356,7 @@ generate_gnet <- function(x,
   bnlearn::amat(gnet) <- bnlearn::amat(net)
 
   ## generate parameters for gnet
-  dist <- lapply(gnet$nodes, function(node){
+  dist <- lapply(bnlearn::nodes(gnet), function(node){
 
     ## sample coefficients and standard deviations
     params <- list(coef = c(0,  # zero mean
