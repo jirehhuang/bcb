@@ -181,12 +181,21 @@ generate_data_grid <- function(data_grid = build_data_grid(),
                           i, data_row$network)
 
         network <- data_row$network
-        bn.fit <- generate_gnet(x = network,
-                                coefs = c(data_row$coef_lb, data_row$coef_ub),
-                                vars = c(data_row$var_lb, data_row$var_ub),
-                                seed = data_row$seed,
-                                normalize = data_row$normalize,
+
+        if (data_row$data_type == "gaussian"){
+
+          bn.fit <- generate_gnet(x = network,
+                                  coefs = c(data_row$coef_lb, data_row$coef_ub),
+                                  vars = c(data_row$var_lb, data_row$var_ub),
+                                  seed = data_row$seed,
+                                  normalize = data_row$normalize,
+                                  reorder = TRUE, rename = TRUE)
+
+        } else if (data_row$data_type == "discrete"){
+
+          bn.fit <- load_bn.fit(x = network,
                                 reorder = TRUE, rename = TRUE)
+        }
 
         ## true graphs
         true_dag <- bnlearn::amat(bn.fit)
@@ -242,7 +251,7 @@ generate_data_grid <- function(data_grid = build_data_grid(),
         ## prepare data row and directory
         data_row <- data_grid[i, , drop = FALSE]
         data_dir <- file.path(path,
-                              sprintf("%g_%g_%s_n%g",
+                              sprintf("%g_%g_%s_%g",
                                       data_row$index, data_row$id,
                                       data_row$network, data_row$n_obs))
         dir_check(data_dir)
@@ -250,9 +259,70 @@ generate_data_grid <- function(data_grid = build_data_grid(),
         debug_cli_sprintf(debug, "", "%g Generating %g datasets for network %s",
                           i, data_row$n_dat, data_row$network)
 
-        browser()
+        if (data_row$n_obs <= 0)
+          return(NULL)
 
-        ## TODO: generate datasets
+        true_scores <- data.frame(loglik = numeric(data_row$n_dat),
+                                  aic = 0, bic = 0)
+
+        ## generate and write datasets
+        for (j in seq_len(data_row$n_dat)){
+
+          if (file.exists(data_file <- file.path(data_dir,
+                                                 sprintf("data%g.txt", j)))){
+
+            data <- read.table(data_file)
+
+          } else{
+
+            ## read bn.fit object
+            bn.fit <- readRDS(file.path(data_dir, "bn.fit.rds"))
+
+            set.seed(data_row$seed + j)
+
+            if ("bn.fit.gnet" %in% class(bn.fit)){
+
+              data <- bnlearn::rbn(x = bn.fit, n = data_row$n_obs)
+
+            } else if ("bn.fit.dnet" %in% class(bn.fit)){
+
+              attempt <- 1
+              repeat{
+
+                data <- bnlearn::rbn(x = bn.fit, n = data_row$n_obs)
+
+                ## check if any with only one discrete level
+                invalid <- sum(sapply(data, function(x) var(as.integer(x))) == 0)
+
+                debug_cli_sprintf(debug, ifelse(invalid, "danger", "success"),
+                                  "Dataset %g has %g/%g invalid variables on attempt %g",
+                                  j, invalid, data_row$n_node, attempt)
+
+                if (invalid == 0)
+                  break
+                attempt <- attempt + 1
+              }
+            }
+          }
+          ## write data
+          write.table(data, data_file)
+
+          ## compute log-likelihood
+          true_scores[j, "loglik"] <- bnlearn:::logLik.bn.fit(bn.fit, data)
+        }
+        ## AIC
+        true_scores$aic <- true_scores$loglik -
+          1 * bnlearn::nparams(bn.fit)
+
+        ## BIC
+        true_scores$bic <- true_scores$loglik -
+          log(nrow(data)) / 2 * bnlearn::nparams(bn.fit)
+
+        ## write scores
+        write.table(true_scores, file.path(data_dir,
+                                           sprintf("true_scores%g.txt", j)))
+
+        return(NULL)
       }
       , error = function(err){
 
