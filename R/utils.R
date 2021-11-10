@@ -388,7 +388,8 @@ wamat <- function(bn.fit){
 # Extract information from bn.fit for data_row
 
 bn.fit2data_row <- function(bn.fit,
-                            data_row){
+                            data_row,
+                            effects_mat = NULL){
 
   in_deg <- sapply(bn.fit, function(x) length(x$parents))
   out_deg <- sapply(bn.fit, function(x) length(x$children))
@@ -405,6 +406,50 @@ bn.fit2data_row <- function(bn.fit,
   data_row$n_reversible <- data_row$n_edge - data_row$n_compelled
 
   data_row$n_params <- bnlearn::nparams(bn.fit)
+
+  if (is.numeric(data_row$target) &&
+      data_row$target %% 1 == 0 &&
+      data_row$target >= 1 &&
+      data_row$target <= length(bn.fit)){
+
+    ## provided index
+    data_row$target <- bnlearn::nodes(bn.fit)[data_row$target]
+
+  } else if (! data_row$target %in% bnlearn::nodes(bn.fit)){
+
+    ## default to root
+    data_row$target <- bnlearn::node.ordering(bn.fit)[length(bn.fit)]
+  }
+  if ("bn.fit.gnet" %in% class(bn.fit)){
+
+    betas <- abs(wamat(bn.fit)[bnlearn::amat(bn.fit) > 0])
+    vars <- sapply(bn.fit, `[[`, "sd")^2
+
+    data_row$coef_lb <- min(betas)
+    data_row$coef_ub <- max(betas)
+    data_row$var_lb <- min(vars)
+    data_row$var_ub <- max(vars)
+
+  } else if ("bn.fit.dnet" %in% class(bn.fit)){
+
+    n_lev <- sapply(bn.fit,
+                    function(node) dim(node$prob)[1])
+
+    data_row$var_lb <- min(n_lev)
+    data_row$var_ub <- max(n_lev)
+  }
+  if (!is.null(effects_mat)){
+
+    effects <- sort(abs(effects_mat[, data_row$target]),
+                    decreasing = TRUE)
+    effects <- effects[effects > 0]
+
+    if (length(effects)){
+
+      data_row$reg_lb <- effects[length(effects)] / effects[1]
+      data_row$reg_ub <- effects[2] / effects[1]
+    }
+  }
 
   return(data_row)
 }

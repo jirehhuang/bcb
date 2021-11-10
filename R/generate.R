@@ -15,6 +15,9 @@ build_data_grid <- function(network = "survey",
                             data_type = "gaussian",
                             n_dat = 0,
                             n_obs = 0,
+                            target = "",
+                            reg_lb = 0,
+                            reg_ub = 1,
                             var_lb = 0.5,
                             var_ub = 1,
                             coef_lb = 0.5,
@@ -28,7 +31,7 @@ build_data_grid <- function(network = "survey",
   # manual network structures
   # random network structures
   # data_type: discrete
-  # max_levels: merge discrete levels
+  # var_ub: merge discrete levels
   # manipulate cpts
   # add and remove discrete edges
   # max_in_deg and max_out_deg
@@ -39,14 +42,15 @@ build_data_grid <- function(network = "survey",
   avg_deg <- 4
   max_in_deg <- Inf
   max_out_deg <- Inf
-  max_levels <- Inf
 
   data_grid <- expand.grid(normalize = normalize,
                            coef_ub = coef_ub,
                            coef_lb = coef_lb,
                            var_ub = var_ub,
                            var_lb = var_lb,
-                           max_levels = max_levels,
+                           reg_ub = reg_ub,
+                           reg_lb = reg_lb,
+                           target = target,
                            max_out_deg = max_out_deg,
                            max_in_deg = max_out_deg,
                            avg_deg = avg_deg,
@@ -67,8 +71,7 @@ build_data_grid <- function(network = "survey",
 
 check_data_grid <- function(data_grid){
 
-  ## TODO:
-  # check values
+  ## TODO: check values
 
   ## remove duplicates
   data_grid <- data_grid[! duplicated(data_grid), , drop = FALSE]
@@ -77,11 +80,11 @@ check_data_grid <- function(data_grid){
   data_grid$index <- seq_len(nrow(data_grid))
   if (is.null(data_grid$id))
     data_grid$id <- 1
-  nms <- c("index", "id", "seed", "network", "data_type", "k", "n_dat",
-           "n_obs", "avg_deg", "max_in_deg", "max_out_deg", "max_levels",
-           "var_lb", "var_ub", "coef_lb", "coef_ub", "normalize",
-           "n_node", "n_edge", "n_within", "n_between",
-           "n_compelled", "n_reversible", "n_params")
+  nms <- c("index", "id", "seed", "network", "data_type", "k",
+           "n_dat", "n_obs", "avg_deg", "max_in_deg", "max_out_deg",
+           "target", "reg_lb", "reg_ub", "var_lb", "var_ub",
+           "coef_lb", "coef_ub", "normalize", "n_node", "n_edge", "n_within",
+           "n_between", "n_compelled", "n_reversible", "n_params")
   data_grid[setdiff(nms, names(data_grid))] <- 0
 
   ## rearrange columns
@@ -181,11 +184,11 @@ generate_data_grid <- function(data_grid = build_data_grid(),
         debug_cli_sprintf(debug, "", "%g Preparing network %s",
                           i, data_row$network)
 
-        network <- data_row$network
-
         if (data_row$data_type == "gaussian"){
 
-          bn.fit <- generate_gnet(x = network,
+          ## TODO: impose constraint with reg_lb and reg_ub
+
+          bn.fit <- generate_gnet(x = data_row$network,
                                   coefs = c(data_row$coef_lb, data_row$coef_ub),
                                   vars = c(data_row$var_lb, data_row$var_ub),
                                   seed = data_row$seed,
@@ -194,8 +197,10 @@ generate_data_grid <- function(data_grid = build_data_grid(),
 
         } else if (data_row$data_type == "discrete"){
 
-          bn.fit <- load_bn.fit(x = network,
+          bn.fit <- load_bn.fit(x = data_row$network,
                                 reorder = TRUE, rename = TRUE)
+
+          ## TODO: generate cpts
         }
 
         ## true graphs
@@ -215,7 +220,7 @@ generate_data_grid <- function(data_grid = build_data_grid(),
         )
 
         ## update data_row
-        data_row <- bn.fit2data_row(bn.fit, data_row)
+        data_row <- bn.fit2data_row(bn.fit, data_row, effects_mat)
 
         ## write files
         write.table(data_row, file.path(data_dir, "data_row.txt"))
@@ -330,7 +335,7 @@ generate_data_grid <- function(data_grid = build_data_grid(),
       }
       , error = function(err){
 
-        debug_cli_sprintf(TRUE, "danger", "Error: %s", err)
+        debug_cli_sprintf(TRUE, "danger", "%s", err)
       }
     )
   }
