@@ -184,17 +184,41 @@ generate_data_grid <- function(data_grid = build_data_grid(),
         debug_cli_sprintf(debug, "", "%g Preparing network %s",
                           i, data_row$network)
 
+        ## TODO: split generate_gnet() into bn2gnet()
+
         if (data_row$data_type == "gaussian"){
 
-          ## TODO: impose constraint with reg_lb and reg_ub
+          attempt <- 1
+          repeat{
 
-          bn.fit <- generate_gnet(x = data_row$network,
-                                  coefs = c(data_row$coef_lb, data_row$coef_ub),
-                                  vars = c(data_row$var_lb, data_row$var_ub),
-                                  seed = data_row$seed,
-                                  normalize = data_row$normalize,
-                                  reorder = TRUE, rename = TRUE)
+            seed <- data_row$seed + (attempt - 1) * nrow(data_grid)
+            bn.fit <- generate_gnet(x = data_row$network,
+                                    coefs = c(data_row$coef_lb, data_row$coef_ub),
+                                    vars = c(data_row$var_lb, data_row$var_ub),
+                                    seed = seed,
+                                    normalize = data_row$normalize,
+                                    reorder = TRUE, rename = TRUE)
 
+            ## get true effect sizes
+            effects_list <- bn.fit2effects(bn.fit, debug = debug)
+            effects_mat <- effects_list2mat(effects_list)
+            temp_row <- bn.fit2data_row(bn.fit, data_row, effects_mat)
+
+            ## check if invalid
+            invalid <- temp_row$reg_lb < data_row$reg_lb ||
+              temp_row$reg_ub > data_row$reg_ub
+
+            debug_cli_sprintf(debug, ifelse(invalid, "danger", "success"),
+                              "bn.fit %s regret constraints on attempt %g",
+                              ifelse(invalid, "violates", "satisfies"), attempt)
+
+            if (! invalid){
+
+              data_row$seed <- seed
+              break
+            }
+            attempt <- attempt + 1
+          }
         } else if (data_row$data_type == "discrete"){
 
           bn.fit <- load_bn.fit(x = data_row$network,
@@ -209,7 +233,8 @@ generate_data_grid <- function(data_grid = build_data_grid(),
 
         ## get true effect sizes
         effects_list <- bn.fit2effects(bn.fit, debug = debug)
-        effects_mat <- effects_list2mat(effects_list, level = 1)
+        effects_mat <- effects_list2mat(effects_list,
+                                        level = 2)  # only applicable for discrete
 
         ## random orderings
         set.seed(data_row$seed)
