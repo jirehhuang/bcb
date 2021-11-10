@@ -25,10 +25,10 @@ build_data_grid <- function(network = "survey",
   # manual network structures
   # random network structures
   # data_type: discrete
-  # n_levels: merge discrete levels
+  # max_levels: merge discrete levels
   # manipulate cpts
   # add and remove discrete edges
-  # max_in_degree and max_out_degree
+  # max_in_deg and max_out_deg
   # tiling
 
   ## dormant parameters
@@ -36,18 +36,20 @@ build_data_grid <- function(network = "survey",
   k <- 1
   n_dat <- 0
   n_obs <- 0
-  max_in_degree <- Inf
-  max_out_degree <- Inf
-  n_levels <- Inf
+  avg_deg <- 4
+  max_in_deg <- Inf
+  max_out_deg <- Inf
+  max_levels <- Inf
 
   data_grid <- expand.grid(normalize = normalize,
                            coef_ub = coef_ub,
                            coef_lb = coef_lb,
                            var_ub = var_ub,
                            var_lb = var_lb,
-                           n_levels = n_levels,
-                           max_out_degree = max_out_degree,
-                           max_in_degree = max_out_degree,
+                           max_levels = max_levels,
+                           max_out_deg = max_out_deg,
+                           max_in_deg = max_out_deg,
+                           avg_deg = avg_deg,
                            n_obs = n_obs,
                            n_dat = n_dat,
                            k = k,
@@ -76,10 +78,10 @@ check_data_grid <- function(data_grid){
   if (is.null(data_grid$id))
     data_grid$id <- 1
   nms <- c("index", "id", "seed", "network", "data_type", "k", "n_dat",
-           "n_obs", "max_in_degree", "max_out_degree", "n_levels",
+           "n_obs", "avg_deg", "max_in_deg", "max_out_deg", "max_levels",
            "var_lb", "var_ub", "coef_lb", "coef_ub", "normalize",
-           "n_node", "n_edge", "sparsity", "n_within", "n_between",
-           "n_reversible", "n_compelled", "n_params")
+           "n_node", "n_edge", "n_within", "n_between",
+           "n_compelled", "n_reversible", "n_params")
   data_grid[setdiff(nms, names(data_grid))] <- 0
 
   ## rearrange columns
@@ -117,17 +119,16 @@ generate_data_grid <- function(data_grid = build_data_grid(),
 
   ## data_grid
   dg_path <- file.path(path, "data_grid.txt")
-  if (!is.null(n_dat)){
+  if (!is.null(n_dat) && is.numeric(n_dat)){
 
     if (file.exists(dg_path)){
 
       data_grid <- read.table(dg_path, stringsAsFactors = FALSE)
-      data_grid$n_dat <- n_dat
     }
+    data_grid$n_dat <- n_dat
   }
   data_grid <- check_data_grid(data_grid)
   data_grid$seed <- seed0 + data_grid$id
-  debug_cli_sprintf(debug, "", "Writing data_grid to output directory")
   write.table(data_grid, dg_path)
 
   ## set up parallel execution
@@ -142,14 +143,16 @@ generate_data_grid <- function(data_grid = build_data_grid(),
                   Sys.info()[["sysname"]] %in% c("Windows")){
 
     ## TODO: eventually support windows
-    ## windows workaround with parLapply()
+    ## windows workaround with https://github.com/nathanvan/parallelsugar
     # parallelsugar::mclapply
+
   } else{
 
     ## reduces to lapply() when ncores = 1
     parallel::mclapply
   }
 
+  ## function for preparing networks
   net_fn <- function(i){
 
     error <- tryCatch(
@@ -162,26 +165,76 @@ generate_data_grid <- function(data_grid = build_data_grid(),
                                       data_row$network, data_row$n_obs))
         dir_check(data_dir)
 
-        debug_cli_sprintf(debug, "", "(%g / %g) Preparing network %s",
-                          i, nrow(data_grid), data_row$network)
+        ## files already completed
+        if (all(c("bn.fit.rds", "effects_list.rds",
+                  "true_dag.txt", "true_cpdag.txt",
+                  "effects_mat.txt", "order_mat.txt") %in% list.files(data_dir))){
 
-        ## TODO:
+          debug_cli_sprintf(debug, "success",
+                            "%g Previously completed preparing network %s",
+                            i, data_row$network)
+
+          return(data_row)
+        }
+
+        debug_cli_sprintf(debug, "", "%g Preparing network %s",
+                          i, data_row$network)
+
         network <- data_row$network
-        net <- generate_gnet(x = network,
-                             coefs = c(data_row$coef_lb, data_row$coef_ub),
-                             vars = c(data_row$var_lb, data_row$var_ub),
-                             seed = data_row$seed, normalize = data_row$normalize,
-                             reorder = TRUE, rename = TRUE)
+        bn.fit <- generate_gnet(x = network,
+                                coefs = c(data_row$coef_lb, data_row$coef_ub),
+                                vars = c(data_row$var_lb, data_row$var_ub),
+                                seed = data_row$seed,
+                                normalize = data_row$normalize,
+                                reorder = TRUE, rename = TRUE)
 
-        browser()
+        ## true graphs
+        true_dag <- bnlearn::amat(bn.fit)
+        true_cpdag <- bnlearn::amat(bnlearn::cpdag(bn.fit))
+
+        ## get true effect sizes
+        effects_list <- bn.fit2effects(bn.fit, debug = debug)
+        effects_mat <- effects_list2mat(effects_list, level = 1)
+
+        ## random orderings
+        set.seed(data_row$seed)
+        order_mat <- do.call(cbind,
+          lapply(seq_len(max(1, data_row$n_dat)), function(x){
+            sample(seq_len(data_row$n_node))
+          })
+        )
+
+        ## update data_row
+        data_row <- bn.fit2data_row(bn.fit, data_row)
+
+        ## write files
+        write.table(data_row, file.path(data_dir, "data_row.txt"))
+        saveRDS(bn.fit, file.path(data_dir, "bn.fit.rds"))
+        saveRDS(effects_list, file.path(data_dir, "effects_list.rds"))
+        write.table(true_dag, file.path(data_dir, "true_dag.txt"))
+        write.table(true_cpdag, file.path(data_dir, "true_cpdag.txt"))
+        write.table(effects_mat, file.path(data_dir, "effects_mat.txt"))
+        write.table(order_mat, file.path(data_dir, "order_mat.txt"))
+
+        debug_cli_sprintf(debug, "success",
+                          "%g Completed preparing network %s",
+                          i, data_row$network)
+
+        return(data_row)
       }
       , error = function(err){
 
         debug_cli_sprintf(TRUE, "danger", "Error in %g: %s", i, err)
+        browser()
       }
     )
   }
+  data_rows <- mclapply(seq_len(nrow(data_grid)), mc.cores = n_cores,
+                        mc.preschedule = FALSE, net_fn)
+  data_grid <- as.data.frame(data.table::rbindlist(data_rows))
+  write.table(data_grid, dg_path)
 
+  ## function for generating datasets
   gen_fn <- function(i){
 
     error <- tryCatch(
@@ -194,8 +247,8 @@ generate_data_grid <- function(data_grid = build_data_grid(),
                                       data_row$network, data_row$n_obs))
         dir_check(data_dir)
 
-        debug_cli_sprintf(debug, "", "(%g / %g) Generating $g datasets for network %s",
-                          i, nrow(data_grid), data_row$n_dat, data_row$network)
+        debug_cli_sprintf(debug, "", "%g Generating %g datasets for network %s",
+                          i, data_row$n_dat, data_row$network)
 
         browser()
 
@@ -207,12 +260,6 @@ generate_data_grid <- function(data_grid = build_data_grid(),
       }
     )
   }
-
-  null <- mclapply(seq_len(nrow(data_grid)), mc.cores = n_cores,
-                   mc.preschedule = FALSE, net_fn)
-
-  ## TODO: rewrite data_grid and data_row
-
   null <- mclapply(seq_len(nrow(data_grid)), mc.cores = n_cores,
                    mc.preschedule = FALSE, gen_fn)
 }
@@ -323,7 +370,7 @@ ribn <- function(x,
   }
 
   debug_cli_sprintf(! class(x)[2] %in% c("bn.fit.gnet", "bn.fit.dnet"),
-                    "abort", "Currently only bn.fit.gnet and bn.fit.dnet supported for generationg interventional data")
+                    "abort", "Currently only bn.fit.gnet and bn.fit.dnet supported for generating interventional data")
 
   ## TODO: check intervene
 
