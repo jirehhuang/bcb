@@ -1,6 +1,10 @@
 ## test generate_gnet()
 
-gnet <- generate_gnet(x = "asia", seed = 1, normalize = TRUE)
+bn.fit <- load_bn.fit(x = "asia")
+gnet <- bn2gnet(bn = bn.fit, seed = 1,
+                coefs = c(0.5, 1),
+                vars = c(0.5, 1),
+                normalize = TRUE)
 
 
 

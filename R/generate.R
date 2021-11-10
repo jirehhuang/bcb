@@ -184,7 +184,9 @@ generate_data_grid <- function(data_grid = build_data_grid(),
         debug_cli_sprintf(debug, "", "%g Preparing network %s",
                           i, data_row$network)
 
-        ## TODO: split generate_gnet() into bn2gnet()
+        ## load bn structure
+        bn.fit <- load_bn.fit(x = data_row$network,
+                              reorder = TRUE, rename = TRUE)
 
         if (data_row$data_type == "gaussian"){
 
@@ -192,19 +194,15 @@ generate_data_grid <- function(data_grid = build_data_grid(),
           repeat{
 
             seed <- data_row$seed + (attempt - 1) * nrow(data_grid)
-            bn.fit <- generate_gnet(x = data_row$network,
-                                    coefs = c(data_row$coef_lb, data_row$coef_ub),
-                                    vars = c(data_row$var_lb, data_row$var_ub),
-                                    seed = seed,
-                                    normalize = data_row$normalize,
-                                    reorder = TRUE, rename = TRUE)
-
-            ## get true effect sizes
-            effects_list <- bn.fit2effects(bn.fit, debug = debug)
-            effects_mat <- effects_list2mat(effects_list)
-            temp_row <- bn.fit2data_row(bn.fit, data_row, effects_mat)
+            gnet <- bn2gnet(bn = bn.fit,
+                            seed = seed,
+                            coefs = c(data_row$coef_lb, data_row$coef_ub),
+                            vars = c(data_row$var_lb, data_row$var_ub),
+                            normalize = data_row$normalize)
 
             ## check if invalid
+            temp_mat <- effects_list2mat(bn.fit2effects(gnet, debug = debug))
+            temp_row <- bn.fit2data_row(gnet, data_row, temp_mat)
             invalid <- temp_row$reg_lb < data_row$reg_lb ||
               temp_row$reg_ub > data_row$reg_ub
 
@@ -220,9 +218,6 @@ generate_data_grid <- function(data_grid = build_data_grid(),
             attempt <- attempt + 1
           }
         } else if (data_row$data_type == "discrete"){
-
-          bn.fit <- load_bn.fit(x = data_row$network,
-                                reorder = TRUE, rename = TRUE)
 
           ## TODO: generate cpts
         }
@@ -366,88 +361,6 @@ generate_data_grid <- function(data_grid = build_data_grid(),
   }
   null <- mclapply(seq_len(nrow(data_grid)), mc.cores = n_cores,
                    mc.preschedule = FALSE, gen_fn)
-}
-
-
-
-# Generate Gaussian network parameters
-#' @export
-
-generate_gnet <- function(x,
-                          coefs = c(0.5, 1),
-                          vars = c(0.5, 1),
-                          seed = 1,
-                          normalize = TRUE,
-                          reorder = TRUE,
-                          rename = TRUE){
-
-  ## TODO: check arguments
-
-  set.seed(seed)
-
-  net <- load_bn.fit(x = x, reorder = reorder, rename = rename)
-  gnet <- bnlearn::empty.graph(nodes = bnlearn::nodes(net))
-  bnlearn::amat(gnet) <- bnlearn::amat(net)
-
-  ## generate parameters for gnet
-  dist <- lapply(gnet$nodes, function(node){
-
-    ## sample coefficients and standard deviations
-    params <- list(coef = c(0,  # zero mean
-                            sample(c(-1, 1),  # negative or positive
-                                   length(node$parents), replace = TRUE) *
-                              runif(length(node$parents),  # magnitudes
-                                    coefs[1], coefs[2])),
-                   sd = runif(1, sqrt(vars[1]), sqrt(vars[2])))
-
-    names(params$coef) <- c("(Intercept)", node$parents)
-
-    return(params)
-  })
-
-  ## normalize variances
-  if (normalize){
-
-    beta <- wamat(bnlearn::custom.fit(gnet, dist = dist))  # coefficient matrix
-    I <- diag(length(dist))  # identity matrix
-    Omega <- diag(sapply(dist, `[[`, "sd")^2)  # error variances
-
-    rownames(I) <- colnames(I) <-
-      rownames(Omega) <- colnames(Omega) <- names(dist)
-
-    ## visit nodes topologically
-    for (node in bnlearn::node.ordering(net)){
-
-      if (length(net[[node]]$parents) == 0){
-
-        ## if no parents, variance 1
-        Omega[node, node] <- 1
-        dist[[node]]$sd <- 1
-
-      } else{
-
-        ## if there are parents, scale coefficients and error
-        ## variances such that the variable variance is 1
-
-        ## TODO: other normalizing strategies
-
-        ## estimate covariance matrix
-        Sigma <- solve(t(I - beta)) %*% Omega %*% solve(I - beta)
-
-        ## scale coefficients
-        beta[, node] <- beta[, node] / sqrt(Sigma[node, node])
-        dist[[node]]$coef[-1] <-
-          dist[[node]]$coef[-1] / sqrt(Sigma[node, node])
-
-        ## scale error variance
-        Omega[node, node] <- Omega[node, node] / Sigma[node, node]
-        dist[[node]]$sd <- dist[[node]]$sd / sqrt(Sigma[node, node])
-      }
-    }
-  }
-  gnet <- bnlearn::custom.fit(gnet, dist = dist)
-
-  return(gnet)
 }
 
 
