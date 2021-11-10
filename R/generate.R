@@ -12,6 +12,9 @@
 #' @export
 
 build_data_grid <- function(network = "survey",
+                            data_type = "gaussian",
+                            n_dat = 0,
+                            n_obs = 0,
                             var_lb = 0.5,
                             var_ub = 1,
                             coef_lb = 0.5,
@@ -32,10 +35,7 @@ build_data_grid <- function(network = "survey",
   # tiling
 
   ## dormant parameters
-  data_type <- "continuous"
   k <- 1
-  n_dat <- 0
-  n_obs <- 0
   avg_deg <- 4
   max_in_deg <- Inf
   max_out_deg <- Inf

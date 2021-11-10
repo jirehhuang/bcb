@@ -6,6 +6,9 @@
 \usage{
 build_data_grid(
   network = "survey",
+  data_type = "gaussian",
+  n_dat = 0,
+  n_obs = 0,
   var_lb = 0.5,
   var_ub = 1,
   coef_lb = 0.5,
