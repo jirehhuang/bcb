@@ -35,8 +35,55 @@ bandit <- function(bn.fit,
 
 ## TODO:
 # initialize_rounds()
-# initialize_rounds()
+# summarize_rounds()
 # apply_method()
+
+
+
+# Function for building arms, a list of interventions
+
+build_arms <- function(bn.fit, settings, debug = FALSE){
+
+  if (is.null(settings$arms)){
+
+    debug_cli_sprintf(debug, "", "Initializing default arms")
+
+    ## exclude target
+    ex <- which(settings$nodes == settings$target)
+
+    ## exclude parents if not intervening on parents
+    if (!is.null(settings$int_parents) &&
+        !settings$int_parents){
+      ex <- union(ex, which(settings$nodes %in%
+                              bn.fit[[settings$target]]$parents))
+    }
+    arms <- do.call(c, lapply(bn.fit[-ex], function(node){
+
+      values <- if (settings$type == "bn.fit.gnet"){
+        c(-1, 1)
+      } else if (settings$type == "bn.fit.dnet"){
+        seq_len(dim(node$prob)[1])
+      }
+      lapply(values, function(value){
+
+        list(n = settings$n_t,  # number of trials per round
+             node = node$node,  # node
+             value = value,  # intervention value
+             N = ifelse(settings$optimistic == 0,
+                        0, 1),  # number of times arm is pulled
+             estimate = settings$optimistic)  # current estimate
+      })
+    }))
+  } else{
+
+    debug_cli_sprintf(debug, "", "Loading arms from settings")
+
+    ## TODO: check validity of arms
+
+    arms <- settings$arms
+  }
+  return(unname(arms))
+}
 
 
 
@@ -214,7 +261,7 @@ check_settings <- function(bn.fit, settings, debug = FALSE){
   ## check id
   if (is.null(settings$id)){
     settings$id <- random_id(n = 12)
-    debug_cli_sprintf(debug, "", "Default id = %s", settings$id)
+    debug_cli_sprintf(debug, "", "Generated id = %s", settings$id)
   }
 
   ## TODO: remove; temporary for debugging
