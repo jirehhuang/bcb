@@ -28,12 +28,18 @@ debug_cli_sprintf <- function(debug,
 
   if (debug){
 
-    ## identify calling function
-    fn <- sys.call(-1)[1]
-    fn <- gsub("\\(.*", "", as.character(fn))
-    fn <- sprintf("%s:", fn)
+    ## identify calling function, avoiding tryCatch()
+    i <- -1
+    ns <- ls(getNamespace("bcb"))
+    repeat{
+      fn <- sys.call(i)[1]
+      fn <- gsub("\\(.*", "", as.character(fn))
+      if (length(fn) == 0 || fn %in% ns) break
+      i <- i - 1
+    }
     if (length(fn) == 0)
-      fn <- "[UNKNOWN]:"
+      fn <- "[UNKNOWN]"
+    fn <- sprintf("%s:", fn)
 
     ## style
     style <- ifelse(style == "", style,
@@ -60,7 +66,6 @@ debug_cli_sprintf <- function(debug,
     fun(msg)
   }
 }
-
 
 
 
@@ -249,8 +254,9 @@ load_bn.fit <- function(x,
 
   } else{
 
-    # TODO: manual structures
     browser()
+
+    # TODO: manual structures
   }
 
   if (reorder)
@@ -347,7 +353,7 @@ bn.fit2effects <- function(bn.fit,
     for (int in intervene){
 
       data <- ribn(x = bn.fit0, fix = TRUE,
-                   intervene = list(int), debug = debug)
+                   intervene = list(int), debug = FALSE)
       node <- intersect(names(int), nodes)
       effects_list[[node]][-match(node,
                                   nodes)] <- unlist(data[-match(node, nodes)])
@@ -355,9 +361,9 @@ bn.fit2effects <- function(bn.fit,
 
   } else if (class(bn.fit[2]) == "bn.fit.dnet"){
 
-    ## TODO: discrete version
-
     browser()
+
+    ## TODO: discrete version
 
     ## initialize interventions
     intervene <- do.call(c, lapply(bn.fit, function(node){
@@ -388,9 +394,9 @@ effects_list2mat <- function(effects_list,
 
     ## if list, dnet
 
-    ## TODO: discrete version
-
     browser()
+
+    ## TODO: discrete version
   }
   return(effects_mat)
 }
