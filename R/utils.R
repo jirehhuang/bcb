@@ -331,7 +331,7 @@ bn.fit2effects <- function(bn.fit,
 
   }, simplify = FALSE, USE.NAMES = TRUE)
 
-  if (class(bn.fit)[2] == "bn.fit.gnet"){
+  if ("bn.fit.gnet" %in% class(bn.fit)){
 
     bn_list0 <- bn.fit[seq_len(length(bn.fit))]
     for (node in names(bn_list0)){
@@ -359,7 +359,7 @@ bn.fit2effects <- function(bn.fit,
                                   nodes)] <- unlist(data[-match(node, nodes)])
     }
 
-  } else if (class(bn.fit[2]) == "bn.fit.dnet"){
+  } else if ("bn.fit.dnet" %in% class(bn.fit)){
 
     browser()
 
