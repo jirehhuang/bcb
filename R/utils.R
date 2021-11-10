@@ -252,11 +252,22 @@ load_bn.fit <- function(x,
 
     bn.fit <- phsl::bnrepository(x = x)
 
+  } else if (grepl("parallel", x)){
+
+    n_parents <- as.numeric(strsplit(x, "_")[[1]][2])
+    bn.fit <- parallel_bn.fit(n_parents = n_parents)
+
+  } else if (grepl("random", x)){
+
+    browser()
+
+    # TODO: random structures
+
   } else{
 
     browser()
 
-    # TODO: manual structures
+    # TODO: default structures in globals.R
   }
 
   if (reorder)
