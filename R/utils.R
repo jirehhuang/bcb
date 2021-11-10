@@ -258,6 +258,12 @@ load_bn.fit <- function(x,
     bn <- parallel_bn(p = p)
     bn.fit <- bn2gnet(bn = bn)
 
+  } else if (grepl("chain", x)){
+
+    p <- as.numeric(strsplit(x, "_")[[1]][2])
+    bn <- chain_bn(p = p)
+    bn.fit <- bn2gnet(bn = bn)
+
   } else if (grepl("random", x)){
 
     p_d_seed <- as.numeric(strsplit(x, "_")[[1]][seq_len(3) + 1])
@@ -308,6 +314,22 @@ random_bn <- function(p,
 
 
 
+# Create chain graph structure
+
+chain_bn <- function(p){
+
+  nodes <- sprintf("V%s", seq_len(p))
+
+  bn <- bnlearn::empty.graph(nodes = nodes)
+
+  bnlearn::arcs(bn) <- t(sapply(seq_len(p - 1),
+                                function(x) nodes[c(x, x + 1)]))
+
+  return(bn)
+}
+
+
+
 # Create parallel graph structure
 
 parallel_bn <- function(p = 3){
@@ -315,10 +337,9 @@ parallel_bn <- function(p = 3){
   nodes <- sprintf("V%s", seq_len(p))
 
   bn <- bnlearn::empty.graph(nodes = nodes)
-  bn$nodes[[p]]$parents <- nodes[seq_len(p - 1)]
 
   a <- bnlearn::amat(bn)
-  a[nodes[seq_len(p - 1)], nodes[p]] <- 1
+  a[seq_len(p - 1), p] <- 1
   bnlearn::amat(bn) <- a
 
   return(bn)
