@@ -241,14 +241,20 @@ rename_bn.fit <- function(bn.fit,
 
 # Load bn.fit
 # An extension of phsl::bnrepository() that includes
-# functionality for reordering and renaming
+# functionality for reordering and renaming, as well
+# as parallel, chain, and random graphs
 #' @export
 
 load_bn.fit <- function(x,
                         reorder = TRUE,
-                        rename = TRUE){
+                        rename = TRUE,
+                        ...){
 
-  if (x %in% avail_bnrepository){
+  if ("bn.fit" %in% class(x)){
+
+    ## ignore
+
+  } else if (x %in% avail_bnrepository){
 
     bn.fit <- phsl::bnrepository(x = x)
 
@@ -256,13 +262,13 @@ load_bn.fit <- function(x,
 
     p <- as.numeric(strsplit(x, "_")[[1]][2])
     bn <- parallel_bn(p = p)
-    bn.fit <- bn2gnet(bn = bn)
+    bn.fit <- bn2gnet(bn = bn, ...)
 
   } else if (grepl("chain", x)){
 
     p <- as.numeric(strsplit(x, "_")[[1]][2])
     bn <- chain_bn(p = p)
-    bn.fit <- bn2gnet(bn = bn)
+    bn.fit <- bn2gnet(bn = bn, ...)
 
   } else if (grepl("random", x)){
 
@@ -270,7 +276,7 @@ load_bn.fit <- function(x,
     bn <- random_bn(p = p_d_seed[1],
                     d = p_d_seed[2],
                     seed = p_d_seed[3])
-    bn.fit <- bn2gnet(bn = bn)
+    bn.fit <- bn2gnet(bn = bn, ...)
 
   } else{
 
@@ -286,6 +292,87 @@ load_bn.fit <- function(x,
     bn.fit <- rename_bn.fit(bn.fit = bn.fit, nodes = "V", categories = TRUE)
 
   return(bn.fit)
+}
+
+
+
+# Convert bn to a "default" bn.fit.gnet object
+
+bn2gnet <- function(bn,
+                    seed,
+                    coefs = c(0, 0),
+                    vars = c(0, 0),
+                    normalize = TRUE){
+
+  ## TODO: check arguments
+
+  bnlearn:::check.bn.or.fit(bn)
+
+  if (!missing(seed) && !is.numeric(seed) && !is.na(seed))
+    set.seed(seed)
+
+  gnet <- bnlearn::empty.graph(nodes = bnlearn::nodes(bn))
+  bnlearn::amat(gnet) <- bnlearn::amat(bn)
+
+  ## generate parameters for gnet
+  dist <- lapply(gnet$nodes, function(node){
+
+    ## sample coefficients and standard deviations
+    params <- list(coef = c(0,  # zero mean
+                            sample(c(-1, 1),  # negative or positive
+                                   length(node$parents), replace = TRUE) *
+                              runif(length(node$parents),  # magnitudes
+                                    coefs[1], coefs[2])),
+                   sd = runif(1, sqrt(vars[1]), sqrt(vars[2])))
+
+    names(params$coef) <- c("(Intercept)", node$parents)
+
+    return(params)
+  })
+
+  ## normalize variances
+  if (normalize){
+
+    beta <- wamat(bnlearn::custom.fit(gnet, dist = dist))  # coefficient matrix
+    I <- diag(length(dist))  # identity matrix
+    Omega <- diag(sapply(dist, `[[`, "sd")^2)  # error variances
+
+    rownames(I) <- colnames(I) <-
+      rownames(Omega) <- colnames(Omega) <- names(dist)
+
+    ## visit nodes topologically
+    for (node in bnlearn::node.ordering(bn)){
+
+      if (length(bn[[node]]$parents) == 0){
+
+        ## if no parents, variance 1
+        Omega[node, node] <- 1
+        dist[[node]]$sd <- 1
+
+      } else{
+
+        ## if there are parents, scale coefficients and error
+        ## variances such that the variable variance is 1
+
+        ## TODO: other normalizing strategies
+
+        ## estimate covariance matrix
+        Sigma <- solve(t(I - beta)) %*% Omega %*% solve(I - beta)
+
+        ## scale coefficients
+        beta[, node] <- beta[, node] / sqrt(Sigma[node, node])
+        dist[[node]]$coef[-1] <-
+          dist[[node]]$coef[-1] / sqrt(Sigma[node, node])
+
+        ## scale error variance
+        Omega[node, node] <- Omega[node, node] / Sigma[node, node]
+        dist[[node]]$sd <- dist[[node]]$sd / sqrt(Sigma[node, node])
+      }
+    }
+  }
+  gnet <- bnlearn::custom.fit(gnet, dist = dist)
+
+  return(gnet)
 }
 
 
@@ -343,26 +430,6 @@ parallel_bn <- function(p = 3){
   bnlearn::amat(bn) <- a
 
   return(bn)
-}
-
-
-
-# Convert bn to a "default" bn.fit object
-
-bn2gnet <- function(bn){
-
-  dist <- lapply(bn$nodes, function(node){
-
-    ## default coefficients and standard deviations
-    params <- list(coef = c(0, rep(1, length(node$parents))), sd = 1)
-    names(params$coef) <- c("(Intercept)", node$parents)
-
-    return(params)
-  })
-
-  bn.fit <- bnlearn::custom.fit(x = bn, dist = dist)
-
-  return(bn.fit)
 }
 
 
