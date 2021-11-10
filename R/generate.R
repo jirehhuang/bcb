@@ -73,6 +73,16 @@ check_data_grid <- function(data_grid){
 
   ## TODO: check values
 
+  ## column names
+  nms <- c("index", "id", "seed", "network", "data_type", "k",
+           "n_dat", "n_obs", "avg_deg", "max_in_deg", "max_out_deg",
+           "target", "reg_lb", "reg_ub", "var_lb", "var_ub",
+           "coef_lb", "coef_ub", "normalize", "n_node", "n_edge", "n_within",
+           "n_between", "n_compelled", "n_reversible", "n_params")
+
+  ## remove extra columns
+  data_grid <- data_grid[, intersect(names(data_grid), nms)]
+
   ## remove duplicates
   data_grid <- data_grid[! duplicated(data_grid), , drop = FALSE]
 
@@ -80,11 +90,6 @@ check_data_grid <- function(data_grid){
   data_grid$index <- seq_len(nrow(data_grid))
   if (is.null(data_grid$id))
     data_grid$id <- 1
-  nms <- c("index", "id", "seed", "network", "data_type", "k",
-           "n_dat", "n_obs", "avg_deg", "max_in_deg", "max_out_deg",
-           "target", "reg_lb", "reg_ub", "var_lb", "var_ub",
-           "coef_lb", "coef_ub", "normalize", "n_node", "n_edge", "n_within",
-           "n_between", "n_compelled", "n_reversible", "n_params")
   data_grid[setdiff(nms, names(data_grid))] <- 0
 
   ## rearrange columns
