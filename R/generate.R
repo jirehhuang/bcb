@@ -212,6 +212,7 @@ generate_data_grid <- function(data_grid = build_data_grid(),
 
             if (! invalid){
 
+              bn.fit <- gnet
               data_row$seed <- seed
               break
             }
