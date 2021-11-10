@@ -12,4 +12,4 @@ testthat::expect_true(all.equal(bn.fit, bn.fit0))
 
 bn.fit <- load_bn.fit(x = "parallel_10")
 
-testthat::expect_true(length(bnlearn::nodes(bn.fit)) == 11)
+testthat::expect_true(length(bnlearn::nodes(bn.fit)) == 10)
