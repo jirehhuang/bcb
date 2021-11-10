@@ -361,7 +361,7 @@ bn.fit2effects <- function(bn.fit,
 
   } else if ("bn.fit.dnet" %in% class(bn.fit)){
 
-    browser()
+    # browser()
 
     ## TODO: discrete version
 
@@ -394,7 +394,7 @@ effects_list2mat <- function(effects_list,
 
     ## if list, dnet
 
-    browser()
+    # browser()
 
     ## TODO: discrete version
   }
