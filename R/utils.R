@@ -260,9 +260,11 @@ load_bn.fit <- function(x,
 
   } else if (grepl("random", x)){
 
-    browser()
-
-    # TODO: random structures
+    p_d_seed <- as.numeric(strsplit(x, "_")[[1]][seq_len(3) + 1])
+    bn <- random_bn(p = p_d_seed[1],
+                    d = p_d_seed[2],
+                    seed = p_d_seed[3])
+    bn.fit <- bn2gnet(bn = bn)
 
   } else{
 
@@ -278,6 +280,30 @@ load_bn.fit <- function(x,
     bn.fit <- rename_bn.fit(bn.fit = bn.fit, nodes = "V", categories = TRUE)
 
   return(bn.fit)
+}
+
+
+
+# Create parallel graph structure
+
+random_bn <- function(p,
+                      d,
+                      seed,
+                      ...){
+
+  if (!missing(seed) && is.numeric(seed) && !is.na(seed))
+    set.seed(seed)
+
+  nodes <- sprintf("V%s", seq_len(p))
+
+  nel <- pcalg::randDAG(n = p, d = d, weighted = FALSE, ...)
+  a <- as(nel, "matrix")
+  rownames(a) <- colnames(a) <- nodes
+
+  bn <- bnlearn::empty.graph(nodes = nodes)
+  bnlearn::amat(bn) <- a
+
+  return(bn)
 }
 
 
