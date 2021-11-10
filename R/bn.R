@@ -148,7 +148,7 @@ bn2gnet <- function(bn,
 
   bnlearn:::check.bn.or.fit(bn)
 
-  if (!missing(seed) && !is.numeric(seed) && !is.na(seed))
+  if (!missing(seed) && is.numeric(seed) && !is.na(seed))
     set.seed(seed)
 
   gnet <- bnlearn::empty.graph(nodes = bnlearn::nodes(bn))
