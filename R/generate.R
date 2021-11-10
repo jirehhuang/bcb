@@ -129,7 +129,8 @@ generate_data_grid <- function(data_grid = build_data_grid(),
   }
   data_grid <- check_data_grid(data_grid)
   data_grid$seed <- seed0 + data_grid$id
-  write.table(data_grid, dg_path)
+  write.table(data_grid,  # write initial data_grid settings
+              file.path(path, "data_grid0.txt"))
 
   ## set up parallel execution
   if (n_cores < 1)
@@ -268,15 +269,18 @@ generate_data_grid <- function(data_grid = build_data_grid(),
         ## generate and write datasets
         for (j in seq_len(data_row$n_dat)){
 
+          ## read bn.fit object
+          bn.fit <- readRDS(file.path(data_dir, "bn.fit.rds"))
+
           if (file.exists(data_file <- file.path(data_dir,
                                                  sprintf("data%g.txt", j)))){
 
             data <- read.table(data_file)
 
-          } else{
+            if ("bn.fit.dnet" %in% class(bn.fit))
+              data <- as.data.frame(lapply(data, as.factor))
 
-            ## read bn.fit object
-            bn.fit <- readRDS(file.path(data_dir, "bn.fit.rds"))
+          } else{
 
             set.seed(data_row$seed + j)
 
