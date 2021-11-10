@@ -207,7 +207,7 @@ generate_data_grid <- function(data_grid = build_data_grid(),
               temp_row$reg_ub > data_row$reg_ub
 
             debug_cli_sprintf(debug, ifelse(invalid, "danger", "success"),
-                              "bn.fit %s regret constraints on attempt %g",
+                              "gnet %s regret constraints on attempt %g",
                               ifelse(invalid, "violates", "satisfies"), attempt)
 
             if (! invalid){
