@@ -87,7 +87,9 @@ check_data_grid <- function(data_grid){
   data_grid <- data_grid[! duplicated(data_grid), , drop = FALSE]
 
   ## add missing columns
-  data_grid$index <- seq_len(nrow(data_grid))
+  data_grid$index <- stringr::str_pad(string = seq_len(nrow(data_grid)),
+                                      width = nchar(nrow(data_grid)),
+                                      side = "left", pad = "0")
   if (is.null(data_grid$id))
     data_grid$id <- 1
   data_grid[setdiff(nms, names(data_grid))] <- 0
@@ -169,7 +171,7 @@ generate_data_grid <- function(data_grid = build_data_grid(),
         ## prepare data row and directory
         data_row <- data_grid[i, , drop = FALSE]
         data_dir <- file.path(path,
-                              sprintf("%g_%g_%s_%g",
+                              sprintf("%s_%g_%s_%g",
                                       data_row$index, data_row$id,
                                       data_row$network, data_row$n_obs))
         dir_check(data_dir)
@@ -283,7 +285,7 @@ generate_data_grid <- function(data_grid = build_data_grid(),
         ## prepare data row and directory
         data_row <- data_grid[i, , drop = FALSE]
         data_dir <- file.path(path,
-                              sprintf("%g_%g_%s_%g",
+                              sprintf("%s_%g_%s_%g",
                                       data_row$index, data_row$id,
                                       data_row$network, data_row$n_obs))
         dir_check(data_dir)
