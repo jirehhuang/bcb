@@ -15,7 +15,8 @@ RoxygenNote: 7.1.1
 LinkingTo: 
     Rcpp
 Imports: 
-    Rcpp, sys, cli, data.table, DirichletReg, phsl, bnlearn, sparsebnUtils
+    Rcpp, sys, cli, data.table, parallel, DirichletReg, 
+    phsl, bnlearn, sparsebnUtils
 Suggests: 
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
