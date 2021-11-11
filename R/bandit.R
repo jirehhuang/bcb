@@ -257,12 +257,12 @@ check_settings <- function(bn.fit, settings, debug = FALSE){
     debug_cli_sprintf(debug, "", "bn.fit type = %s", settings$type)
   }
 
-  ## check dir
-  if (is.null(settings$dir) || ! dir.exists(settings$dir)){
-    settings$dir <- file.path(path.expand("~"),
+  ## check temp_dir
+  if (is.null(settings$temp_dir) || ! dir.exists(settings$temp_dir)){
+    settings$temp_dir <- file.path(path.expand("~"),
                               "Documents/ucla/research/projects/current",
                               "simulations", "temp")
-    debug_cli_sprintf(debug, "", "Default dir = %s", settings$dir)
+    debug_cli_sprintf(debug, "", "Default temp_dir = %s", settings$temp_dir)
   }
 
   ## check id
@@ -290,8 +290,8 @@ check_settings <- function(bn.fit, settings, debug = FALSE){
       settings$data_obs <- as.data.frame(lapply(settings$data_obs,
                                                 function(x) as.factor))
   }
-  debug_cli_sprintf(!is.data.frame(data_obs), "abort",
-                    "data_obs is not a data.frame")
+  debug_cli_sprintf(!is.data.frame(data_obs),
+                    "abort", "data_obs is not a data.frame")
 
   ## TODO: remove; temporary for debugging
   settings$bn.fit <- bn.fit
@@ -300,8 +300,8 @@ check_settings <- function(bn.fit, settings, debug = FALSE){
   nms <- c("method", "target", "run", "n_run", "n_obs", "n_int",
            "n_ess", "n_t", "int_parents", "optimistic", "epsilon",
            "c", "score", "max_parents", "eta", "borrow")
-  settings <- settings[union(nms, c("nodes", "nnodes", "type",
-                                    "dir", "id", "bn.fit", "data_obs"))]
+  settings <- settings[union(nms, c("nodes", "nnodes", "type", "temp_dir",
+                                    "id", "bn.fit", "data_obs"))]
 
   return(settings)
 }
