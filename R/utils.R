@@ -34,6 +34,7 @@ debug_cli_sprintf <- function(debug,
     repeat{
       fn <- sys.call(i)[1]
       fn <- gsub("\\(.*", "", as.character(fn))
+      fn <- gsub(".*:", "", fn)
       if (length(fn) == 0 || fn %in% ns) break
       i <- i - 1
     }
