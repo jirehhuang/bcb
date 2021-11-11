@@ -264,6 +264,7 @@ check_settings <- function(bn.fit, settings, debug = FALSE){
                               "simulations", "temp")
     debug_cli_sprintf(debug, "", "Default temp_dir = %s", settings$temp_dir)
   }
+  dir_check(settings$temp_dir)
 
   ## check id
   if (is.null(settings$id)){
@@ -276,21 +277,24 @@ check_settings <- function(bn.fit, settings, debug = FALSE){
 
     settings$data_obs <- ribn(settings$bn.fit, n = 0)
   }
-  if (is.null(data_obs) || data_obs == ""){
+  if (is.null(settings$data_obs) || settings$data_obs == ""){
 
     ## generate observational data
     settings$data_obs <- ribn(settings$bn.fit, n = settings$n_obs)
 
-  } else if (dir.exists(data_obs) &&
-             file.exists(fp <- file.path(data_obs, sprintf("data%s.txt",
-                                                           settings$run)))){
+  } else if (dir.exists(settings$data_obs) &&
+             (file.exists(fp <-
+                         file.path(settings$data_obs, sprintf("data%s.txt",
+                                                              settings$run)))) ||
+             file.exists(fp <- settings$data_obs)){
+
     settings$data_obs <- read.table(fp)[seq_len(settings$n_obs),]
 
     if (settings$type == "bn.fit.dnet")
       settings$data_obs <- as.data.frame(lapply(settings$data_obs,
                                                 function(x) as.factor))
   }
-  debug_cli_sprintf(!is.data.frame(data_obs),
+  debug_cli_sprintf(!is.data.frame(settings$data_obs),
                     "abort", "data_obs is not a data.frame")
 
   ## TODO: remove; temporary for debugging
