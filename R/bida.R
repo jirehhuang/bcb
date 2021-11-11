@@ -1,6 +1,7 @@
 # Build bida aps using make
 
-build_bida <- function(debug = FALSE){
+make_bida <- function(aps_dir = get_bida(dir = TRUE),
+                      debug = FALSE){
 
   debug_cli_sprintf(debug, "info",
                     "Building bida using make")
@@ -11,8 +12,7 @@ build_bida <- function(debug = FALSE){
   ## make bida aps
   start_time <- Sys.time()
   make <- sys::exec_internal(cmd = "make",
-                             args = sprintf("--directory=%s",
-                                            get_bida(dir = TRUE)))
+                             args = sprintf("--directory=%s", aps_dir))
   end_time <- Sys.time()
   make_time <- as.numeric(end_time - start_time, units = "secs")
 
@@ -21,12 +21,12 @@ build_bida <- function(debug = FALSE){
     if (length(make$stderr)){
 
       debug_cli_sprintf(debug, "success",
-                        "Successfully built bida aps in %g secs",
+                        "Successfully made bida aps in %g secs",
                         make_time)
     } else{
 
       debug_cli_sprintf(debug, "success",
-                        "Already built bida aps")
+                        "Already made bida aps")
     }
   }
 }
@@ -40,7 +40,7 @@ test_bida <- function(debug = FALSE){
   debug_cli_sprintf(debug, "info",
                     "Testing bida using github examples")
 
-  build_bida(debug = debug)
+  make_bida(debug = debug)
 
   wd0 <- getwd()
   on.exit(setwd(wd0))
