@@ -294,7 +294,8 @@ generate_data_grid <- function(data_grid = build_data_grid(),
         debug_cli_sprintf(debug, "", "%g Generating %g datasets for network %s",
                           i, data_row$n_dat, data_row$network)
 
-        if (data_row$n_obs <= 0)
+        if (data_row$n_obs <= 0 ||
+            data_row$n_dat <= 0)
           return(NULL)
 
         true_scores <- data.frame(loglik = numeric(data_row$n_dat),
