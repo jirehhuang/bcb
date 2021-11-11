@@ -40,6 +40,201 @@ bandit <- function(bn.fit,
 
 
 
+# Cache scores for use in bida
+# Modification and extension of calc_parent_score_to_file() in bida
+# Instead of writeLines(), compile all scores and write.table()
+# Supported scores are fml and bge0 (renamed from bge) scores from bida,
+# and bnlearn:::available.scores
+
+cache_scores <- function(data, score, max_parents, cache_file,
+                         interventions = rep("", nrow(data)), blmat = NULL,
+                         debug = FALSE){
+
+  ## TODO: check and support blmat
+  blmat <- NULL
+
+  n <- nrow(data)
+  d <- ncol(data)
+  if (score %in% c("fml", "bge0")){
+
+    if (max(abs(apply(data, 2, mean))) > 1e-6){
+      debug_cli_sprintf(debug, "",
+                        "Assumes zero-centered data")
+      data <- apply(data, 2, function(x) x-mean(x))
+    }
+    S <- t(data)%*%data
+  }
+  nodes <- seq_len(d)
+  node_names <- colnames(data)
+
+  nps <- sum(sapply(0:max_parents, function(x) choose(d-1,x)))
+  debug_cli_sprintf(nps > 1e6,
+                    "abort", "The number of parent sets is > 1e6")
+
+  lns <- c(character(0), toString(d))
+
+  ## fml score from bida
+  if (score == "fml"){
+    n0 <- 1
+    a <- d-1
+    const1 <- -log(pi)*(n-n0)*0.5
+    for (node in nodes){
+      lines <- list()
+      for (k in 0:max_parents){
+        dfam <- 1+k
+        par_sets <- combn(nodes[-node],k)
+        const2 <- lgamma(0.5*(a+n-d+dfam))-
+          lgamma(0.5*(a+n0-d+dfam))+
+          log(n0/n)*(a+n0-d+2*dfam-1)*0.5
+        const <- const1+const2
+        for (i in 1:ncol(par_sets)){
+          par <- par_sets[,i]
+          fam <- c(node,par)
+          if (!is.null(blmat) && any(blmat[par, node] == 1)) next
+          scr <- const-(log(det(S[fam,fam, drop = FALSE]))-log(det(S[par,par, drop = FALSE])))*(n-n0)*0.5
+          lines[[length(lines)+1]] <- paste(trimws(format(round(scr, 6), nsmall=6)),
+                                            k, paste(par,collapse = " "), sep = " ")
+        }
+      }
+      lns <- c(lns, sprintf("%g %g", node, length(lines)), unlist(lines))
+    }
+    ## bge score from bida, renamed to bge0
+  } else if (score == "bge0"){
+    const1 <- -log(pi)*n*0.5
+    for (node in nodes){
+      for (k in 0:max_parents){
+        dfam <- 1+k
+        par_sets <- combn(nodes[-node],k)
+        const2 <- lgamma((dfam+n)*0.5)-lgamma(dfam*0.5)
+        const <- const1+const2
+        for (i in 1:ncol(par_sets)){
+          par <- par_sets[,i]
+          fam <- c(node,par)
+          scr <- const-log(det(S[fam,fam, drop = FALSE]+diag(1,dfam)))*(dfam+n)*0.5+log(det(S[par,par, drop = FALSE]+diag(1,k)))*(k+n)*0.5
+          lines[[length(lines)+1]] <- paste(trimws(format(round(scr, 6), nsmall=6)),
+                                            k, paste(par,collapse = " "), sep = " ")
+        }
+      }
+      lns <- c(lns, sprintf("%g %g", node, length(lines)), unlist(lines))
+    }
+    ## use bnlearn scores, which includes bge
+  } else if (score %in% bnlearn:::available.scores){
+
+    if (score %in% bnlearn:::available.discrete.scores){
+
+      browser()
+
+      ## TODO: check discrete
+    }
+
+    data <- as.data.frame(data)
+    network <- bnlearn::empty.graph(nodes = colnames(data))
+    amat <- bnlearn::amat(network)
+
+    ## TODO: initialize vector instead of appending lines
+
+    for (node in nodes){
+
+      lines <- list()
+
+      for (k in 0:max_parents){
+
+        par_sets <- combn(nodes[-node], k)
+
+        ## remove parent sets that violate blmat
+        if (!is.null(blmat))
+          par_sets <- par_sets[, !apply(par_sets, 2,
+                                        function(par) any(blmat[par, node]))]
+
+        len <- length(lines)
+        lines <- c(lines, vector(mode = "list", ncol(par_sets)))
+
+        for (i in seq_len(ncol(par_sets))){
+
+          ## direct parents -> node in network
+          par <- par_sets[,i]
+          amat[par, node] <- 1
+          bnlearn::amat(network) <- amat
+
+          extra.args <- list()
+          extra.args = bnlearn:::check.score.args(score = score, network = network,
+                                                  data = data, extra.args = extra.args)
+
+          ## compute and store score
+          scr <- local_score(network = network, data = data, score = score,
+                             targets = node_names[node], extra.args = extra.args,
+                             interventions = interventions, debug = debug > 1)
+
+          ## TODO: can I increase nsmall
+
+          lines[[len + i]] <- sprintf("%s %g %s",
+                                      trimws(format(round(scr, 6), nsmall=6)),
+                                      k, paste(par, collapse = " "))
+
+          ## disconnect parents -> node in network
+          amat[par, node] <- 0
+        }
+      }
+      lns <- c(lns, sprintf("%g %g", node, length(lines)), unlist(lines))
+    }
+  } else{
+
+    debug_cli_sprintf(TRUE, "abort",
+                      "Unknown score type `%s`; please use bnlearn:::available.scores, fml, or bge0",
+                      score)
+  }
+  ## write table
+  write.table(x = data.frame(lns),
+              file = sprintf("%s_score", cache_file),
+              row.names = FALSE, col.names = FALSE, quote = FALSE)
+
+  debug_cli_sprintf(debug, "success",
+                    "Computed %g scores and saved to %s_score",
+                    length(lns) - 2 * d, tail(strsplit(cache_file, "/")[[1]], 1))
+}
+
+
+
+# Compute local score using bnlearn
+
+local_score <- function(network,
+                        data,
+                        score,
+                        targets,
+                        extra.args,
+                        interventions = rep("", nrow(data)),
+                        debug = FALSE){
+
+  scores <- sapply(targets, function(x) 0)
+
+  ## TODO: add to slides
+
+  ## use all data for target(s) that have not been intervened on
+  targets_obs <- setdiff(targets, unique(interventions))
+  if (length(targets_obs)){
+
+    scores[targets_obs] <- bnlearn:::per.node.score(network = network, data = data,
+                                                    score = score, targets = targets_obs,
+                                                    extra.args = extra.args, debug = debug)
+  }
+  if (length(targets_obs) < length(targets)){
+
+    ## for target(s) that have been intervened on, exclude interventional
+    ## data on that target because it mutilates the graph for that target
+    targets_int <- setdiff(targets, targets_obs)
+    for (target in targets_int){
+
+      scores[target] <- bnlearn:::per.node.score(network = network,
+                                                 data = data[interventions != target,,drop=FALSE],
+                                                 score = score, targets = target,
+                                                 extra.args = extra.args, debug = debug)
+    }
+  }
+  return(scores)
+}
+
+
+
 # Function for building arms, a list of interventions
 
 build_arms <- function(bn.fit, settings, debug = FALSE){
