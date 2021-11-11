@@ -147,3 +147,16 @@ read_dir <- function(dir,
   list2env(x = objs,
            envir = envir)
 }
+
+
+
+# Function for generating a random id
+
+random_id <- function(n = 12){
+
+  ## TODO: replace with tempfile()?
+
+  bank <- c(letters, LETTERS, 0:9)
+
+  return(paste(sample(bank, size = n, replace = TRUE), collapse = ""))
+}

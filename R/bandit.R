@@ -114,6 +114,13 @@ check_settings <- function(bn.fit, settings, debug = FALSE){
                       settings$target)
   }
 
+  ## check run
+  if (is.null(settings$run) ||
+      settings$run < 1){
+    settings$run <- 1
+    debug_cli_sprintf(debug, "", "Default run = %s", settings$run)
+  }
+
   ## check n_run
   if (is.null(settings$n_run) ||
       settings$n_run < 1){
@@ -264,28 +271,37 @@ check_settings <- function(bn.fit, settings, debug = FALSE){
     debug_cli_sprintf(debug, "", "Generated id = %s", settings$id)
   }
 
+  ## check data_obs
+  if (settings$n_obs == 0){
+
+    settings$data_obs <- ribn(settings$bn.fit, n = 0)
+  }
+  if (is.null(data_obs) || data_obs == ""){
+
+    ## generate observational data
+    settings$data_obs <- ribn(settings$bn.fit, n = settings$n_obs)
+
+  } else if (dir.exists(data_obs) &&
+             file.exists(fp <- file.path(data_obs, sprintf("data%s.txt",
+                                                           settings$run)))){
+    settings$data_obs <- read.table(fp)[seq_len(settings$n_obs),]
+
+    if (settings$type == "bn.fit.dnet")
+      settings$data_obs <- as.data.frame(lapply(settings$data_obs,
+                                                function(x) as.factor))
+  }
+  debug_cli_sprintf(!is.data.frame(data_obs), "abort",
+                    "data_obs is not a data.frame")
+
   ## TODO: remove; temporary for debugging
   settings$bn.fit <- bn.fit
 
   ## sort settings
-  nms <- c("method", "target", "n_run", "n_obs", "n_int",
+  nms <- c("method", "target", "run", "n_run", "n_obs", "n_int",
            "n_ess", "n_t", "int_parents", "optimistic", "epsilon",
            "c", "score", "max_parents", "eta", "borrow")
   settings <- settings[union(nms, c("nodes", "nnodes", "type",
-                                    "dir", "id", "bn.fit"))]
+                                    "dir", "id", "bn.fit", "data_obs"))]
 
   return(settings)
-}
-
-
-
-# Function for generating a random id
-
-random_id <- function(n = 12){
-
-  ## TODO: replace with tempfile()?
-
-  bank <- c(letters, LETTERS, 0:9)
-
-  return(paste(sample(bank, size = n, replace = TRUE), collapse = ""))
 }
