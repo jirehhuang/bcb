@@ -461,6 +461,13 @@ check_settings <- function(bn.fit, settings, debug = FALSE){
   }
   dir_check(settings$temp_dir)
 
+  ## check aps_dir
+  if (is.null(settings$aps_dir)){
+    settings$aps_dir <- get_bida(dir = TRUE)
+    debug_cli_sprintf(debug, "", "Detected aps_dir = %s", settings$aps_dir)
+  }
+  make_bida(aps_dir = settings$aps_dir, debug = debug)
+
   ## check id
   if (is.null(settings$id)){
     settings$id <- random_id(n = 12)
@@ -500,7 +507,7 @@ check_settings <- function(bn.fit, settings, debug = FALSE){
            "n_ess", "n_t", "int_parents", "optimistic", "epsilon",
            "c", "score", "max_parents", "eta", "borrow")
   settings <- settings[union(nms, c("nodes", "nnodes", "type", "temp_dir",
-                                    "id", "bn.fit", "data_obs"))]
+                                    "aps_dir", "id", "data_obs", "bn.fit"))]
 
   return(settings)
 }
