@@ -24,7 +24,7 @@ bandit <- function(bn.fit,
                       t, settings$n_int + settings$n_obs)
 
     rounds <- apply_method(t = t, bn.fit = bn.fit, settings = settings,
-                            rounds = rounds, debug = debug)
+                           rounds = rounds, debug = debug)
   }
   rounds <- summarize_rounds(bn.fit = bn.fit, settings = settings, rounds = rounds)
 
@@ -37,7 +37,6 @@ bandit <- function(bn.fit,
 # initialize_rounds()
 # summarize_rounds()
 # apply_method()
-# threshold_ps()
 
 
 
@@ -47,6 +46,7 @@ bandit <- function(bn.fit,
 compute_ps <- function(data,
                        settings,
                        interventions = rep("", nrow(data)),
+                       threshold = 0.999,
                        debug = FALSE){
 
   ## load relevant settings
@@ -84,6 +84,47 @@ compute_ps <- function(data,
   ## delete support, saving score for arp
   file.remove(sprintf("%s_support", cache_file))  # keep score for arp
 
+  ## threshold low probability parent sets
+  ps <- threshold_ps(ps = ps, threshold = threshold, debug = debug)
+
+  return(ps)
+}
+
+
+
+# Function to threshold parent configurations with low support
+
+threshold_ps <- function(ps,
+                         threshold = 0.999,
+                         debug = FALSE){
+
+  ## remove lowest probability parent sets
+  ## beyond some cumulative support threshold
+
+  if (threshold >= 1){
+
+    debug_cli_sprintf(debug, "info",
+                      "No parent support thresholding requested")
+    return(ps)
+  }
+
+  for (i in seq_len(length(ps))){
+
+    ## first location where cumsum is at least threshold
+    pos <- match(TRUE,
+                 cumsum(ps[[i]]$support[ps[[i]]$ordering]) >= threshold)
+    if (is.na(pos))
+      pos <- nrow(ps[[i]])
+
+    ## remove parents with low support
+    ps[[i]]$support[-ps[[i]]$ordering[seq_len(pos)]] <- 0
+
+    debug_cli_sprintf(debug, "", "Thresholded %g out of %g parent sets",
+                      nrow(ps[[i]]) - pos, nrow(ps[[i]]))
+
+    ## normalize probabilities
+    ps[[i]]$support <- ps[[i]]$support / sum(ps[[i]]$support)
+  }
   return(ps)
 }
 
@@ -111,34 +152,35 @@ read_aps_ps <- function(settings){
            "score", "support", "order", "ordering")
 
   ## for each node
-  for (i in seq_len(p)){
+  for (j in seq_len(p)){
 
-    node <- temp[pos,1]  # node
-    n_parents <- temp[pos,2]  # number of parent configurations
+    i <- temp[pos, 1]  # node index
+    n_parents <- temp[pos, 2]  # number of parent configurations
     pos <- pos + 1
 
-    ps[[node]] <- as.data.frame(sapply(nms, function(x) numeric(n_parents),
-                                       simplify = FALSE))
+    ps[[i]] <- as.data.frame(sapply(nms, function(x) numeric(n_parents),
+                                    simplify = FALSE))
 
     ## parent configurations of node
-    ps[[node]][seq_len(n_parents),
-               seq_len(max_parents)] <- temp[seq(pos, pos + n_parents - 1),
-                                             seq_len(max_parents) + 2]
+    ps[[i]][seq_len(n_parents),
+            seq_len(max_parents)] <- temp[seq(pos, pos + n_parents - 1),
+                                          seq_len(max_parents) + 2]
 
     ## convert corresponding scores to support
-    ps[[node]][["score"]] <- temp[seq(pos, pos + n_parents - 1), 1]
-    scr <- exp(ps[[node]][["score"]] -
-                 max(ps[[node]][["score"]]))
-    ps[[node]][["support"]] <- scr / sum(scr)
+    ps[[i]][["score"]] <- temp[seq(pos, pos + n_parents - 1), 1]
+    scr <- exp(ps[[i]][["score"]] -
+                 max(ps[[i]][["score"]]))
+    ps[[i]][["support"]] <- scr / sum(scr)
 
     ## ordering and order
-    ps[[node]][["ordering"]] <- order(ps[[node]][["support"]],
-                                      decreasing = TRUE)
-    ps[[node]][["order"]][ps[[node]][["ordering"]]] <- seq_len(n_parents)
+    ps[[i]][["ordering"]] <- order(ps[[i]][["support"]],
+                                   decreasing = TRUE)
+    # ps[[i]][["order"]][ps[[i]][["ordering"]]] <- seq_len(n_parents)
 
     ## iterate position
     pos <- pos + n_parents
   }
+  names(ps) <- settings$nodes
 
   return(ps)
 }
@@ -569,8 +611,8 @@ check_settings <- function(bn.fit, settings, debug = FALSE){
   ## check temp_dir
   if (is.null(settings$temp_dir) || ! dir.exists(settings$temp_dir)){
     settings$temp_dir <- file.path(path.expand("~"),
-                              "Documents/ucla/research/projects/current",
-                              "simulations", "temp")
+                                   "Documents/ucla/research/projects/current",
+                                   "simulations", "temp")
     debug_cli_sprintf(debug, "", "Default temp_dir = %s", settings$temp_dir)
   }
   dir_check(settings$temp_dir)
@@ -600,8 +642,8 @@ check_settings <- function(bn.fit, settings, debug = FALSE){
 
   } else if (dir.exists(settings$data_obs) &&
              (file.exists(fp <-
-                         file.path(settings$data_obs, sprintf("data%s.txt",
-                                                              settings$run)))) ||
+                          file.path(settings$data_obs, sprintf("data%s.txt",
+                                                               settings$run)))) ||
              file.exists(fp <- settings$data_obs)){
 
     settings$data_obs <- read.table(fp)[seq_len(settings$n_obs),]
