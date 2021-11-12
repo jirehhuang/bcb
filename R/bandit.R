@@ -119,8 +119,8 @@ threshold_ps <- function(ps,
     ## remove parents with low support
     ps[[i]]$support[-ps[[i]]$ordering[seq_len(pos)]] <- 0
 
-    debug_cli_sprintf(debug, "", "Thresholded %g out of %g parent sets",
-                      nrow(ps[[i]]) - pos, nrow(ps[[i]]))
+    debug_cli_sprintf(debug, "", "Thresholded %g out of %g parent sets for node %s",
+                      nrow(ps[[i]]) - pos, nrow(ps[[i]]), names(ps)[i])
 
     ## normalize probabilities
     ps[[i]]$support <- ps[[i]]$support / sum(ps[[i]]$support)
@@ -149,7 +149,7 @@ read_aps_ps <- function(settings){
   pos <- 2  # position
   ps <- vector("list", length = p)
   nms <- c(sprintf("V%g", seq_len(max_parents)),
-           "score", "support", "order", "ordering")
+           "score", "support", "ordering")
 
   ## for each node
   for (j in seq_len(p)){
@@ -183,6 +183,57 @@ read_aps_ps <- function(settings){
   names(ps) <- settings$nodes
 
   return(ps)
+}
+
+
+
+# Compute ancestor relation probabilities
+
+compute_arp <- function(data,
+                        settings,
+                        interventions = rep("", nrow(data)),
+                        debug = FALSE){
+
+  ## load relevant settings
+  list2env(settings[c("score", "max_parents", "blmat",
+                      "aps_dir", "nnodes")],
+           envir = environment())
+  cache_file <- file.path(settings$temp_dir, settings$id)
+
+  debug_cli_sprintf(nnodes > 20,
+                    "abort", "Don't use on systems with more than 20 variables")
+
+  ## calculate parent scores and save as temporary files
+  if (!file.exists(sprintf("%s_score", cache_file))){
+
+    debug_cli_sprintf(missing(data),
+                      "abort", "File score missing and argument data missing")
+
+    cache_scores(data = data, settings = settings,
+                 interventions = interventions, debug = debug)
+  }
+
+  ## calculate parent support using the APS solver
+  aps_type <- "ar_modular"
+  system(sprintf("%s/aps %s %s_score %s_arp", aps_dir,
+                 aps_type, shQuote(cache_file), shQuote(cache_file)))
+
+  debug_cli_sprintf(!file.exists(sprintf("%s_arp", cache_file)),
+                    "abort", "File arp missing, and score %s",
+                    ifelse(file.exists(sprintf("%s_score", cache_file)),
+                           "exists", "also missing"))
+
+  ## read in calculated ancestor support from file
+  arp <- as.matrix(read.delim(sprintf("%s_arp", cache_file),
+                              header = FALSE, sep = " ",
+                              skip = settings$nnodes + 1))
+  rownames(arp) <- colnames(arp) <- settings$nodes
+  arp <- t(exp(arp - arp[1, 1]))
+
+  # Delete temporary files
+  file.remove(sprintf("%s_arp", cache_file))
+
+  return(arp)
 }
 
 
