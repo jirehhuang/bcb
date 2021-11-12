@@ -46,9 +46,15 @@ bandit <- function(bn.fit,
 # Supported scores are fml and bge0 (renamed from bge) scores from bida,
 # and bnlearn:::available.scores
 
-cache_scores <- function(data, score, max_parents, cache_file,
-                         interventions = rep("", nrow(data)), blmat = NULL,
+cache_scores <- function(data,
+                         settings,
+                         interventions = rep("", nrow(data)),
                          debug = FALSE){
+
+  ## load relevant settings
+  list2env(settings[c("score", "max_parents", "blmat")],
+           envir = environment())
+  cache_file <- file.path(settings$temp_dir, settings$id)
 
   ## TODO: check and support blmat
   blmat <- NULL
