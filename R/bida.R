@@ -442,6 +442,16 @@ ps2es <- function(ps,
 
 
 
+## Trivial convenience function for converting
+## edge support to median probability graph
+
+es2med_graph <- function(es){
+
+  return(1 * (es > 0.5))
+}
+
+
+
 ######################################################################
 ## Compile and test
 ######################################################################
