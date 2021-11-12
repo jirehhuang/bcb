@@ -8,6 +8,12 @@
 
 eval_graph <- function(est, true, cp = FALSE){
 
+  if (any(class(est) %in% c("bn", "bn.fit")))
+    est <- bnlearn::amat(est)
+
+  if (any(class(true) %in% c("bn", "bn.fit")))
+    true <- bnlearn::amat(true)
+
   ## convert to cpdags
   if (cp){
 
