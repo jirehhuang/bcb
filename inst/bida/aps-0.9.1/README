@@ -1,0 +1,5 @@
+aps0 is the original uncompiled BIDA APS folder: https://github.com/jopensar/BIDA/tree/master/aps-0.9.1/aps
+
+aps.zip is the zipped original folder (unzips as aps, not aps0)
+
+aps is a precompiled copy to accelerate development by avoiding recompiling the tool after each installation
