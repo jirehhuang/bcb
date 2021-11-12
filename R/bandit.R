@@ -40,7 +40,7 @@ bandit <- function(bn.fit,
 
 
 
-# Update parent support
+# Compute parent set supports
 # Modification of calc_bida_post()
 
 compute_ps <- function(data,

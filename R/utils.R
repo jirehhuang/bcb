@@ -126,12 +126,14 @@ dir_check <- function(path,
 #' @export
 
 read_dir <- function(dir,
-                     envir = sys.frame(-1)){
+                     envir = sys.frame(-1),
+                     exclude = "data"){
 
   files <- list.files(dir)
   files <- files[grepl(".txt|.rds", files)]
+  files <- files[!grepl(exclude, files)]
 
-  objs <- sapply(list.files(data_dir), function(x){
+  objs <- sapply(files, function(x){
 
     if (grepl(".txt", x)){
 
