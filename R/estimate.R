@@ -159,6 +159,32 @@ compute_bda <- function(data,
 
 
 
+# Compute expectation over posterior mean
+
+expect_post <- function(rounds,
+                        metric = "est_bda",
+                        squared = FALSE){
+
+  p <- length(rounds$bda)
+  seq_p <- seq_len(p)
+
+  post_mean <- matrix(0, p, p)
+  rownames(post_mean) <- colnames(post_mean) <- names(rounds$bda)
+
+  for (i in seq_p){
+
+    for (j in seq_p[-i]){
+
+      post_mean[i, j] <-
+        sum(rounds$ps[[i]]$support *
+              rounds$bda[[i]][[j]][[metric]]^(1 + squared), na.rm = TRUE)
+    }
+  }
+  return(post_mean)
+}
+
+
+
 ######################################################################
 ## General relevant functions
 ######################################################################
