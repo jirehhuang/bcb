@@ -5,3 +5,11 @@ lm_cpp <- function(X, y, beta, se) {
     invisible(.Call(`_bcb_lm_cpp`, X, y, beta, se))
 }
 
+lm_nig <- function(Xty, m_0, Lambda_0, Lambda_n, V_n, yty, a_n, b_0, beta, se) {
+    invisible(.Call(`_bcb_lm_nig`, Xty, m_0, Lambda_0, Lambda_n, V_n, yty, a_n, b_0, beta, se))
+}
+
+lm_nig0 <- function(X, y, m_0, Lambda_0, a_0, b_0, n, beta, se) {
+    invisible(.Call(`_bcb_lm_nig0`, X, y, m_0, Lambda_0, a_0, b_0, n, beta, se))
+}
+

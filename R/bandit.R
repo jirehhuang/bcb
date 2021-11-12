@@ -42,7 +42,11 @@ bandit <- function(bn.fit,
 
 # Indicate data rows
 
-get_bool_data <- function(t, i, settings, rounds, debug = FALSE){
+get_bool_data <- function(t,
+                          i,
+                          settings,
+                          rounds,
+                          debug = FALSE){
 
   bool_data <- rep(TRUE, t)
 
@@ -70,21 +74,38 @@ get_bool_data <- function(t, i, settings, rounds, debug = FALSE){
 
 ## compute back-door adjustment estimates
 
-compute_bda <- function(data, settings, rounds, debug = FALSE){
-
-  ## TODO: make this only update only not cached causal effect estimates in bda
+compute_bda <- function(data,
+                        settings,
+                        rounds,
+                        target = settings$target,
+                        nig_bda = NULL,
+                        a_0 = 1,
+                        b_0 = 1,
+                        m_0 = 0,
+                        Lambda_0 = 1,
+                        debug = FALSE){
 
   t <- nrow(data)
   p <- settings$nnodes
   seq_p <- seq_len(p)
   nodes <- settings$nodes
   parents <- seq_len(settings$max_parents)
+  m_00 <- m_0
+  Lambda_00 <- Lambda_0
 
-  ## hyperparameters
-  # a0 <- 1
-  # b0 <- 1
-  # c_mu0 <- 0
-  # diag_V0 <- 1
+  ## use normal-inverse-gamma (nig) linear model if
+  ## observational data n < max_parents + 2
+  if (is.null(nig_bda)){
+
+    nig_bda <- any(sapply(seq_p, function(i){
+
+      sum(get_bool_data(t = t, i = i, settings = settings, rounds = rounds))
+
+    }) < (settings$max_parents + 2))
+  }
+  debug_cli_sprintf(debug, "info",
+                    "Computing back-door effects with %s linear model",
+                    ifelse(nig_bda, "Bayesian Normal-inverse-gamma", "standard"))
 
   ## initialize storage structure
   if (is.null(rounds[["bda"]])){
@@ -93,9 +114,11 @@ compute_bda <- function(data, settings, rounds, debug = FALSE){
 
       lapply(seq_p, function(j) if (j != i){
 
-        data.frame(bda_t = rep(NA, nrow(rounds$ps[[i]])),
-                   bda_est = NA, bda_se = NA,
-                   joint_t = NA, joint_est = NA, joint_se = NA)
+        # for bda estimate and joint estimate:
+        # last t where updated, estimate, and standard error
+        data.frame(t_bda = rep(NA, nrow(rounds$ps[[i]])),
+                   est_bda = NA, se_bda = NA,
+                   t_joint = NA, est_joint = NA, se_joint = NA)
 
       } else NULL)
     })
@@ -116,13 +139,14 @@ compute_bda <- function(data, settings, rounds, debug = FALSE){
       pars <- as.matrix(rounds$ps[[i]][parents])
       temp <- bda[[i]]
       n <- sum(bool_data)
-      X <- as.matrix(data[bool_data, , drop=FALSE])
-      if (max(abs(apply(X, 2, mean))) > 1e-6){
+
+      Xy <- as.matrix(data[bool_data, , drop=FALSE])
+      if (max(abs(apply(Xy, 2, mean))) > 1e-6){
         debug_cli_sprintf(debug > 1, "",
                           "Assumes zero-centered data")
-        X <- apply(X, 2, function(x) x - mean(x))
+        Xy <- apply(Xy, 2, function(x) x - mean(x))
       }
-      # S <- t(X) %*% X
+      XytXy <- t(Xy) %*% Xy
 
       for (l in rounds$ps[[i]]$ordering){
 
@@ -131,17 +155,19 @@ compute_bda <- function(data, settings, rounds, debug = FALSE){
         k <- pars[l, !is.na(pars[l, ])]  # indices of parents
         n_parents <- length(k)  # number of parents
 
-        # prior hyperparameters
-        # mu0 <- matrix(c_mu0, n_parents + 1, 1)  # prior mean
-        # A0 <- diag(n_parents + 1) / diag_V0  # prior variance
+        if (nig_bda){
 
-        # update hyperparameters
-        # xzTxz <- S[c(i, k), c(i, k), drop = FALSE]
-        # A1 <- A0 + xzTxz
-        # V1 <- solve(A1)
-        # a1 <- a0 + n/2
+          # prior hyperparameters
+          m_0 <- matrix(m_00, n_parents + 1, 1)  # prior mean
+          Lambda_0 <- diag(n_parents + 1) / Lambda_00  # prior variance
 
-        for (j in seq_p[-i]){
+          # update hyperparameters
+          Lambda_n <- XytXy[c(i, k), c(i, k), drop = FALSE] + Lambda_0
+          a_n <- a_0 + n / 2
+          V_n <- solve(Lambda_n)
+        }
+
+        for (j in if (is.null(target)) seq_p[-i] else target){
 
           if (j %in% k){  # j -> i, so i -/-> j
 
@@ -153,27 +179,54 @@ compute_bda <- function(data, settings, rounds, debug = FALSE){
             if (is.na(temp[[j]][l, 1]) ||  # not computed bda effect
                 any(bool_data[seq(temp[[j]][i, 1] + 1, t)])){  # added obs data
 
-              # xzTy <- S[c(i, k), j]
-              # XZtXZ <- solve(xzTxz)
-              # beta <- XZtXZ %*% xzTy
-              # s <- sd(X[, c(i, k), drop = FALSE] %*% beta - X[, j])
-              # Sigma_xy <- s * sqrt(XZtXZ[1, 1])
+              # Xty_ik <- XytXy[c(i, k), j]
+              # m_n <- V_n %*% (Xty_ik + Lambda_0 %*% m_0)
+              # b_n <- as.vector(b_0 + (XytXy[j, j] +
+              #                           t(m_0) %*% Lambda_0 %*% m_0 -
+              #                           t(m_n) %*% Lambda_n %*% m_n) / 2)
+              # abV_n <- b_n / a_n * V_n
+              # beta <- m_n[1]
+              # se <- abV_n[1, 1]
 
               beta <- 0
               se <- 0
-              lm_cpp(X = X[, c(i, k), drop = FALSE], y = X[, j],
-                     beta = beta, se = se)
 
-              temp[[j]][i, seq_len(3)] <- c(t,   # the last t bda was computed
-                                            beta,  # estimate
-                                            se)  # standard error
+              if (nig_bda){
 
-              ## check
-              m <- lm(formula = as.formula(sprintf("%s ~ %s", nodes[j],
-                                                   paste(nodes[c(i, k)], collapse = " + "))),
-                      data = as.data.frame(X))
-              if (!all.equal(se, summary(m)$coefficients[2, "Std. Error"]) == TRUE)
-                browser()
+                ## normal inverse gamma linear model
+                lm_nig(Xty = XytXy[c(i, k), j], m_0 = m_0, Lambda_0 = Lambda_0,
+                       Lambda_n = Lambda_n, V_n = V_n, yty = XytXy[j, j],
+                       a_n = a_n, b_0 = b_0, beta = beta, se = se)
+              } else{
+
+                ## standard linear model
+                lm_cpp(X = Xy[, c(i, k), drop = FALSE], y = Xy[, j],
+                       beta = beta, se = se)
+              }
+
+              ## normal inverse gamma linear model
+              # lm_nig(Xty = XytXy[c(i, k), j], m_0 = m_0, Lambda_0 = Lambda_0,
+              #        Lambda_n = Lambda_n, V_n = V_n, yty = XytXy[j, j],
+              #        a_n = a_n, b_0 = b_0, beta = beta, se = se)
+
+              # normal inverse gamma linear model
+              # lm_nig0(X = X[, c(i, k), drop = FALSE], y = X[, j],
+              #         m_0 = m_0, Lambda_0 = Lambda_0,
+              #         a_0 = a_0, b_0 = b_0, n = n,
+              #         beta = beta, se = se)
+
+              ## standard linear model
+              # lm_cpp(X = Xy[, c(i, k), drop = FALSE], y = Xy[, j],
+              #        beta = beta, se = se)
+
+              temp[[j]][i, seq_len(3)] <- c(t, beta, se)
+
+              ## TODO: temp check
+              # m <- lm(formula = as.formula(sprintf("%s ~ %s", nodes[j],
+              #                                      paste(nodes[c(i, k)], collapse = " + "))),
+              #         data = as.data.frame(X))
+              # if (!all.equal(se, summary(m)$coefficients[2, "Std. Error"]) == TRUE)
+              #   browser()
             }
 
             ## compute joint estimate
@@ -685,7 +738,9 @@ build_arms <- function(bn.fit, settings, debug = FALSE){
 
 # Function for checking settings
 
-check_settings <- function(bn.fit, settings, debug = FALSE){
+check_settings <- function(bn.fit,
+                           settings,
+                           debug = FALSE){
 
   debug_cli_sprintf(debug, "info",
                     "Checking %g settings", length(settings))

@@ -24,9 +24,48 @@ BEGIN_RCPP
     return R_NilValue;
 END_RCPP
 }
+// lm_nig
+void lm_nig(arma::vec& Xty, arma::vec& m_0, arma::mat& Lambda_0, arma::mat& Lambda_n, arma::mat& V_n, double yty, double a_n, double b_0, arma::vec& beta, arma::vec& se);
+RcppExport SEXP _bcb_lm_nig(SEXP XtySEXP, SEXP m_0SEXP, SEXP Lambda_0SEXP, SEXP Lambda_nSEXP, SEXP V_nSEXP, SEXP ytySEXP, SEXP a_nSEXP, SEXP b_0SEXP, SEXP betaSEXP, SEXP seSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec& >::type Xty(XtySEXP);
+    Rcpp::traits::input_parameter< arma::vec& >::type m_0(m_0SEXP);
+    Rcpp::traits::input_parameter< arma::mat& >::type Lambda_0(Lambda_0SEXP);
+    Rcpp::traits::input_parameter< arma::mat& >::type Lambda_n(Lambda_nSEXP);
+    Rcpp::traits::input_parameter< arma::mat& >::type V_n(V_nSEXP);
+    Rcpp::traits::input_parameter< double >::type yty(ytySEXP);
+    Rcpp::traits::input_parameter< double >::type a_n(a_nSEXP);
+    Rcpp::traits::input_parameter< double >::type b_0(b_0SEXP);
+    Rcpp::traits::input_parameter< arma::vec& >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< arma::vec& >::type se(seSEXP);
+    lm_nig(Xty, m_0, Lambda_0, Lambda_n, V_n, yty, a_n, b_0, beta, se);
+    return R_NilValue;
+END_RCPP
+}
+// lm_nig0
+void lm_nig0(arma::mat& X, arma::vec& y, arma::vec& m_0, arma::mat& Lambda_0, double a_0, double b_0, double n, arma::vec& beta, arma::vec& se);
+RcppExport SEXP _bcb_lm_nig0(SEXP XSEXP, SEXP ySEXP, SEXP m_0SEXP, SEXP Lambda_0SEXP, SEXP a_0SEXP, SEXP b_0SEXP, SEXP nSEXP, SEXP betaSEXP, SEXP seSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< arma::vec& >::type y(ySEXP);
+    Rcpp::traits::input_parameter< arma::vec& >::type m_0(m_0SEXP);
+    Rcpp::traits::input_parameter< arma::mat& >::type Lambda_0(Lambda_0SEXP);
+    Rcpp::traits::input_parameter< double >::type a_0(a_0SEXP);
+    Rcpp::traits::input_parameter< double >::type b_0(b_0SEXP);
+    Rcpp::traits::input_parameter< double >::type n(nSEXP);
+    Rcpp::traits::input_parameter< arma::vec& >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< arma::vec& >::type se(seSEXP);
+    lm_nig0(X, y, m_0, Lambda_0, a_0, b_0, n, beta, se);
+    return R_NilValue;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_bcb_lm_cpp", (DL_FUNC) &_bcb_lm_cpp, 4},
+    {"_bcb_lm_nig", (DL_FUNC) &_bcb_lm_nig, 10},
+    {"_bcb_lm_nig0", (DL_FUNC) &_bcb_lm_nig0, 9},
     {NULL, NULL, 0}
 };
 
