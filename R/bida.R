@@ -1,10 +1,10 @@
-# Build bida aps using make
+# Compile bida aps using make
 
-make_bida <- function(aps_dir = get_bida(dir = TRUE),
-                      debug = FALSE){
+compile_bida <- function(aps_dir = get_bida(dir = TRUE),
+                         debug = FALSE){
 
   debug_cli_sprintf(debug, "info",
-                    "Building bida using make")
+                    "Compiling bida using make")
 
   ## check operating system
   check_os()
@@ -21,14 +21,48 @@ make_bida <- function(aps_dir = get_bida(dir = TRUE),
     if (length(make$stderr)){
 
       debug_cli_sprintf(debug, "success",
-                        "Successfully made bida aps in %g secs",
+                        "Successfully copmiled bida aps in %g secs",
                         make_time)
     } else{
 
       debug_cli_sprintf(debug, "success",
-                        "Already made bida aps")
+                        "Already compiled bida aps")
     }
   }
+}
+
+
+
+# Recompile bida aps using make
+
+recompile_bida <- function(aps_dir = get_bida(dir = TRUE),
+                           aps0_dir = sprintf("%s0", aps_dir),
+                           debug = FALSE){
+
+  debug_cli_sprintf(!dir.exists(aps0_dir), "abort",
+                    "Invalid aps0 directory")
+
+  debug_cli_sprintf(debug, "info",
+                    "Recompiling bida using make")
+
+
+  debug_cli_sprintf(debug, "",
+                    "Clearing aps directory")
+
+  null <- sapply(file.path(aps_dir, list.files(aps_dir)), file.remove)
+
+
+  debug_cli_sprintf(debug, "",
+                    "Copying aps0 directory to aps")
+
+  null <- sapply(list.files(aps0_dir), function(file){
+
+    file.copy(file.path(aps0_dir, file),
+              file.path(aps_dir, file))
+  })
+
+  compile_bida(aps_dir = aps_dir,
+               debug = debug)
 }
 
 
@@ -40,7 +74,7 @@ test_bida <- function(debug = FALSE){
   debug_cli_sprintf(debug, "info",
                     "Testing bida using github examples")
 
-  make_bida(debug = debug)
+  compile_bida(debug = debug)
 
   wd0 <- getwd()
   on.exit(setwd(wd0))

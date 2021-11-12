@@ -352,7 +352,7 @@ build_arms <- function(bn.fit, settings, debug = FALSE){
 
   if (is.null(settings$arms)){
 
-    debug_cli_sprintf(debug, "", "Initializing default arms")
+    debug_cli_sprintf(debug, "info", "Initializing default arms")
 
     ## exclude target
     ex <- which(settings$nodes == settings$target)
@@ -382,7 +382,7 @@ build_arms <- function(bn.fit, settings, debug = FALSE){
     }))
   } else{
 
-    debug_cli_sprintf(debug, "", "Loading arms from settings")
+    debug_cli_sprintf(debug, "info", "Loading arms from settings")
 
     ## TODO: check validity of arms
 
@@ -396,6 +396,9 @@ build_arms <- function(bn.fit, settings, debug = FALSE){
 # Function for checking settings
 
 check_settings <- function(bn.fit, settings, debug = FALSE){
+
+  debug_cli_sprintf(debug, "info",
+                    "Checking %g settings", length(settings))
 
   ## TODO:
   # simplify
@@ -577,7 +580,7 @@ check_settings <- function(bn.fit, settings, debug = FALSE){
     settings$aps_dir <- get_bida(dir = TRUE)
     debug_cli_sprintf(debug, "", "Detected aps_dir = %s", settings$aps_dir)
   }
-  make_bida(aps_dir = settings$aps_dir, debug = debug)
+  compile_bida(aps_dir = settings$aps_dir, debug = debug)
 
   ## check id
   if (is.null(settings$id)){
