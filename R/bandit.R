@@ -40,6 +40,172 @@ bandit <- function(bn.fit,
 
 
 
+# Indicate data rows
+
+get_bool_data <- function(t, i, settings, rounds, debug = FALSE){
+
+  bool_data <- rep(TRUE, t)
+
+  if (t > settings$n_obs){
+
+    ## add interventional data with node j such that either
+    ## Pr(i -> j) or Pr(j -> target) is low; i.e. j does not
+    ## block a directed path from i to target
+    bool_arms <- sapply(rounds$arms, function(arm){
+
+      max(rounds$arp[i, arm$node],
+          rounds$arp[arm$node, settings$target]) < settings$eta
+    })
+    bool_data[rounds$selected$arm[seq_len(t)] > 0] <-
+      bool_arms[rounds$selected$arm[seq_len(t)]]
+
+    debug_cli_sprintf(debug && sum(bool_data) > settings$n_obs, "",
+                      "Using %g rows of experimental data for back-door adjustment",
+                      sum(bool_data) - settings$n_obs)
+  }
+  return(bool_data)
+}
+
+
+
+## compute back-door adjustment estimates
+
+compute_bda <- function(data, settings, rounds, debug = FALSE){
+
+  ## TODO: make this only update only not cached causal effect estimates in bda
+
+  t <- nrow(data)
+  p <- settings$nnodes
+  seq_p <- seq_len(p)
+  nodes <- settings$nodes
+  parents <- seq_len(settings$max_parents)
+
+  ## hyperparameters
+  # a0 <- 1
+  # b0 <- 1
+  # c_mu0 <- 0
+  # diag_V0 <- 1
+
+  ## initialize storage structure
+  if (is.null(rounds[["bda"]])){
+
+    bda <- lapply(seq_p, function(i){
+
+      lapply(seq_p, function(j) if (j != i){
+
+        data.frame(bda_t = rep(NA, nrow(rounds$ps[[i]])),
+                   bda_est = NA, bda_se = NA,
+                   joint_t = NA, joint_est = NA, joint_se = NA)
+
+      } else NULL)
+    })
+    names(bda) <- nodes
+
+  } else{
+
+    bda <- rounds$bda
+  }
+  if (settings$type == "bn.fit.gnet"){
+
+    ## Gaussian implementation
+    for (i in seq_p){
+
+      bool_data <- get_bool_data(t = t, i = i,
+                                 settings = settings, rounds = rounds)
+
+      pars <- as.matrix(rounds$ps[[i]][parents])
+      temp <- bda[[i]]
+      n <- sum(bool_data)
+      X <- as.matrix(data[bool_data, , drop=FALSE])
+      if (max(abs(apply(X, 2, mean))) > 1e-6){
+        debug_cli_sprintf(debug > 1, "",
+                          "Assumes zero-centered data")
+        X <- apply(X, 2, function(x) x - mean(x))
+      }
+      # S <- t(X) %*% X
+
+      for (l in rounds$ps[[i]]$ordering){
+
+        if (rounds$ps[[i]]$support[l] == 0) break
+
+        k <- pars[l, !is.na(pars[l, ])]  # indices of parents
+        n_parents <- length(k)  # number of parents
+
+        # prior hyperparameters
+        # mu0 <- matrix(c_mu0, n_parents + 1, 1)  # prior mean
+        # A0 <- diag(n_parents + 1) / diag_V0  # prior variance
+
+        # update hyperparameters
+        # xzTxz <- S[c(i, k), c(i, k), drop = FALSE]
+        # A1 <- A0 + xzTxz
+        # V1 <- solve(A1)
+        # a1 <- a0 + n/2
+
+        for (j in seq_p[-i]){
+
+          if (j %in% k){  # j -> i, so i -/-> j
+
+            temp[[j]][l, seq(1, 6)] <- rep(0, 6)
+
+          } else {
+
+            ## compute bda effect
+            if (is.na(temp[[j]][l, 1]) ||  # not computed bda effect
+                any(bool_data[seq(temp[[j]][i, 1] + 1, t)])){  # added obs data
+
+              # xzTy <- S[c(i, k), j]
+              # XZtXZ <- solve(xzTxz)
+              # beta <- XZtXZ %*% xzTy
+              # s <- sd(X[, c(i, k), drop = FALSE] %*% beta - X[, j])
+              # Sigma_xy <- s * sqrt(XZtXZ[1, 1])
+
+              beta <- 0
+              se <- 0
+              lm_cpp(X = X[, c(i, k), drop = FALSE], y = X[, j],
+                     beta = beta, se = se)
+
+              temp[[j]][i, seq_len(3)] <- c(t,   # the last t bda was computed
+                                            beta,  # estimate
+                                            se)  # standard error
+
+              ## check
+              m <- lm(formula = as.formula(sprintf("%s ~ %s", nodes[j],
+                                                   paste(nodes[c(i, k)], collapse = " + "))),
+                      data = as.data.frame(X))
+              if (!all.equal(se, summary(m)$coefficients[2, "Std. Error"]) == TRUE)
+                browser()
+            }
+
+            ## compute joint estimate
+            if (t <= settings$n_obs){
+
+              temp[[j]][l, seq(4, 6)] <- temp[[j]][l, seq(1, 3)]
+
+            } else if (temp[[j]][l, 1] == t ||  # just updated bda effect
+                       rounds$selected$interventions[t] ==
+                       nodes[i]){  # most recent intervention is on i
+
+              browser()
+
+              ## TODO: joint estimate
+            }
+          }
+        }
+      }
+      bda[[i]] <- temp
+    }
+  } else if (settings$type == "bn.fit.dnet"){
+
+    browser()
+
+    ## TODO: discrete implementation
+
+  }
+  return(bda)
+}
+
+
+
 # Compute parent set supports
 # Modification of calc_bida_post()
 
