@@ -119,7 +119,7 @@ threshold_ps <- function(ps,
     ## remove parents with low support
     ps[[i]]$support[-ps[[i]]$ordering[seq_len(pos)]] <- 0
 
-    debug_cli_sprintf(debug, "", "Thresholded %g out of %g parent sets for node %s",
+    debug_cli_sprintf(debug > 1, "", "Thresholded %g out of %g parent sets for node %s",
                       nrow(ps[[i]]) - pos, nrow(ps[[i]]), names(ps)[i])
 
     ## normalize probabilities
@@ -183,6 +183,38 @@ read_aps_ps <- function(settings){
   names(ps) <- settings$nodes
 
   return(ps)
+}
+
+
+
+## Convert parent support to edge support matrix
+
+ps2es <- function(ps,
+                  settings){
+
+  nnodes <- settings$nnodes
+  max_parents <- settings$max_parents
+  # parents <- setdiff(names(ps[[1]]), c("score", "support", "ordering"))
+  parents <- seq_len(max_parents)
+
+  es <- bnlearn::amat(bnlearn::empty.graph(settings$nodes))
+
+  for (i in seq_len(nnodes - 1)){
+
+    for (j in seq(i + 1, nnodes)){
+
+      # j -> i
+      es[j, i] <- sum(ps[[i]]$support
+                      [apply(ps[[i]][parents],
+                             1, function(x) j %in% x)])
+
+      # i -> j
+      es[i, j] <- sum(ps[[j]]$support
+                      [apply(ps[[j]][parents],
+                             1, function(x) i %in% x)])
+    }
+  }
+  return(es)
 }
 
 
@@ -394,7 +426,7 @@ cache_scores <- function(data,
 
   debug_cli_sprintf(debug, "success",
                     "Computed %g scores and saved to %s_score",
-                    length(lns) - 2 * d, tail(strsplit(cache_file, "/")[[1]], 1))
+                    length(lns) - d - 1, tail(strsplit(cache_file, "/")[[1]], 1))
 }
 
 
