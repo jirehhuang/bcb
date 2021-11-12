@@ -290,18 +290,17 @@ cache_scores <- function(data,
   blmat <- NULL
 
   n <- nrow(data)
-  d <- ncol(data)
+  p <- d <- ncol(data)
+  seq_p <- nodes <- seq_len(p)
   if (score %in% c("fml", "bge0")){
 
     if (max(abs(apply(data, 2, mean))) > 1e-6){
       debug_cli_sprintf(debug, "",
                         "Assumes zero-centered data")
-      data <- apply(data, 2, function(x) x-mean(x))
+      data <- apply(data, 2, function(x) x - mean(x))
     }
-    S <- t(data)%*%data
+    S <- t(data) %*% data
   }
-  nodes <- seq_len(d)
-  node_names <- colnames(data)
 
   nps <- sum(sapply(0:max_parents, function(x) choose(d-1,x)))
   debug_cli_sprintf(nps > 1e6,
@@ -369,27 +368,27 @@ cache_scores <- function(data,
 
     ## TODO: initialize vector instead of appending lines
 
-    for (node in nodes){
+    for (i in seq_p){
 
       lines <- list()
 
-      for (k in 0:max_parents){
+      for (k in seq(0, max_parents)){
 
-        par_sets <- combn(nodes[-node], k)
+        par_sets <- combn(seq_p[-i], k)
 
         ## remove parent sets that violate blmat
         if (!is.null(blmat))
           par_sets <- par_sets[, !apply(par_sets, 2,
-                                        function(par) any(blmat[par, node]))]
+                                        function(par) any(blmat[par, i]))]
 
         len <- length(lines)
         lines <- c(lines, vector(mode = "list", ncol(par_sets)))
 
-        for (i in seq_len(ncol(par_sets))){
+        for (j in seq_len(ncol(par_sets))){
 
-          ## direct parents -> node in network
-          par <- par_sets[,i]
-          amat[par, node] <- 1
+          ## direct parents -> i in network
+          par <- par_sets[, j]
+          amat[par, i] <- 1
           bnlearn::amat(network) <- amat
 
           extra.args <- list()
@@ -398,20 +397,20 @@ cache_scores <- function(data,
 
           ## compute and store score
           scr <- local_score(network = network, data = data, score = score,
-                             targets = node_names[node], extra.args = extra.args,
+                             targets = settings$nodes[i], extra.args = extra.args,
                              interventions = interventions, debug = debug > 1)
 
           ## TODO: can I increase nsmall
 
-          lines[[len + i]] <- sprintf("%s %g %s",
+          lines[[len + j]] <- sprintf("%s %g %s",
                                       trimws(format(round(scr, 6), nsmall=6)),
                                       k, paste(par, collapse = " "))
 
-          ## disconnect parents -> node in network
-          amat[par, node] <- 0
+          ## disconnect parents -> i in network
+          amat[par, i] <- 0
         }
       }
-      lns <- c(lns, sprintf("%g %g", node, length(lines)), unlist(lines))
+      lns <- c(lns, sprintf("%g %g", i, length(lines)), unlist(lines))
     }
   } else{
 
