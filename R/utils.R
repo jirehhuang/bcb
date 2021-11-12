@@ -153,6 +153,19 @@ read_dir <- function(dir,
 
 
 
+# Restore matrix that was stored in a row
+
+row2mat <- function(row,
+                    nodes){
+
+  mat <- matrix(row, nrow = length(nodes), ncol = length(nodes))
+  rownames(mat) <- colnames(mat) <- nodes
+
+  return(mat)
+}
+
+
+
 # Function for generating a random id
 
 random_id <- function(n = 12){
