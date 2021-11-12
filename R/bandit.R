@@ -15,6 +15,8 @@ bandit <- function(bn.fit,
   settings <- check_settings(bn.fit = bn.fit, settings = settings, debug = debug)
   rounds <- initialize_rounds(bn.fit = bn.fit, settings = settings, debug = debug)
 
+  ## TODO: set seed
+
   tt <- if (settings$recompute <= 0){
 
     seq_len(settings$n_int + settings$n_obs)
@@ -49,7 +51,43 @@ bandit <- function(bn.fit,
 
 
 
+## TODO: update_rounds()
+
+
+
 ## TODO: summarize_rounds()
+
+
+
+######################################################################
+## General relevant functions
+######################################################################
+
+
+
+# Random which.max() for randomly choosing a best arm
+
+random_which.max <- function(x){
+
+  which_max <- which(x == max(x))
+
+  if (length(which_max) > 1)
+    sample(which_max, 1)
+  else
+    which_max
+}
+
+
+
+# Convert arm list element to intervene for use in ribn()
+
+arm2intervene <- function(arm){
+
+  intervene <- arm[1]
+  intervene[[arm$node]] <- arm$value
+
+  return(list(intervene))
+}
 
 
 
