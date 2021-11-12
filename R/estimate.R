@@ -50,7 +50,7 @@ compute_bda <- function(data,
         # last t where updated, estimate, and standard error
         data.frame(t_bda = rep(NA, nrow(rounds$ps[[i]])),
                    est_bda = NA, se_bda = NA,
-                   t_joint = NA, est_joint = NA, se_joint = NA)
+                   t_est = NA, est_est = NA, se_est = NA)
 
       } else NULL)
     })
@@ -109,7 +109,7 @@ compute_bda <- function(data,
 
             ## compute bda effect
             if (is.na(temp[[j]][l, 1]) ||  # not computed bda effect
-                any(bool_data[seq(temp[[j]][i, 1] + 1, t)])){  # added obs data
+                any(bool_data[seq(temp[[j]][l, 1] + 1, t)])){  # added obs data
 
               beta <- 0
               se <- 0
@@ -126,7 +126,7 @@ compute_bda <- function(data,
                 lm_cpp(X = Xy[, c(i, k), drop = FALSE], y = Xy[, j],
                        beta = beta, se = se)
               }
-              temp[[j]][i, seq_len(3)] <- c(t, beta, se)
+              temp[[j]][l, seq_len(3)] <- c(t, beta, se)
             }
 
             ## compute joint estimate
