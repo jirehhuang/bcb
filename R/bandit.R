@@ -37,6 +37,111 @@ bandit <- function(bn.fit,
 # initialize_rounds()
 # summarize_rounds()
 # apply_method()
+# threshold_ps()
+
+
+
+# Update parent support
+# Modification of calc_bida_post()
+
+compute_ps <- function(data,
+                       settings,
+                       interventions = rep("", nrow(data)),
+                       debug = FALSE){
+
+  ## load relevant settings
+  list2env(settings[c("score", "max_parents", "blmat",
+                      "aps_dir", "nnodes")],
+           envir = environment())
+  cache_file <- file.path(settings$temp_dir, settings$id)
+
+  debug_cli_sprintf(nnodes > 20,
+                    "abort", "Don't use on systems with more than 20 variables")
+
+  ## calculate parent scores and save as temporary files
+  if (!file.exists(sprintf("%s_score", cache_file))){
+
+    debug_cli_sprintf(missing(data),
+                      "abort", "File score missing and argument data missing")
+
+    cache_scores(data = data, settings = settings,
+                 interventions = interventions, debug = debug)
+  }
+
+  ## calculate parent support using the APS solver
+  aps_type <- "modular"
+  system(sprintf("%s/aps %s %s_score %s_support", aps_dir,
+                 aps_type, shQuote(cache_file), shQuote(cache_file)))
+
+  debug_cli_sprintf(!file.exists(sprintf("%s_support", cache_file)),
+                    "abort", "File support missing, and score %s",
+                    ifelse(file.exists(sprintf("%s_score", cache_file)),
+                           "exists", "also missing"))
+
+  ## read in calculated parent support from file
+  ps <- read_aps_ps(settings = settings)
+
+  ## delete support, saving score for arp
+  file.remove(sprintf("%s_support", cache_file))  # keep score for arp
+
+  return(ps)
+}
+
+
+
+# Modification of read_in_aps_parent_post() from bida
+# that stores the parent configurations and support as a data.frame
+
+read_aps_ps <- function(settings){
+
+  ## load relevant settings
+  max_parents <- settings$max_parents
+  cache_file <- file.path(settings$temp_dir, settings$id)
+
+  ## read file containing support
+  temp <- read.table(sprintf("%s_support", cache_file),
+                     header = FALSE, sep = " ",
+                     col.names = sprintf("V%g", seq_len(max_parents + 2)),
+                     fill = TRUE)
+
+  p <- temp[1, 1]  # number of variables
+  pos <- 2  # position
+  ps <- vector("list", length = p)
+  nms <- c(sprintf("V%g", seq_len(max_parents)),
+           "score", "support", "order", "ordering")
+
+  ## for each node
+  for (i in seq_len(p)){
+
+    node <- temp[pos,1]  # node
+    n_parents <- temp[pos,2]  # number of parent configurations
+    pos <- pos + 1
+
+    ps[[node]] <- as.data.frame(sapply(nms, function(x) numeric(n_parents),
+                                       simplify = FALSE))
+
+    ## parent configurations of node
+    ps[[node]][seq_len(n_parents),
+               seq_len(max_parents)] <- temp[seq(pos, pos + n_parents - 1),
+                                             seq_len(max_parents) + 2]
+
+    ## convert corresponding scores to support
+    ps[[node]][["score"]] <- temp[seq(pos, pos + n_parents - 1), 1]
+    scr <- exp(ps[[node]][["score"]] -
+                 max(ps[[node]][["score"]]))
+    ps[[node]][["support"]] <- scr / sum(scr)
+
+    ## ordering and order
+    ps[[node]][["ordering"]] <- order(ps[[node]][["support"]],
+                                      decreasing = TRUE)
+    ps[[node]][["order"]][ps[[node]][["ordering"]]] <- seq_len(n_parents)
+
+    ## iterate position
+    pos <- pos + n_parents
+  }
+
+  return(ps)
+}
 
 
 
