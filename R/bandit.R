@@ -332,6 +332,104 @@ summarize_rounds <- function(bn.fit, settings, rounds){
 
 
 
+## Write rounds to a location
+
+write_rounds <- function(rounds, where){
+
+  if (grepl(".rds", where)){
+
+    ## TODO: check
+
+    saveRDS(rounds, where)
+
+  } else{
+
+    dir_check(where)
+
+    for (nm in setdiff(names(rounds), c("settings", "ps", "bda", "bda_list"))){
+
+      write.table(rounds[[nm]], file = file.path(where, sprintf("%s.txt", nm)))
+    }
+
+    write.table(convert_ps(ps = rounds$ps, new_class = "data.frame"),
+                file.path(where, "ps.txt"))
+    write.table(convert_bda(bda = rounds$bda, new_class = "data.frame"),
+                file.path(where, "bda.txt"))
+
+    rounds$settings$nodes <- paste(rounds$settings$nodes, collapse = ", ")
+    write.table(as.data.frame(rounds$settings[setdiff(names(rounds$settings),
+                                                      c("data_obs", "bn.fit"))]),
+                file.path(where, "settings.txt"))
+  }
+}
+
+
+
+## Read rounds from a location
+
+read_rounds <- function(where){
+
+  if (grepl(".rds", where)){
+
+    debug_cli_sprintf(! file.exists(where),
+                      "abort", "Specified file does not exist")
+
+    rounds <- readRDS(where)
+
+  } else{
+
+    debug_cli_sprintf(! dir.exists(where),
+                      "abort", "Specified directory does not exist")
+
+    nms <- c("arms", "data", "selected", "effects_true", "ps", "bda",
+             mat <- c("es", "med_graph", "effects_est", "effects_bda", "effects_int", "se_est", "se_bda", "se_int",
+                      "E_Var_bda", "E_Var_int", "E_Var_est", "Var_E_bda", "Var_E_int", "Var_E_est"),
+             "med_dag", "med_cpdag", "settings")
+
+    mat <- c("effects_true", mat)
+    mat <- sprintf("%s.txt", mat)
+
+    files <- sprintf("%s.txt", nms)
+    files <- files[files %in% list.files(where)]
+
+    rounds <- lapply(files, function(file){
+
+      temp <- read.table(file.path(where, file), as.is = TRUE)
+      rownames(temp) <- NULL
+
+      if (file %in% mat)
+        temp <- as.matrix(temp)
+
+      if (file == "ps.txt"){
+
+        for (nm in names(temp)){
+
+          mode(temp[[nm]]) <- switch(nm, node = "character", ordering = "integer", "numeric")
+        }
+      }
+      return(temp)
+    })
+    names(rounds) <- gsub(".txt", "", files)
+
+    rounds$selected$interventions <- ifelse(is.na(rounds$selected$interventions),
+                                            "", rounds$selected$interventions)
+
+    rounds$ps <- convert_ps(ps = rounds$ps, new_class = "list")
+    rounds$bda <- convert_bda(bda = rounds$bda, new_class = "list")
+
+    rounds$settings <- as.list(rounds$settings)
+    rounds$settings$nodes <- strsplit(rounds$settings$nodes, ", ")[[1]]
+  }
+  return(rounds)
+}
+
+
+
+
+## TODO: read_rounds()
+
+
+
 ######################################################################
 ## General relevant functions
 ######################################################################
@@ -406,14 +504,19 @@ initialize_rounds <- function(bn.fit,
         selected = data.frame(arm = integer(n_obs + n_int),
                               interventions = character(1), reward = numeric(1),
                               simple_reward = numeric(1), time = numeric(1)),
-        bda_list = list(),  # TODO: remove; temp for debugging
-        effects_true = effects_list2mat(bn.fit2effects(bn.fit, debug = debug))
+        effects_true = effects_list2mat(bn.fit2effects(bn.fit, debug = debug)),
+        ps = list(),
+        bda = list()
+        # bda_list = list(),  # TODO: remove; temp for debugging
       ),
       sapply(c("es", "med_graph",
                "effects_est", "effects_bda", "effects_int",
                "se_est", "se_bda", "se_int"), function(x) matrices,
              simplify = FALSE, USE.NAMES = TRUE)
     )
+    rounds$selected$reward[seq_len(n_obs)] <-
+      rounds$data[[settings$target]][seq_len(n_obs)]
+
     ## TODO: remove; temp for debugging
     rounds <- c(rounds,
                 sapply(c(sprintf("E_Var_%s", c("bda", "int", "est")),
@@ -421,8 +524,6 @@ initialize_rounds <- function(bn.fit,
                        function(x) matrix(0, nrow = n_obs + n_int,
                                           ncol = settings$nnodes - 1),
                        simplify = FALSE, USE.NAMES = TRUE))
-    rounds$selected$reward[seq_len(n_obs)] <-
-      rounds$data[[settings$target]][seq_len(n_obs)]
   }
   return(rounds)
 }
