@@ -10,6 +10,9 @@ bandit <- function(bn.fit,
                    settings = list(),
                    debug = FALSE){
 
+  ## load settings
+  list2env(settings[c("n_obs", "n_int")], envir = environment())
+
   ## check arguments and initialize
   bnlearn:::check.bn.or.fit(bn.fit)
   settings <- check_settings(bn.fit = bn.fit, settings = settings, debug = debug)
@@ -17,19 +20,19 @@ bandit <- function(bn.fit,
 
   ## TODO: set seed
 
-  tt <- if (settings$recompute <= 0){
+  tt <- if (settings$borrow <= 0){
 
-    seq_len(settings$n_int + settings$n_obs)
+    seq_len(n_obs + n_int)
 
   } else{
 
-    seq_len(settings$n_int) + settings$n_obs
+    seq_len(n_int) + n_obs
   }
-  tt <- tt[tt > settings$max_parents]
+  tt <- tt[tt > settings$max_parents + 1 | tt > n_obs]
   for (t in tt){
 
     debug_cli_sprintf(debug, "", "t = %g / %g",
-                      t, settings$n_int + settings$n_obs)
+                      t, n_int + n_obs)
 
     rounds <- apply_method(t = t, bn.fit = bn.fit, settings = settings,
                            rounds = rounds, debug = debug)
@@ -41,7 +44,53 @@ bandit <- function(bn.fit,
 
 
 
-## TODO: apply_method()
+## Apply bandit policy
+
+apply_method <- function(t,
+                         bn.fit,
+                         settings,
+                         rounds,
+                         debug = FALSE){
+
+  ## load settings
+  list2env(settings[c("method")], envir = environment())
+
+  start_time <- Sys.time()
+
+  if (t <= settings$n_obs || (method != "bcb" &&
+                              rounds$selected$arm[t] > 0)){
+
+    ## update observational
+    rounds <- update_rounds(t = t, a = rounds$selected$arm[t],
+                            data_t = rounds$data[t,], settings = settings,
+                            rounds = rounds, debug = debug)
+  } else{
+
+    ## choose arm
+    if (method == "random"){
+
+      ## select random arm
+      a <- sample(seq_len(length(rounds$arms)), 1)
+      if (debug)
+        cat(sprintf("random: Intervention %s = %s with estimated = %s\n",
+                    rounds$arms[[a]]$node, rounds$arms[[a]]$value,
+                    rounds$arms[[a]]$estimate))
+
+    }
+    ## generate data based on arm
+    data_t <- ribn(x = bn.fit, debug = FALSE,
+                   intervene = arm2intervene(rounds$arms[[a]]))
+
+    ## update rounds: posterior distribution, estimates, variances, med
+    rounds <- update_rounds(t = t, a = a, data_t = data_t, settings = settings,
+                            rounds = rounds, debug = debug)
+  }
+
+  end_time <- Sys.time()
+  rounds$selected$time[t] <- as.numeric(end_time - start_time, unit = "secs")
+
+  return(rounds)
+}
 
 
 
@@ -51,7 +100,148 @@ bandit <- function(bn.fit,
 
 
 
-## TODO: update_rounds()
+## Update arms after a round t
+
+update_arms <- function(t,
+                        settings,
+                        rounds){
+
+  # if (t <= settings$n_obs) return(rounds$arms)
+
+  if (settings$type == "bn.fit.gnet"){
+
+    ## TODO: check again for int
+
+    effects_est <- row2mat(rounds$effects_est[t,],
+                           nodes = settings$nodes)
+
+    for (a in seq_len(length(rounds$arms))){
+
+      rounds$arms[[a]]$estimate <- rounds$arms[[a]]$value *
+        effects_est[rounds$arms[[a]]$node, settings$target]
+
+      ## TODO: increment instead
+      rounds$arms[[a]]$N <- sum(rounds$selected$arm == a)
+    }
+  } else if (settings$type == "bn.fit.dnet"){
+
+    browser()
+
+    ## TODO: discrete implementation
+  }
+  return(rounds$arms)
+}
+
+
+
+# Average true effect of chosen estimate(s)
+
+simple_reward <- function(settings,
+                          rounds){
+
+  if (settings$type == "bn.fit.gnet"){
+
+    ests <- sapply(rounds$arms, function(arm) arm$estimate)
+    chosen_arms <- which(ests == max(ests))
+
+    mean(sapply(chosen_arms, function(a){
+
+      rounds$effects_true[rounds$arms[[a]]$node,
+                          settings$target] * rounds$arms[[a]]$value
+    }))
+
+  } else if (settings$type == "bn.fit.dnet"){
+
+    browser()
+
+    ## TODO: discrete implementation
+  }
+}
+
+
+
+## Update rounds after a round t
+
+update_rounds <- function(t,
+                          a,
+                          data_t,
+                          settings,
+                          rounds,
+                          debug = FALSE){
+
+  ## load settings
+  list2env(settings[c("target", "n_obs", "n_int")], envir = environment())
+
+  if (a > 0){
+    rounds$data[t,] <- data_t
+    rounds$selected$arm[t] <- a
+    rounds$selected$reward[t] <- colMeans(data_t)[target]
+    rounds$selected$interventions[t] <- rounds$arms[[a]]$node
+  }
+  rounds$ps <- compute_ps(data = rounds$data[seq_len(t),,drop = FALSE],
+                          settings = settings,
+                          interventions = rounds$selected$interventions[seq_len(t)],
+                          threshold = settings$threshold,
+                          debug = debug)
+  if (t > n_obs){
+
+    rounds$arp <- compute_arp(data = rounds$data[seq_len(t),,drop = FALSE],
+                              settings = settings,
+                              interventions = rounds$selected$interventions[seq_len(t)],
+                              debug = debug)
+  }
+  rounds$es[t,] <- ps2es(ps = rounds$ps, settings = settings)
+  rounds$med_graph[t,] <- es2med_graph(es = rounds$es[t,])
+
+  rounds <- compute_int(t = t, settings = settings, rounds = rounds)
+  rounds$bda <- compute_bda(data = rounds$data[seq_len(t),,drop = FALSE],
+                            settings = settings, rounds = rounds,
+                            target = NULL, debug = debug)
+
+  ## TODO: remove; temporary for debugging
+  # if (t == 10 || t %% 100 == 0 || t == (n_obs + n_int))
+  #   rounds$bda_list[[as.character(t)]] <- rounds$bda
+
+  if (settings$type == "bn.fit.gnet"){
+
+    rounds$effects_bda[t,] <- expect_post(rounds = rounds, metric = "est_bda")
+    rounds$effects_est[t,] <- expect_post(rounds = rounds, metric = "est_est")
+
+    ## E(Var(X)) + Var(E(X)) = E(Var(X)) + (E(X^2) - E(X)^2)
+    rounds$se_bda[t,] <-
+      sqrt(
+        (E_Var_bda <- expect_post(rounds = rounds, metric = "se_bda", squared = TRUE)) +
+          (Var_E_bda <- expect_post(rounds = rounds, metric = "est_bda", squared = TRUE) -
+             expect_post(rounds = rounds, metric = "est_bda")^2)
+      )
+    rounds$se_est[t,] <-
+      sqrt(
+        (E_Var_est <- expect_post(rounds = rounds, metric = "se_est", squared = TRUE)) +
+          (Var_E_est <- expect_post(rounds = rounds, metric = "est_est", squared = TRUE) -
+          expect_post(rounds = rounds, metric = "est_est")^2)
+      )
+
+    ## TODO: remove; temporary for debugging
+    rounds$E_Var_bda[t,] <- E_Var_bda[setdiff(settings$nodes,
+                                              target), target]
+    rounds$Var_E_bda[t,] <- Var_E_bda[setdiff(settings$nodes,
+                                              target), target]
+    rounds$E_Var_est[t,] <- E_Var_est[setdiff(settings$nodes,
+                                              target), target]
+    rounds$Var_E_est[t,] <- Var_E_est[setdiff(settings$nodes,
+                                              target), target]
+
+  } else if (settings$type == "bn.fit.dnet"){
+
+    browser()
+
+    ## TODO: discrete implementation
+  }
+  rounds$arms <- update_arms(t = t, settings = settings, rounds = rounds)
+  rounds$selected$chosen[t] <- ifelse(FALSE && t <= n_obs, 0,  # TODO: remove F
+                                      simple_reward(settings, rounds))
+  return(rounds)
+}
 
 
 
@@ -97,7 +287,62 @@ arm2intervene <- function(arm){
 
 
 
-## TODO: initialize_rounds()
+## Initialize rounds
+
+initialize_rounds <- function(bn.fit,
+                              settings,
+                              debug = FALSE){
+
+  ## load settings
+  list2env(settings[c("n_obs", "n_int")], envir = environment())
+
+  ## borrow data from previous rounds
+  if (!is.null(settings$rounds)){
+
+    browser()
+
+    debug_cli_sprintf(n_obs > settings$rounds$n_obs,
+                      "abort", "Attempting to borrow %g > %g observations",
+                      n_obs, settings$rounds$n_obs)
+
+    ## TODO: borrow previous rounds
+
+  } else{
+
+    ## structure to store a p x p matrix in each row
+    matrices <- matrix(0, nrow = n_obs + n_int,
+                       ncol = settings$nnodes^2)
+    rounds <- c(
+      list(
+        arms = build_arms(bn.fit = bn.fit, settings = settings, debug = debug),
+        data = rbind(
+          settings$data_obs,
+          as.data.frame(sapply(settings$nodes,
+                               function(x) integer(n_int), simplify = FALSE))
+        ),
+        selected = data.frame(arm = integer(n_obs + n_int),
+                              interventions = character(1), reward = numeric(1),
+                              chosen = numeric(1), time = numeric(1)),
+        bda_list = list(),  # TODO: remove; temp for debugging
+        effects_true = effects_list2mat(bn.fit2effects(bn.fit, debug = debug))
+      ),
+      sapply(c("es", "med_graph",
+               "effects_est", "effects_bda", "effects_int",
+               "se_est", "se_bda", "se_int"), function(x) matrices,
+             simplify = FALSE, USE.NAMES = TRUE)
+    )
+    ## TODO: remove; temp for debugging
+    rounds <- c(rounds,
+                sapply(c(sprintf("E_Var_%s", c("bda", "int", "est")),
+                         sprintf("Var_E_%s", c("bda", "int", "est"))),
+                       function(x) matrix(0, nrow = n_obs + n_int,
+                                          ncol = settings$nnodes - 1),
+                       simplify = FALSE, USE.NAMES = TRUE))
+    rounds$selected$reward[seq_len(n_obs)] <-
+      rounds$data[[settings$target]][seq_len(n_obs)]
+  }
+  return(rounds)
+}
 
 
 
