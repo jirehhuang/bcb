@@ -359,7 +359,7 @@ generate_data_grid <- function(data_grid = build_data_grid(),
 
         ## write scores
         write.table(true_scores, file.path(data_dir,
-                                           sprintf("true_scores%g.txt", j)))
+                                           sprintf("true_scores.txt")))
 
         return(NULL)
       }
