@@ -15,6 +15,8 @@ cache_scores <- function(data,
                          interventions = rep("", nrow(data)),
                          debug = FALSE){
 
+  ## TODO: read cache_file and update only nodes that were not most recently intervened on
+
   ## load relevant settings
   list2env(settings[c("score", "max_parents", "blmat")],
            envir = environment())
@@ -442,12 +444,48 @@ ps2es <- function(ps,
 
 
 
-## Trivial convenience function for converting
-## edge support to median probability graph
+# Trivial convenience function for converting
+# edge support to median probability graph
 
 es2med_graph <- function(es){
 
   return(1 * (es > 0.5))
+}
+
+
+
+# Convert ps between list and data.frame
+
+convert_ps <- function(ps,
+                       new_class = switch(class(ps), list = "data.frame", `data.frame` = "list")){
+
+  debug_cli_sprintf(! class(ps) %in% c("list", "data.frame"),
+                    "abort", "ps must be a list or data.frame")
+
+  debug_cli_sprintf(! new_class %in% c("list", "data.frame"),
+                    "abort", "new_class must be a list or data.frame")
+
+  if (class(ps) == new_class)
+    return(ps)
+
+  if (new_class == "data.frame"){
+
+    ps <- as.data.frame(data.table::rbindlist(lapply(names(ps), function(node){
+
+      cbind(node = node, ps[[node]])
+    })))
+  } else if (new_class == "list"){
+
+    nodes <- unique(ps$node)
+    ps <- sapply(nodes, function(node){
+
+      ps_node <- ps[ps$node == node, names(ps) != "node"]
+      rownames(ps_node) <- NULL
+      return(ps_node)
+
+    }, simplify = FALSE, USE.NAMES = TRUE)
+  }
+  return(ps)
 }
 
 
