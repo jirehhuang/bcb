@@ -252,6 +252,13 @@ check_settings <- function(bn.fit,
   }
   settings$max_parents <- min(settings$nnodes-1, settings$max_parents)
 
+  ## check threshold
+  if (is.null(settings$threshold) ||
+      settings$threshold < 0 || settings$threshold > 1){
+    settings$threshold <- 0
+    debug_cli_sprintf(debug, "", "Default threshold = %s", settings$threshold)
+  }
+
   ## check eta
   if (is.null(settings$eta) ||
       settings$eta < 0 || settings$eta > 1){
@@ -346,26 +353,33 @@ check_settings <- function(bn.fit,
   }
 
   ## check data_obs
-  if (settings$n_obs == 0){
+  if (is.data.frame(settings$data_obs)){
+
+    ## TODO: check
+
+  } else if (settings$n_obs == 0){
 
     settings$data_obs <- ribn(settings$bn.fit, n = 0)
-  }
-  if (is.null(settings$data_obs) || settings$data_obs == ""){
+
+  } else if (is.null(settings$data_obs) || settings$data_obs == ""){
 
     ## generate observational data
     settings$data_obs <- ribn(settings$bn.fit, n = settings$n_obs)
 
-  } else if (dir.exists(settings$data_obs) &&
-             (file.exists(fp <-
-                          file.path(settings$data_obs, sprintf("data%s.txt",
-                                                               settings$run)))) ||
-             file.exists(fp <- settings$data_obs)){
+  } else if (is.character(settings$data_obs)){
 
-    settings$data_obs <- read.table(fp)[seq_len(settings$n_obs),]
+    if (dir.exists(settings$data_obs) &&
+        (file.exists(fp <-
+                     file.path(settings$data_obs, sprintf("data%s.txt",
+                                                          settings$run)))) ||
+        file.exists(fp <- settings$data_obs)){
 
-    if (settings$type == "bn.fit.dnet")
-      settings$data_obs <- as.data.frame(lapply(settings$data_obs,
-                                                function(x) as.factor))
+      settings$data_obs <- read.table(fp)[seq_len(settings$n_obs),]
+
+      if (settings$type == "bn.fit.dnet")
+        settings$data_obs <- as.data.frame(lapply(settings$data_obs,
+                                                  function(x) as.factor))
+    }
   }
   debug_cli_sprintf(!is.data.frame(settings$data_obs),
                     "abort", "data_obs is not a data.frame")
@@ -376,7 +390,7 @@ check_settings <- function(bn.fit,
   ## sort settings
   nms <- c("method", "target", "run", "n_run", "n_obs", "n_int",
            "n_ess", "n_t", "int_parents", "optimistic", "epsilon",
-           "c", "score", "max_parents", "eta", "borrow")
+           "c", "score", "max_parents", "threshold", "eta", "borrow")
   settings <- settings[union(nms, c("nodes", "nnodes", "type", "temp_dir",
                                     "aps_dir", "id", "data_obs", "bn.fit"))]
 
