@@ -220,3 +220,56 @@ get_bool_data <- function(t,
   }
   return(bool_data)
 }
+
+
+
+# Convert bda between list and data.frame
+
+convert_bda <- function(bda,
+                        new_class = switch(class(bda), list = "data.frame", `data.frame` = "list")){
+
+  debug_cli_sprintf(! class(bda) %in% c("list", "data.frame"),
+                    "abort", "bda must be a list or data.frame")
+
+  debug_cli_sprintf(! new_class %in% c("list", "data.frame"),
+                    "abort", "new_class must be a list or data.frame")
+
+  if (class(bda) == new_class)
+    return(bda)
+
+  if (new_class == "data.frame"){
+
+    bda <- as.data.frame(data.table::rbindlist(lapply(names(bda), function(from){
+
+      as.data.frame(data.table::rbindlist(lapply(names(bda[[from]]), function(to){
+
+        if (from != to)
+          cbind(from = from, to = to, bda[[from]][[to]])
+        else
+          NULL
+      })))
+    })))
+  } else if (new_class == "list"){
+
+    nodes <- unique(bda$from)
+    bda <- sapply(nodes, function(from){
+
+      sapply(nodes, function(to){
+
+        if (from != to){
+
+          bda_from_to <- bda[bda$from == from, names(bda) != "from"]
+          bda_from_to <- bda_from_to[bda_from_to$to == to, names(bda_from_to) != "to"]
+          rownames(bda_from_to) <- NULL
+          return(bda_from_to)
+
+        } else{
+
+          return(NULL)
+        }
+
+      }, simplify = FALSE, USE.NAMES = TRUE)
+
+    }, simplify = FALSE, USE.NAMES = TRUE)
+  }
+  return(bda)
