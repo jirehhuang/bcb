@@ -10,13 +10,13 @@ bandit <- function(bn.fit,
                    settings = list(),
                    debug = FALSE){
 
-  ## load settings
-  list2env(settings[c("n_obs", "n_int")], envir = environment())
-
   ## check arguments and initialize
   bnlearn:::check.bn.or.fit(bn.fit)
   settings <- check_settings(bn.fit = bn.fit, settings = settings, debug = debug)
   rounds <- initialize_rounds(bn.fit = bn.fit, settings = settings, debug = debug)
+
+  ## load settings
+  list2env(settings[c("n_obs", "n_int")], envir = environment())
 
   ## TODO: set seed
 
@@ -175,7 +175,7 @@ update_rounds <- function(t,
   if (a > 0){
     rounds$data[t,] <- data_t
     rounds$selected$arm[t] <- a
-    rounds$selected$reward[t] <- colMeans(data_t)[target]
+    rounds$selected$reward[t] <- mean(data_t[[target]])
     rounds$selected$interventions[t] <- rounds$arms[[a]]$node
   }
   rounds$ps <- compute_ps(data = rounds$data[seq_len(t),,drop = FALSE],
@@ -238,14 +238,97 @@ update_rounds <- function(t,
     ## TODO: discrete implementation
   }
   rounds$arms <- update_arms(t = t, settings = settings, rounds = rounds)
-  rounds$selected$chosen[t] <- ifelse(FALSE && t <= n_obs, 0,  # TODO: remove F
-                                      simple_reward(settings, rounds))
+  rounds$selected$simple_reward[t] <- simple_reward(settings, rounds)
   return(rounds)
 }
 
 
 
-## TODO: summarize_rounds()
+## Summarize rounds
+
+summarize_rounds <- function(bn.fit, settings, rounds){
+
+  ## arms
+  rounds$arms <- do.call(rbind, lapply(rounds$arms, as.data.frame))
+  rounds$arms$effect_true <-
+    rounds$effects_true[rounds$arms$node, settings$target] *
+    rounds$arms$value  # true effects
+
+  ## expected reward from pulled arms
+  max_effect <- max(abs(rounds$arms$effect_true))
+  rounds$selected$expected <- 0
+  rounds$selected$expected[rounds$selected$arm != 0] <-
+    rounds$arms$effect_true[rounds$selected$arm]
+
+  ## whether or not correct arm would be simple_reward
+  rounds$selected$correct <- 1 * (rounds$selected$simple_reward == max_effect)
+
+  ## simple and cumulative regret
+  rounds$selected$simple_regret <- max_effect - rounds$selected$simple_reward
+  ind_obs <- rounds$selected$interventions == ""
+  rounds$selected$cumulative <- 0
+  rounds$selected$cumulative[ind_obs] <-
+    cumsum((max_effect - rounds$selected$reward)[ind_obs])
+  rounds$selected$cumulative[!ind_obs] <-
+    cumsum((max_effect - rounds$selected$reward)[!ind_obs])
+
+  ## median probability graph metrics
+  true <- bnlearn::amat(bn.fit)
+  cp_dag <- apply(rounds$med_graph, 1, function(row){
+    est <- row2mat(row = row, nodes = settings$nodes)
+    list(dag = eval_graph(est = est, true = true, cp = FALSE),
+         cpdag = eval_graph(est = est, true = true, cp = TRUE))
+  })
+  rounds$med_dag <- do.call(rbind, lapply(cp_dag, `[[`, "dag"))
+  rounds$med_cpdag <- do.call(rbind, lapply(cp_dag, `[[`, "cpdag"))
+
+  ## mse of edge support
+  not_diag <- diag(settings$nnodes) == 0
+  rounds$selected$mse_es <- apply(rounds$es, 1, function(row){
+
+    est <- row2mat(row = row, nodes = settings$nodes)
+    mean((est - true)[not_diag]^2)
+  })
+
+  ## causal effects mse and sum of variances
+  rv <- which(settings$nodes == settings$target)  # reward variable
+  # if (!is.null(settings$int_parents) && !settings$int_parents){
+  #   rv <- c(rv, which(names(bn.fit) %in% bn.fit[[settings$target]]$parents))
+  # }
+  for (effects in c("est", "bda", "int")){
+
+    ## pairwise
+    rounds$selected[[sprintf("mse_%s", effects)]] <- 0
+    rounds$selected[[sprintf("se_%s", effects)]] <- 0
+
+    ## on target variable
+    rounds$selected[[sprintf("mse_%s_target", effects)]] <- 0
+    rounds$selected[[sprintf("se_%s_target", effects)]] <- 0
+
+    for (i in seq_len(nrow(rounds$selected))){
+
+      row <- rounds[[sprintf("effects_%s", effects)]][i,]
+      est <- row2mat(row = row, nodes = settings$nodes)
+
+      rounds$selected[[sprintf("mse_%s", effects)]][i] <-
+        mean((est - rounds$effects_true)[not_diag]^2)
+      rounds$selected[[sprintf("mse_%s_target", effects)]][i] <-
+        mean((est - rounds$effects_true)[-rv, rv]^2)
+
+      row <- rounds[[sprintf("se_%s", effects)]][i,]
+      est <- row2mat(row = row, nodes = settings$nodes)
+
+      rounds$selected[[sprintf("se_%s", effects)]][i] <- sum(est^2)
+      rounds$selected[[sprintf("se_%s_target", effects)]][i] <- sum(est[-rv, rv]^2)
+    }
+  }
+  ## delete ps and bda and add settings
+  # rounds <- rounds[setdiff(names(rounds), c("ps", "bda", "arp"))]
+  settings <- settings[setdiff(names(settings), c("rounds"))]
+  rounds$settings <- settings
+
+  return(rounds)
+}
 
 
 
@@ -322,7 +405,7 @@ initialize_rounds <- function(bn.fit,
         ),
         selected = data.frame(arm = integer(n_obs + n_int),
                               interventions = character(1), reward = numeric(1),
-                              chosen = numeric(1), time = numeric(1)),
+                              simple_reward = numeric(1), time = numeric(1)),
         bda_list = list(),  # TODO: remove; temp for debugging
         effects_true = effects_list2mat(bn.fit2effects(bn.fit, debug = debug))
       ),
@@ -448,7 +531,7 @@ check_settings <- function(bn.fit,
 
   ## check n_int
   if (is.null(settings$n_int) ||
-      settings$n_int < 1){
+      settings$n_int < 0){
     settings$n_int <- 100
     debug_cli_sprintf(debug, "", "Default n_int = %s", settings$n_int)
   }
