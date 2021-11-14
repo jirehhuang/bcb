@@ -10,6 +10,8 @@ bandit <- function(bn.fit,
                    settings = list(),
                    debug = FALSE){
 
+  start_time <- Sys.time()
+
   ## check arguments and initialize
   bnlearn:::check.bn.or.fit(bn.fit)
   settings <- check_settings(bn.fit = bn.fit, settings = settings, debug = debug)
@@ -29,10 +31,18 @@ bandit <- function(bn.fit,
     seq_len(n_int) + n_obs
   }
   tt <- tt[tt > settings$max_parents + 1 | tt > n_obs]
+
+  debug_cli(debug, cli::cli_progress_bar,
+            c("t = {stringr::str_pad(string = t, width = nchar(tt[length(tt)]), side = 'left')} ",
+              "| {pb_bar} {pb_percent}"),
+            total = tt[length(tt)], clear = FALSE,
+            format_done = c("Successfully executed {settings$method} in ",
+                            "{prettyunits::pretty_sec(as.numeric(Sys.time() - start_time, unit = 'secs'))}"),
+            format_failed = "Stopped executing {settings$method} at round {t}")
+
   for (t in tt){
 
-    debug_cli_sprintf(debug, "", "t = %g / %g",
-                      t, n_int + n_obs)
+    debug_cli(debug, cli::cli_progress_update, set = t)
 
     rounds <- apply_method(t = t, bn.fit = bn.fit, settings = settings,
                            rounds = rounds, debug = debug)
@@ -702,6 +712,7 @@ check_settings <- function(bn.fit,
     debug_cli_sprintf(debug, "", "Default borrow = %s", settings$borrow)
   }
 
+  settings[c("epsilon", "c")] <- 0
   if (settings$method == "random"){
 
     settings$epsilon <- 1
@@ -793,7 +804,7 @@ check_settings <- function(bn.fit,
   } else if (is.null(settings$data_obs) || settings$data_obs == ""){
 
     ## generate observational data
-    settings$data_obs <- ribn(settings$bn.fit, n = settings$n_obs)
+    settings$data_obs <- ribn(bn.fit, n = settings$n_obs)
 
   } else if (is.character(settings$data_obs)){
 
