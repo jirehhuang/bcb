@@ -37,24 +37,38 @@ debug_cli <- function(debug,
 
       cli::cli_status_clear()  # TODO: test if this works
     }
-    .envir <- sys.frame(which = which)
-    arg_nms <- names(formals(fun))
-    if ("text" %in% arg_nms){
+    if (identical(fun, cli::cli_progress_bar)){
 
-      fun(text = text, .envir = .envir, ...)
-
-    } else if ("msg" %in% arg_nms){
-
-      fun(msg = text, .envir = .envir, ...)
-
-    } else if ("format" %in% arg_nms){
-
-      fun(format = text, .envir = .envir, ...)
-
-    } else{
-
-      fun(..., .envir = .envir)
+      text <- c(cli::symbol$arrow_right, " ", text)
     }
+
+    args <- list(..., .envir = sys.frame(which = which))
+
+    ## add text
+    formals_nms <- names(formals(fun))
+    if ("text" %in% formals_nms){
+
+      args$text <- text
+
+    } else if ("msg" %in% formals_nms){
+
+      args$msg <- text
+
+    } else if ("format" %in% formals_nms){
+
+      args$format <- text
+
+    }
+    ## modify other arguments
+    if ("format_done" %in% names(args)){
+
+      args$format_done <- c(green_tick, " ", fn, args$format_done)
+    }
+    if ("format_failed" %in% names(args)){
+
+      args$format_failed <- c(red_cross, " ", fn, args$format_failed)
+    }
+    do.call(what = fun, args = args)
   }
 }
 
