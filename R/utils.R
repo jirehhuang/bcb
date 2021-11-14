@@ -1,3 +1,65 @@
+# Print debugging output with cli
+# TODO: remove; temporary
+#' @export
+
+debug_cli <- function(debug,
+                      fun = cli::cli_alert,
+                      text = "",
+                      ...){
+
+  if (debug){
+
+    ## identify calling function in bcb namespace
+    which <- -1
+    ns <- ls(getNamespace(name = "bcb"))
+    repeat{
+      fn <- sys.call(which = which)[1]
+      fn <- gsub("\\(.*", "", as.character(fn))
+      fn <- gsub(".*:", "", fn)
+      if (length(fn) == 0 || fn %in% ns) break
+      which <- which - 1
+    }
+    if (length(fn) == 0)
+      fn <- "[UNKNOWN]"
+
+    fn <- sprintf("{.strong %s}:", fn)
+    fn <- stringr::str_pad(fn, width = max(DEBUG_WIDTH + 10, nchar(fn) + 2), side = "right")
+
+    ## text message
+    text <- c(fn, text)  # glue
+
+    ## prepare and execute function
+    if (!is.function(fun)){
+
+      fun <- cli::cli_alert
+    }
+    if (identical(fun, cli::cli_abort)){
+
+      cli::cli_status_clear()  # TODO: test if this works
+    }
+    .envir <- sys.frame(which = which)
+    arg_nms <- names(formals(fun))
+    if ("text" %in% arg_nms){
+
+      fun(text = text, .envir = .envir, ...)
+
+    } else if ("msg" %in% arg_nms){
+
+      fun(msg = text, .envir = .envir, ...)
+
+    } else if ("format" %in% arg_nms){
+
+      fun(format = text, .envir = .envir, ...)
+
+    } else{
+
+      fun(..., .envir = .envir)
+    }
+  }
+}
+
+
+
 # Print debugging output
 #
 # Convenience function for printing debugging output.
@@ -19,6 +81,7 @@
 #                     number, string)
 # }
 # fn(debug = TRUE)
+# TODO: remove; temporary
 #' @export
 
 debug_cli_sprintf <- function(debug,
@@ -28,18 +91,21 @@ debug_cli_sprintf <- function(debug,
 
   if (debug){
 
-    ## identify calling function, avoiding tryCatch()
-    i <- -1
-    ns <- ls(getNamespace("bcb"))
+    name <- "bcb"
+
+    ## identify calling function in namespace, avoiding tryCatch()
+    which <- -1
+    ns <- ls(getNamespace(name = name))
     repeat{
-      fn <- sys.call(i)[1]
+      fn <- sys.call(which = which)[1]
       fn <- gsub("\\(.*", "", as.character(fn))
       fn <- gsub(".*:", "", fn)
       if (length(fn) == 0 || fn %in% ns) break
-      i <- i - 1
+      which <- which - 1
     }
     if (length(fn) == 0)
       fn <- "[UNKNOWN]"
+
     fn <- sprintf("%s:", fn)
 
     ## style
