@@ -42,7 +42,9 @@ debug_cli <- function(debug,
       text <- c(cli::symbol$arrow_right, " ", text)
     }
 
-    args <- list(..., .envir = sys.frame(which = which))
+    args <- list(...)
+    if (is.null(args[[".envir"]]))
+      args[[".envir"]] <- sys.frame(which = which)
 
     ## add text
     formals_nms <- names(formals(fun))
