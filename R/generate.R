@@ -105,12 +105,12 @@ check_data_grid <- function(data_grid){
 
 #' @export
 
-generate_data_grid <- function(data_grid = build_data_grid(),
-                               path = NULL,
-                               n_dat = NULL,
-                               n_cores = 1,
-                               seed0 = 0,
-                               debug = TRUE){
+gen_data_grid <- function(data_grid = build_data_grid(),
+                          path = NULL,
+                          n_dat = NULL,
+                          n_cores = 1,
+                          seed0 = 0,
+                          debug = TRUE){
 
   ## initialize output directory
   if (is.null(path)){
@@ -148,8 +148,8 @@ generate_data_grid <- function(data_grid = build_data_grid(),
     n_cores <- min(parallel::detectCores(), nrow(data_grid))
   n_cores <- round(n_cores)
 
-  debug_cli_sprintf(debug, "", "Generating %g datasets using %g cores",
-                    sum(data_grid$n_dat), n_cores)
+  debug_cli(debug, cli::cli_alert_info,
+            "generating {sum(data_grid$n_dat)} datasets using {n_cores} core(s)")
 
   mclapply <- if (FALSE && ncores > 1 &&
                   Sys.info()[["sysname"]] %in% c("Windows")){
@@ -182,15 +182,18 @@ generate_data_grid <- function(data_grid = build_data_grid(),
                   "true_dag.txt", "true_cpdag.txt",
                   "effects_mat.txt", "order_mat.txt") %in% list.files(data_dir))){
 
-          debug_cli_sprintf(debug, "success",
-                            "%g Previously completed preparing network %s",
-                            i, data_row$network)
+          debug_cli(debug, cli::cli_alert_success,
+                    "{i} previously prepared network {data_row$network}",
+                    .envir = environment())
+
+          write.table(data_row, file.path(data_dir, "data_row.txt"))
 
           return(data_row)
         }
 
-        debug_cli_sprintf(debug, "", "%g Preparing network %s",
-                          i, data_row$network)
+        debug_cli(debug, "",
+                  "{i} preparing network {data_row$network}",
+                  .envir = environment())
 
         ## load bn structure
         bn.fit <- load_bn.fit(x = data_row$network,
@@ -214,9 +217,9 @@ generate_data_grid <- function(data_grid = build_data_grid(),
             invalid <- temp_row$reg_lb < data_row$reg_lb ||
               temp_row$reg_ub > data_row$reg_ub
 
-            debug_cli_sprintf(debug, ifelse(invalid, "danger", "success"),
-                              "gnet %s regret constraints on attempt %g",
-                              ifelse(invalid, "violates", "satisfies"), attempt)
+            debug_cli(debug, ifelse(invalid, cli::cli_alert_danger, cli::cli_alert_success),
+                      "gnet {ifelse(invalid, 'violates', 'satisfies')} regret constraints on attempt {attempt}",
+                      .envir = environment())
 
             if (! invalid){
 
@@ -260,15 +263,16 @@ generate_data_grid <- function(data_grid = build_data_grid(),
         write.table(effects_mat, file.path(data_dir, "effects_mat.txt"))
         write.table(order_mat, file.path(data_dir, "order_mat.txt"))
 
-        debug_cli_sprintf(debug, "success",
-                          "%g Completed preparing network %s",
-                          i, data_row$network)
+        debug_cli(debug, cli::cli_alert_success,
+                  "{i} successfully prepared network {data_row$network}",
+                  .envir = environment())
 
         return(data_row)
       }
       , error = function(err){
 
-        debug_cli_sprintf(TRUE, "danger", "Error in %g: %s", i, err)
+        debug_cli(TRUE, cli::cli_alert_danger, "error in {i}: {err}",
+                  .envir = environment())
         browser()
       }
     )
@@ -291,12 +295,23 @@ generate_data_grid <- function(data_grid = build_data_grid(),
                                       data_row$network, data_row$n_obs))
         dir_check(data_dir)
 
-        debug_cli_sprintf(debug, "", "%g Generating %g datasets for network %s",
-                          i, data_row$n_dat, data_row$network)
-
         if (data_row$n_obs <= 0 ||
             data_row$n_dat <= 0)
           return(NULL)
+
+        if (file.exists(file.path(data_dir, sprintf("true_scores.txt"))) &&
+            all(sapply(seq_len(data_row$n_dat), function(j)
+              file.exists(file.path(data_dir, sprintf("data%g.txt", j)))))){
+
+          debug_cli(debug, cli::cli_alert_success,
+                    "{i} already generated {data_row$n_dat} datasets for network {data_row$network}",
+                    .envir = environment())
+
+          return(NULL)
+        }
+        debug_cli(debug, "",
+                  "{i} generating {data_row$n_dat} datasets for network {data_row$network}",
+                  .envir = environment())
 
         true_scores <- data.frame(loglik = numeric(data_row$n_dat),
                                   aic = 0, bic = 0)
@@ -333,9 +348,9 @@ generate_data_grid <- function(data_grid = build_data_grid(),
                 ## check if any with only one discrete level
                 invalid <- sum(sapply(data, function(x) var(as.integer(x))) == 0)
 
-                debug_cli_sprintf(debug, ifelse(invalid, "danger", "success"),
-                                  "Dataset %g has %g/%g invalid variables on attempt %g",
-                                  j, invalid, data_row$n_node, attempt)
+                debug_cli(debug, ifelse(invalid, cli::cli_alert_danger, cli::cli_alert_success),
+                          "{i} dataset {j} has {invalid}/{data_row$n_node} invalid variables on attempt {attempt}",
+                          .envir = environment())
 
                 if (invalid == 0)
                   break
@@ -365,12 +380,75 @@ generate_data_grid <- function(data_grid = build_data_grid(),
       }
       , error = function(err){
 
-        debug_cli_sprintf(TRUE, "danger", "%s", err)
+        debug_cli(TRUE, cli::cli_alert_danger, "error in {i}: {err}",
+                  .envir = environment())
+        browser()
       }
     )
   }
   null <- mclapply(seq_len(nrow(data_grid)), mc.cores = n_cores,
                    mc.preschedule = FALSE, gen_fn)
+
+  ## function for caching observational rounds
+  obs_fn <- function(i){
+
+    error <- tryCatch(
+      {
+        ## prepare data row and directory
+        data_row <- data_grid[i, , drop = FALSE]
+        data_dir <- file.path(path,
+                              sprintf("%s%g_%s_%g",
+                                      data_row$index, data_row$id,
+                                      data_row$network, data_row$n_obs))
+        dir_check(data_dir)
+
+        if (data_row$n_obs <= 0 ||
+            data_row$n_dat <= 0)
+          return(NULL)
+
+        if (all(sapply(seq_len(data_row$n_dat), function(j)
+              file.exists(file.path(data_dir, sprintf("rounds%g", j)))))){
+
+          debug_cli(debug, cli::cli_alert_success,
+                    "{i} already cached {data_row$n_dat} sets of rounds for network {data_row$network}",
+                    .envir = environment())
+
+          return(NULL)
+        }
+        debug_cli(debug, "",
+                  "{i} caching {data_row$n_dat} sets of rounds for network {data_row$network}",
+                  .envir = environment())
+
+        ## generate and write datasets
+        for (j in seq_len(data_row$n_dat)){
+
+          ## read bn.fit object
+          bn.fit <- readRDS(file.path(data_dir, "bn.fit.rds"))
+
+          settings <- list(method = "random", target = data_row$target,
+                           run = j, n_run = data_row$n_dat, n_obs = data_row$n_obs, n_int = 0)
+          settings <- check_settings(bn.fit = bn.fit, settings = settings, debug = debug > 1)
+
+          ## execute bandit
+          roundsj <- bandit(bn.fit = bn.fit, settings = settings, debug = debug)
+
+          ## write results in folder roundsj and as roundsj.rds
+          rounds_dir <- file.path(data_dir, sprintf("rounds%g", settings$run))
+          write_rounds(rounds = roundsj, where = rounds_dir)
+          write_rounds(rounds = roundsj, where = sprintf("%s.rds", rounds_dir))
+        }
+        return(NULL)
+      }
+      , error = function(err){
+
+        debug_cli(TRUE, cli::cli_alert_danger, "error in {i}: {err}",
+                  .envir = environment())
+        browser()
+      }
+    )
+  }
+  null <- mclapply(seq_len(nrow(data_grid)), mc.cores = n_cores,
+                   mc.preschedule = FALSE, obs_fn)
 }
 
 
