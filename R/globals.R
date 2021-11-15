@@ -19,3 +19,9 @@ avail_bnrepository <- c(
   # Conditional linear Gaussian Bayesian networks
   "healthcare", "sangiovese", "mehra"
 )
+
+
+
+# Symbols from cli package
+green_tick <- "{cli::col_green({cli::symbol$tick})}"
+red_cross <- "{cli::col_red({cli::symbol$cross})}"
