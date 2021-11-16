@@ -63,7 +63,7 @@ setRefClass("Score",
               # @param vertex vector of vertex indices
               validate.vertex = function(vertex) {
                 if (length(vertex) > 0) {
-                  stopifnot(all(is.whole(vertex)))
+                  stopifnot(all(sfsmisc::is.whole(vertex)))
                   min.max <- range(vertex)
                   stopifnot(1 <= min.max[1] && min.max[2] <= node.count())
                 }
@@ -226,3 +226,105 @@ setRefClass("DataScore",
             )
 )
 #' @noRd  # jirehhuang
+
+
+
+######################################################################
+## Score class that utilizes bnlearn scores
+######################################################################
+
+
+
+setRefClass("bnlearn_score",
+            contains = "DataScore",
+
+            fields = list(
+              .format = "character"),
+
+            validity = function(object) {
+
+              ## TODO: check validity
+
+              return(TRUE)
+            },
+
+            methods = list(
+
+              ## constructor
+              initialize = function(data = matrix(1, 1, 1),
+                                    targets = list(integer(0)),
+                                    target.index = rep(as.integer(1), nrow(data)),
+                                    nodes = colnames(data),
+                                    score = bnlearn:::check.score(score = NULL,
+                                                                  data = data),
+                                    extra.args = list(),
+                                    ...) {
+
+                if (!is.data.frame(data)) {
+                  data <- as.data.frame(data)
+                }
+                callSuper(data = data,
+                          targets = targets,
+                          target.index = target.index,
+                          nodes = nodes,
+                          ...)
+
+                ## number of variables
+                p <- ncol(data)
+
+                ## only use decomposable scores
+                decomp <<- TRUE
+
+                ## placeholder to avoid error; not always GaussParDAG
+                .pardag.class <<- "GaussParDAG"
+
+                ## store different settings
+                pp.dat$network <<- bnlearn::empty.graph(nodes = nodes)
+                pp.dat$score <<- score
+                pp.dat$extra.args <<- extra.args
+
+                ## convert targets to interventions
+                interventions <- pp.dat$targets[pp.dat$target.index]
+                pp.dat$interventions <<- sapply(interventions, function(x){
+
+                  ifelse(length(x), nodes[x], "")
+                })
+
+                ## store data format
+                .format <<- "raw"  # TODO: check if necessary
+              },
+
+              ## calculates the local score of a vertex and its parents
+              local.score = function(vertex, parents, ...) {
+
+                ## Check validity of arguments
+                validate.vertex(vertex)
+                validate.parents(parents)
+
+                # bnlearn::arcs(network) <- matrix(c(.nodes[parents],
+                #                                    rep(.nodes[vertex],
+                #                                        length(parents))), ncol = 2)
+                bnlearn::amat(pp.dat$network)[parents, vertex] <- 1
+
+                extra.args <- bnlearn:::check.score.args(score = pp.dat$score,
+                                                         network = pp.dat$network,
+                                                         data = pp.dat$data,
+                                                         extra.args = pp.dat$extra.args)
+
+                return(local_score(network = pp.dat$network,
+                                   data = pp.dat$data,
+                                   score = pp.dat$score,
+                                   targets = .nodes[vertex],
+                                   extra.args = extra.args,
+                                   interventions = pp.dat$interventions,
+                                   debug = FALSE))
+              },
+
+              ## placeholder to avoid error; doesn't do anything
+              local.fit = function(vertex, parents, ...) {
+
+                return(numeric(0))
+              }
+            )
+)
+
