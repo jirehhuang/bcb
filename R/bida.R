@@ -184,15 +184,12 @@ compute_ps <- function(data,
   debug_cli_sprintf(nnodes > 20,
                     "abort", "Don't use on systems with more than 20 variables")
 
-  ## calculate parent scores and save as temporary files
-  if (!file.exists(sprintf("%s_score", cache_file))){
+  debug_cli_sprintf(missing(data),
+                    "abort", "data argument missing")
 
-    debug_cli_sprintf(missing(data),
-                      "abort", "File score missing and argument data missing")
-
-    cache_scores(data = data, settings = settings,
-                 interventions = interventions, debug = debug)
-  }
+  ## calculate parent scores and save as temporary file
+  cache_scores(data = data, settings = settings,
+               interventions = interventions, debug = debug > 1)
 
   ## calculate parent support using the APS solver
   aps_type <- "modular"
@@ -211,7 +208,7 @@ compute_ps <- function(data,
   file.remove(sprintf("%s_support", cache_file))  # keep score for arp
 
   ## threshold low probability parent sets
-  ps <- threshold_ps(ps = ps, threshold = threshold, debug = debug)
+  ps <- threshold_ps(ps = ps, threshold = threshold, debug = debug > 1)
 
   return(ps)
 }
@@ -401,7 +398,7 @@ threshold_ps <- function(ps,
     ## remove parents with low support
     ps[[i]]$support[-ps[[i]]$ordering[seq_len(pos)]] <- 0
 
-    debug_cli_sprintf(debug > 1, "", "Thresholded %g out of %g parent sets for node %s",
+    debug_cli_sprintf(debug, "", "Thresholded %g out of %g parent sets for node %s",
                       nrow(ps[[i]]) - pos, nrow(ps[[i]]), names(ps)[i])
 
     ## normalize probabilities
