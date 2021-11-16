@@ -8,122 +8,7 @@
 ### Part 2 : Reference classes and Methods used by GIES
 #######################################################
 
-#' Auxiliary function bringing targets in a standard format.
-#'
-#' At the same time, the function checks if the targets are valid; if not,
-#' it throws an exception.
-#'
-#' @param 	p				number of vertices
-#' @param 	targets			list of (unique) targets
-#' @param 	target.index	vector of target indices, or NULL
-#' @return  depends on arguments:
-#'   if target.index == NULL: list of sorted targets
-#'   if target.index != NULL: list with two entries, "targets" and "target.index"
-.tidyTargets <- function(p, targets, target.index = NULL) {
-  stopifnot((p <- as.integer(p)) > 0)
-
-  # Check and convert targets
-  if (!is.list(targets) || !all(sapply(targets, is.numeric))) {
-    stop("Argument 'targets' must be a list of integer vectors.")
-  }
-  rawTargets <- lapply(targets, function(v) unique(sort(as.integer(v))))
-  targets <- unique(rawTargets)
-  if (length(targets) < length(rawTargets)) {
-    stop("List of targets must be unique.")
-  }
-  allTargets <- unlist(targets)
-  if (length(allTargets) > 0) {
-    if (any(is.na(allTargets))) {
-      stop("Argument 'targets' must not contain NAs.")
-    }
-    min.max <- range(allTargets)
-    if (min.max[1] <= 0 || min.max[2] > p) {
-      stop("Targets are out of range.")
-    }
-  }
-
-  # Check validity of target index, if provided
-  if (!is.null(target.index)) {
-    if (!is.numeric(target.index)) {
-      stop("Argument 'target.index' must be an integer vector.")
-    }
-    target.index <- as.integer(target.index)
-    min.max <- range(target.index)
-    if (min.max[1] <= 0 || min.max[2] > length(targets)) {
-      stop("Target index is out of range.")
-    }
-    # target.index <- match(rawTargets, targets)[target.index]
-  }
-
-  # Return value
-  if (is.null(target.index)) {
-    targets
-  } else {
-    list(targets = targets, target.index = target.index)
-  }
-}
-
-#' Create a list of targets and a vector of target indices out of a
-#' matrix indicating interventions
-#'
-#' @param 	A		a n x p boolean matrix; A[i, j] is TRUE iff vertex j is intervened
-#' 							in data point i
-#' @return 	list with two entries, "targets" and "target.index".
-#' 					targets is a list of unique intervention targets
-#' 					target.index is a vector of size n; the intervention target of data point
-#' 					i is given by targets[[target.index[i]]].
-mat2targets <- function(A)
-{
-  stopifnot(is.matrix(A) && is.logical(A) && all(dim(A) > 0))
-
-  targets.raw <- as.list(apply(A, 1, which))
-  targets <- unique(targets.raw)
-  list(targets = targets, target.index = match(targets.raw, targets))
-}
-
-#' Create a boolean "intervention matrix" out of a list of targets
-#' and a vector of target indices.  Can be seen as the "inverse function"
-#' of "mat2targets"
-#'
-#' @param 	p				number of vertices
-#' @param 	targets			list of (unique) targets
-#' @param 	target.index	vector of target indices
-targets2mat <- function(p, targets, target.index)
-{
-  ## Check validity of targets :  targetList <-
-  .tidyTargets(p, targets, target.index)
-
-  res <- matrix(FALSE, nrow = length(target.index), ncol = p)
-  for (i in seq_along(target.index))
-    res[i, targets[[target.index[i]]]] <- TRUE
-  res
-}
-
-#' Auxiliary function reading an edge list (as used in the constructors
-#' of DAGs) out of an adjacency matrix or a graphNEL object
-#' @param from adjacency matrix, graphNEL object, or object inherited
-#'  from ParDAG
-#' @return list of in-edges; length of list = number of vertices,
-#' entries for i-th vertex = indices sources of in-edges
-inEdgeList <- function(from)
-{
-  if (is.matrix(from)) {
-    p <- nrow(from)
-    stopifnot(p == ncol(from))
-    lapply(1:p, function(i) which(from[, i] != 0))
-  } else if(inherits(from, "graphNEL")) {
-    nodeNames <- graph::nodes(from)
-    edgeList <- lapply(graph::inEdges(from), function(v) match(v, nodeNames))
-    names(edgeList) <- NULL
-    edgeList
-  } else if (length(grep(".*ParDAG", class(from)) == 1)) {
-    from$.in.edges
-  }else {
-    stop(sprintf("Input of class '%s' is not supported.", class(from)))
-  }
-}
-
-#' Virtual base class for all scoring classes
+# Virtual base class for all scoring classes
 setRefClass("Score",
             contains = "VIRTUAL",
 
@@ -155,27 +40,27 @@ setRefClass("Score",
             },
 
             methods = list(
-              #' Constructor
+              # Constructor
               initialize = function(
                 targets = list(integer(0)),
                 nodes = character(0),
                 ...) {
                 .nodes <<- nodes
-                pp.dat$targets <<- .tidyTargets(length(nodes), targets)
+                pp.dat$targets <<- pcalg:::.tidyTargets(length(nodes), targets)  # jirehhuang
               },
 
-              #' Yields a vector of node names
+              # Yields a vector of node names
               getNodes = function() {
                 .nodes
               },
 
-              #' Yields the number of nodes
+              # Yields the number of nodes
               node.count = function() {
                 length(.nodes)
               },
 
-              #' Checks whether a vertex is valid
-              #' @param vertex vector of vertex indices
+              # Checks whether a vertex is valid
+              # @param vertex vector of vertex indices
               validate.vertex = function(vertex) {
                 if (length(vertex) > 0) {
                   stopifnot(all(is.whole(vertex)))
@@ -184,18 +69,18 @@ setRefClass("Score",
                 }
               },
 
-              #' Checks whether a vector is a valid list of parents
+              # Checks whether a vector is a valid list of parents
               validate.parents = function(parents) {
                 validate.vertex(parents)
                 stopifnot(anyDuplicated(parents) == 0L)
               },
 
-              #' Creates an instance of the corresponding ParDAG class
+              # Creates an instance of the corresponding ParDAG class
               create.dag = function() {
                 new(.pardag.class, nodes = .nodes)
               },
 
-              #' Getter and setter function for the targets
+              # Getter and setter function for the targets
               getTargets = function() {
                 pp.dat$targets
               },
@@ -204,19 +89,19 @@ setRefClass("Score",
                 pp.dat$targets <<- lapply(targets, sort)
               },
 
-              #' Creates a list of options for the C++ functions for the internal
-              #' calculation of scores and MLEs
+              # Creates a list of options for the C++ functions for the internal
+              # calculation of scores and MLEs
               c.fcn.options = function(DEBUG.LEVEL = 0) {
                 list(DEBUG.LEVEL = DEBUG.LEVEL)
               },
 
-              #' Calculates the local score of a vertex and its parents
+              # Calculates the local score of a vertex and its parents
               local.score = function(vertex, parents, ...) {
                 stop("local.score is not implemented in this class.")
               },
 
-              #' Calculates the global score of a DAG which is only specified
-              #' by its list of in-edges
+              # Calculates the global score of a DAG which is only specified
+              # by its list of in-edges
               global.score.int = function(edges, ...) {
                 if (c.fcn == "none") {
                   ## Calculate score in R
@@ -228,12 +113,12 @@ setRefClass("Score",
                 }
               },
 
-              #' Calculates the global score of a DAG
+              # Calculates the global score of a DAG
               global.score = function(dag, ...) {
                 global.score.int(dag$.in.edges, ...)
               },
 
-              #' Calculates a local model fit for a vertex and its parents
+              # Calculates a local model fit for a vertex and its parents
               local.fit = function(vertex, parents, ...) {
                 if (!decomp) {
                   stop("local.fit can only be calculated for decomposable scores.")
@@ -242,7 +127,7 @@ setRefClass("Score",
                 }
               },
 
-              #' Calculates a global model fit
+              # Calculates a global model fit
               global.fit = function(dag, ...) {
                 if (c.fcn == "none") {
                   ## Calculate score in R
@@ -261,6 +146,7 @@ setRefClass("Score",
               }
             )
 )
+#' @noRd  # jirehhuang
 
 setRefClass("DataScore",
             contains = "Score",
@@ -280,16 +166,16 @@ setRefClass("DataScore",
             },
 
             methods = list(
-              #' Constructor
-              #'
-              #' @param 	data 			data set, jointly interventional and observational.
-              #' 							Can either be a matrix or a data frame (this might
-              #' 							be different for inherited classes!)
-              #' @param	targets 		unique list of targets represented in the data
-              #' @param	target.index	index vector for targets of data rows
-              #' @param	nodes			node labels
-              #' Note: all arguments must have a default value for inheritance,
-              #' see ?setRefClass; apart from that, the default values are meaningless
+              # Constructor
+              #
+              # @param 	data 			data set, jointly interventional and observational.
+              # 							Can either be a matrix or a data frame (this might
+              # 							be different for inherited classes!)
+              # @param	targets 		unique list of targets represented in the data
+              # @param	target.index	index vector for targets of data rows
+              # @param	nodes			node labels
+              # Note: all arguments must have a default value for inheritance,
+              # see ?setRefClass; apart from that, the default values are meaningless
               initialize = function(data = matrix(1, 1, 1),
                                     targets = list(integer(0)),
                                     target.index = rep(as.integer(1), nrow(data)),
@@ -300,7 +186,7 @@ setRefClass("DataScore",
                 if (is.null(nodes)) {
                   nodes <- as.character(1:ncol(data))
                 }
-                targetList <- .tidyTargets(ncol(data), targets, target.index)
+                targetList <- pcalg:::.tidyTargets(ncol(data), targets, target.index)  # jirehhuang
                 callSuper(targets = targetList$targets, nodes, ...)
 
                 ## Order by ascending target indices (necessary for certain scoring objects)
@@ -319,7 +205,7 @@ setRefClass("DataScore",
 
                 ## Store list of index vectors of "non-interventions": for each vertex k,
                 ## store the indices of the data points for which k has NOT been intervened
-                A <- !targets2mat(pp.dat$vertex.count, pp.dat$targets, pp.dat$target.index)
+                A <- !pcalg:::targets2mat(pp.dat$vertex.count, pp.dat$targets, pp.dat$target.index)  # jirehhuang
                 pp.dat$non.int <<- lapply(seq_len(ncol(A)), function(i) which(A[, i]))
                 # apply() cannot be used since we need a list, not a matrix.
                 pp.dat$data.count <<- as.integer(colSums(A))
@@ -339,3 +225,4 @@ setRefClass("DataScore",
               }
             )
 )
+#' @noRd  # jirehhuang
