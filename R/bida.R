@@ -313,6 +313,67 @@ local_score <- function(network,
 
 
 
+# Lookup local score from output of read_cache()
+
+lookup_score <- function(target,
+                         parents,
+                         cache,
+                         debug = FALSE){
+
+  ## convert parents to numeric vector
+  if (is.character(parents))
+    parents <- phsl:::build_key(names(cache))[parents]
+  parents <- unique(sort(parents))
+
+  return(lookup_score_cpp(parents = parents,
+                          cache = cache[[target]]))
+}
+
+
+
+# Read scores cached by cache_scores()
+
+read_cache <- function(settings){
+
+  ## load relevant settings
+  max_parents <- settings$max_parents
+  cache_file <- file.path(settings$temp_dir, settings$id)
+
+  ## read file containing support
+  temp <- read.table(sprintf("%s_score", cache_file),
+                     header = FALSE, sep = " ",
+                     col.names = sprintf("V%g", seq_len(max_parents + 2)),
+                     fill = TRUE)
+
+  p <- temp[1, 1]  # number of variables
+  pos <- 2  # position
+  cache <- vector("list", length = p)
+  nms <- c(sprintf("V%g", seq_len(max_parents)), "score")
+
+  ## for each node
+  for (j in seq_len(p)){
+
+    i <- temp[pos, 1]  # node index
+    n_parents <- temp[pos, 2]  # number of parent configurations
+    pos <- pos + 1
+
+    ## save cache
+    cache[[i]] <- as.matrix(temp[seq(pos, pos + n_parents - 1),
+                                 c(seq_len(max_parents) + 2, 1)])
+
+    rownames(cache[[i]]) <- NULL
+    colnames(cache[[i]]) <- nms
+
+    ## iterate position
+    pos <- pos + n_parents
+  }
+  names(cache) <- settings$nodes
+
+  return(cache)
+}
+
+
+
 # Modification of read_in_aps_parent_post() from bida
 # that stores the parent configurations and support data frames
 
