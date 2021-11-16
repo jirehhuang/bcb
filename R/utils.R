@@ -23,7 +23,8 @@ debug_cli <- function(debug,
       fn <- "[UNKNOWN]"
 
     fn <- sprintf("{.strong %s}:", fn)
-    fn <- stringr::str_pad(fn, width = max(DEBUG_WIDTH + 10, nchar(fn) + 2), side = "right")
+    fn <- stringr::str_pad(fn, width = max(debug_width() + 10,
+                                           nchar(fn) + 2), side = "right")
 
     ## text message
     text <- c(fn, text)  # glue
@@ -257,4 +258,12 @@ random_id <- function(n = 12){
   bank <- c(letters, LETTERS, 0:9)
 
   return(paste(sample(bank, size = n, replace = TRUE), collapse = ""))
+}
+
+
+
+# Determine minimum debug width
+debug_width <- function(){
+
+  max(nchar(ls(getNamespace(name = "bcb")))) + 2
 }
