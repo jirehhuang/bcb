@@ -349,7 +349,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
                 invalid <- sum(sapply(data, function(x) var(as.integer(x))) == 0)
 
                 debug_cli(debug, ifelse(invalid, cli::cli_alert_danger, cli::cli_alert_success),
-                          "{i} dataset {j} has {invalid}/{data_row$n_node} invalid variables on attempt {attempt}",
+                          "{i} dataset {j} has {invalid} of {data_row$n_node} invalid variables on attempt {attempt}",
                           .envir = environment())
 
                 if (invalid == 0)
@@ -407,7 +407,8 @@ gen_data_grid <- function(data_grid = build_data_grid(),
           return(NULL)
 
         if (all(sapply(seq_len(data_row$n_dat), function(j)
-              file.exists(file.path(data_dir, sprintf("rounds%g", j)))))){
+              file.exists(file.path(data_dir,
+                                    sprintf("rounds%g.rds", j)))))){
 
           debug_cli(debug, cli::cli_alert_success,
                     "{i} already cached {data_row$n_dat} sets of rounds for network {data_row$network}",
@@ -415,12 +416,22 @@ gen_data_grid <- function(data_grid = build_data_grid(),
 
           return(NULL)
         }
-        debug_cli(debug, "",
-                  "{i} caching {data_row$n_dat} sets of rounds for network {data_row$network}",
-                  .envir = environment())
 
-        ## generate and write datasets
+        ## cache rounds
         for (j in seq_len(data_row$n_dat)){
+
+          if (file.exists(file.path(data_dir,
+                                    sprintf("rounds%g.rds", j)))){
+
+            debug_cli(debug, cli::cli_alert_success,
+                      "{i} already cached rounds {j} of {data_row$n_dat} for network {data_row$network}",
+                      .envir = environment())
+
+            next
+          }
+          debug_cli(debug, "",
+                    "{i} caching rounds {j} of {data_row$n_dat} for network {data_row$network}",
+                    .envir = environment())
 
           ## read bn.fit object
           bn.fit <- readRDS(file.path(data_dir, "bn.fit.rds"))
