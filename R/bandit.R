@@ -34,11 +34,11 @@ bandit <- function(bn.fit,
 
   debug_cli(debug, cli::cli_progress_bar,
             c("t = {stringr::str_pad(string = t, width = nchar(tt[length(tt)]), side = 'left')} ",
-              "| {pb_bar} {pb_percent}"),
+              "| {cli::pb_bar} {cli::pb_percent}"),
             total = tt[length(tt)], clear = FALSE,
-            format_done = c("Successfully executed {settings$method} in ",
+            format_done = c("successfully executed {settings$method} in ",
                             "{prettyunits::pretty_sec(as.numeric(Sys.time() - start_time, unit = 'secs'))}"),
-            format_failed = "Stopped executing {settings$method} at round {t}")
+            format_failed = "stopped executing {settings$method} at round {t}")
 
   for (t in tt){
 
@@ -694,7 +694,7 @@ check_settings <- function(bn.fit,
   ## check threshold
   if (is.null(settings$threshold) ||
       settings$threshold < 0 || settings$threshold > 1){
-    settings$threshold <- 0
+    settings$threshold <- 0.999
     debug_cli_sprintf(debug, "", "Default threshold = %s", settings$threshold)
   }
 
