@@ -184,12 +184,15 @@ compute_ps <- function(data,
   debug_cli_sprintf(nnodes > 20,
                     "abort", "Don't use on systems with more than 20 variables")
 
-  debug_cli_sprintf(missing(data),
-                    "abort", "data argument missing")
+  ## calculate parent scores and save as temporary files
+  if (!file.exists(sprintf("%s_score", cache_file))){
 
-  ## calculate parent scores and save as temporary file
-  cache_scores(data = data, settings = settings,
-               interventions = interventions, debug = debug > 1)
+    debug_cli_sprintf(missing(data),
+                      "abort", "File score missing and argument data missing")
+
+    cache_scores(data = data, settings = settings,
+                 interventions = interventions, debug = debug)
+  }
 
   ## calculate parent support using the APS solver
   aps_type <- "modular"
@@ -505,17 +508,20 @@ ps2es <- function(ps,
 # Trivial convenience function for converting
 # edge support to median probability graph
 
-es2med_graph <- function(es){
+es2mpg <- function(es, prob = 0.5){
 
-  return(1 * (es > 0.5))
+  return(1 * (es > prob))
 }
 
 
 
 # Convert ps between list and data.frame
+# Can also be applied to cache
 
 convert_ps <- function(ps,
-                       new_class = switch(class(ps), list = "data.frame", `data.frame` = "list")){
+                       new_class = switch(class(ps),
+                                          list = "data.frame", `data.frame` = "list"),
+                       list_matrix = FALSE){
 
   debug_cli_sprintf(! class(ps) %in% c("list", "data.frame"),
                     "abort", "ps must be a list or data.frame")
@@ -530,7 +536,7 @@ convert_ps <- function(ps,
 
     ps <- as.data.frame(data.table::rbindlist(lapply(names(ps), function(node){
 
-      cbind(node = node, ps[[node]])
+      cbind(data.frame(node = node), ps[[node]])
     })))
   } else if (new_class == "list"){
 
@@ -539,6 +545,10 @@ convert_ps <- function(ps,
 
       ps_node <- ps[ps$node == node, names(ps) != "node"]
       rownames(ps_node) <- NULL
+
+      if (list_matrix)
+        ps_node <- as.matrix(ps_node)
+
       return(ps_node)
 
     }, simplify = FALSE, USE.NAMES = TRUE)
