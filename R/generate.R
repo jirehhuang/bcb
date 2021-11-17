@@ -110,6 +110,8 @@ gen_data_grid <- function(data_grid = build_data_grid(),
                           n_dat = NULL,
                           n_cores = 1,
                           seed0 = 0,
+                          regenerate = FALSE,
+                          recache = FALSE,
                           debug = TRUE){
 
   ## initialize output directory
@@ -299,7 +301,8 @@ gen_data_grid <- function(data_grid = build_data_grid(),
             data_row$n_dat <= 0)
           return(NULL)
 
-        if (file.exists(file.path(data_dir, sprintf("true_scores.txt"))) &&
+        if (!regenerate &&
+            file.exists(file.path(data_dir, sprintf("true_scores.txt"))) &&
             all(sapply(seq_len(data_row$n_dat), function(j)
               file.exists(file.path(data_dir, sprintf("data%g.txt", j)))))){
 
@@ -322,7 +325,8 @@ gen_data_grid <- function(data_grid = build_data_grid(),
           ## read bn.fit object
           bn.fit <- readRDS(file.path(data_dir, "bn.fit.rds"))
 
-          if (file.exists(data_file <- file.path(data_dir,
+          if (!regenerate &&
+              file.exists(data_file <- file.path(data_dir,
                                                  sprintf("data%g.txt", j)))){
 
             data <- read.table(data_file)
@@ -406,7 +410,8 @@ gen_data_grid <- function(data_grid = build_data_grid(),
             data_row$n_dat <= 0)
           return(NULL)
 
-        if (all(sapply(seq_len(data_row$n_dat), function(j)
+        if (!recache &&
+            all(sapply(seq_len(data_row$n_dat), function(j)
               file.exists(file.path(data_dir,
                                     sprintf("rounds%g.rds", j)))))){
 
@@ -420,7 +425,8 @@ gen_data_grid <- function(data_grid = build_data_grid(),
         ## cache rounds
         for (j in seq_len(data_row$n_dat)){
 
-          if (file.exists(file.path(data_dir,
+          if (!recache &&
+              file.exists(file.path(data_dir,
                                     sprintf("rounds%g.rds", j)))){
 
             debug_cli(debug, cli::cli_alert_success,
@@ -436,7 +442,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
           ## read bn.fit object
           bn.fit <- readRDS(file.path(data_dir, "bn.fit.rds"))
 
-          settings <- list(method = "random", target = data_row$target,
+          settings <- list(method = "cache", target = data_row$target,
                            run = j, n_run = data_row$n_dat, n_obs = data_row$n_obs, n_int = 0)
           settings <- check_settings(bn.fit = bn.fit, settings = settings, debug = debug > 1)
 
