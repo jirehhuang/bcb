@@ -32,6 +32,9 @@ void write_dags(const std::vector<std::vector<int>>& dags) {
 
 template <class Sampler>
 void run_sampler(int number_of_dags, typename Sampler::WeightT weights) {
+
+    rng.seed(number_of_dags);  // jirehhuang
+
     std::cerr << "Sampling " << number_of_dags << " DAGs\n";
 
     clock_t begin = clock();
@@ -39,9 +42,10 @@ void run_sampler(int number_of_dags, typename Sampler::WeightT weights) {
     Sampler sampler(std::move(weights));
 
     clock_t mid = clock();
-    
+
     std::vector<std::vector<int>> dags;
     for (int i = 0; i < number_of_dags; ++i) {
+    // for (int i = 0; i < 1; ++i) {  // jirehhuang
         dags.push_back(sampler.sample());
     }
 
@@ -107,7 +111,7 @@ int main(int argc, char* argv[]) {
         std::string input = getArg();
         int n_dags = std::stoi(getArg());
         argsDone();
-        
+
         std::vector<std::vector<Lognum>> weights = read_nonsymmetric_weights<Lognum>(input);
         run_sampler<NonSymmetricSampler<Lognum>>(n_dags, std::move(weights));
     } else {
