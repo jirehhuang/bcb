@@ -1,0 +1,5 @@
+mds0 is the original uncompiled mds folder: https://github.com/ttalvitie/modular-dag-sampling
+
+mds.zip is the zipped original folder (unzips as mds, not mds0)
+
+mds is a precompiled copy to accelerate development by avoiding recompiling the tool after each installation
