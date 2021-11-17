@@ -349,24 +349,20 @@ setRefClass("lookup_score",
             methods = list(
 
               ## constructor
-              initialize = function(data,
-                                    cache,
-                                    nodes = colnames(data),
+              initialize = function(cache,
+                                    nodes = names(cache),
                                     ...) {
 
                 ## targets and target.index mean nothing because
                 ## scores are already cached into cache
-                if (!is.data.frame(data)) {
-                  data <- as.data.frame(data)
-                }
-                callSuper(data = data,
+                callSuper(data = matrix(1, nrow = 2, ncol = 2),
                           targets = list(integer(0)),
-                          target.index = rep(as.integer(1), nrow(data)),
+                          target.index = rep(as.integer(1), 2),
                           nodes = nodes,
                           ...)
 
                 ## number of variables
-                p <- ncol(data)
+                p <- length(cache)
 
                 ## only use decomposable scores
                 decomp <<- TRUE
