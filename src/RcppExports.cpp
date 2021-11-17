@@ -61,6 +61,18 @@ BEGIN_RCPP
     return R_NilValue;
 END_RCPP
 }
+// lookup
+double lookup(const arma::vec parents, const arma::mat cache);
+RcppExport SEXP _bcb_lookup(SEXP parentsSEXP, SEXP cacheSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec >::type parents(parentsSEXP);
+    Rcpp::traits::input_parameter< const arma::mat >::type cache(cacheSEXP);
+    rcpp_result_gen = Rcpp::wrap(lookup(parents, cache));
+    return rcpp_result_gen;
+END_RCPP
+}
 // lookup_score_cpp
 double lookup_score_cpp(const arma::vec parents, const arma::mat cache);
 RcppExport SEXP _bcb_lookup_score_cpp(SEXP parentsSEXP, SEXP cacheSEXP) {
@@ -78,6 +90,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_bcb_lm_cpp", (DL_FUNC) &_bcb_lm_cpp, 4},
     {"_bcb_lm_nig", (DL_FUNC) &_bcb_lm_nig, 10},
     {"_bcb_lm_nig0", (DL_FUNC) &_bcb_lm_nig0, 9},
+    {"_bcb_lookup", (DL_FUNC) &_bcb_lookup, 2},
     {"_bcb_lookup_score_cpp", (DL_FUNC) &_bcb_lookup_score_cpp, 2},
     {NULL, NULL, 0}
 };
