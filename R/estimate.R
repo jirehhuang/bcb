@@ -35,16 +35,16 @@ compute_bda <- function(data,
 
     }) < (settings$max_parents + 2))
   }
-  debug_cli_sprintf(debug, "info",
+  debug_cli_sprintf(debug > 1, "info",
                     "Computing back-door effects with %s linear model",
                     ifelse(nig_bda, "Bayesian Normal-inverse-gamma", "standard"))
 
   ## initialize storage structure
-  if (is.null(rounds[["bda"]])){
+  if (length(rounds[["bda"]]) == 0){
 
     bda <- lapply(seq_p, function(i){
 
-      lapply(seq_p, function(j) if (j != i){
+      temp <- lapply(seq_p, function(j) if (j != i){
 
         # for bda estimate and joint estimate:
         # last t where updated, estimate, and standard error
@@ -53,6 +53,8 @@ compute_bda <- function(data,
                    t_est = NA, est_est = NA, se_est = NA)
 
       } else NULL)
+      names(temp) <- nodes
+      return(temp)
     })
     names(bda) <- nodes
 
@@ -177,10 +179,46 @@ expect_post <- function(rounds,
 
       post_mean[i, j] <-
         sum(rounds$ps[[i]]$support *
-              rounds$bda[[i]][[j]][[metric]]^(1 + squared), na.rm = TRUE)
+            rounds$bda[[i]][[j]][[metric]]^(1 + squared), na.rm = TRUE)
     }
   }
   return(post_mean)
+}
+
+
+
+# Lookup back-door adjustment effects based on a dag
+
+dag_bda <- function(dag,
+                    rounds,
+                    metric = "est_bda",
+                    squared = FALSE){
+
+  nodes <- names(rounds$ps)
+  if (is.null(dim(dag)))
+    dag <- row2mat(row = dag, nodes = nodes)
+
+  p <- length(rounds$ps)
+  seq_p <- seq_len(p)
+
+  edge_list <- as.list(sparsebnUtils::as.edgeList(dag))
+
+  effects <- t(sapply(seq_p, function(i){
+
+    row_index <- lookup(parents = edge_list[[i]],
+                        cache = as.matrix(rounds$ps[[i]]))
+
+    sapply(seq_p, function(j){
+
+      if (i == j)
+        0
+      else
+        rounds$bda[[i]][[j]][row_index, metric]^(1 + squared)
+    })
+  }))
+  rownames(effects) <- colnames(effects) <- nodes
+
+  return(effects)
 }
 
 
@@ -273,3 +311,4 @@ convert_bda <- function(bda,
     }, simplify = FALSE, USE.NAMES = TRUE)
   }
   return(bda)
+}
