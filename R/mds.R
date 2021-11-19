@@ -153,3 +153,81 @@ compile_mds <- function(mds_dir = get_mds(dir = TRUE),
 
 
 ## TODO: recompile_mds()
+
+
+
+# Test mds using github example
+
+test_mds <- function(debug = 0){
+
+  debug_cli(debug, cli::cli_alert_info,
+            "testing {.pkg mds} using github examples")
+
+  compile_mds(debug = debug)
+
+
+  mds <- get_mds()
+  temp_dir <- file.path(gsub("/tests.*", "", getwd()),
+                        "tests", "temp")
+  temp_file <- file.path(temp_dir, sprintf("weights.txt"))
+
+
+  ## uniform case
+  debug_cli(debug, cli::cli_alert,
+            "testing uniform case")
+
+  sampler <- sys::exec_internal(cmd = mds,
+                                args = c("symmetric", "uniform", 5, 10))
+  text <- sprintf("first 5 sampled DAGs:\n%s",
+                  paste(sys::as_text(sampler$stdout)[seq_len(5)],
+                        collapse = "\n"))
+  debug_cli(debug, cli::cli_alert, "{text}")
+
+
+  ## symmetric case
+  debug_cli(debug, cli::cli_alert,
+            "testing symmetric case")
+
+  lns <- c("3", "0", "0", "-1e100")
+  write.table(x = data.frame(lns),
+              file = temp_file,
+              row.names = FALSE, col.names = FALSE, quote = FALSE)
+
+  sampler <- sys::exec_internal(cmd = mds,
+                                args = c("symmetric", "input",
+                                         temp_file, 10))
+  text <- sprintf("first 5 sampled DAGs:\n%s",
+                  paste(sys::as_text(sampler$stdout)[seq_len(5)],
+                        collapse = "\n"))
+  debug_cli(debug, cli::cli_alert, "{text}")
+
+
+  ## nonsymmetric case
+  debug_cli(debug, cli::cli_alert,
+            "testing nonsymmetric case")
+
+  lns <- c("3",
+           "A 2",
+           "0.6931471805599453 2 B C",
+           "0 0",
+           "B 2",
+           "0 0",
+           "0 1 A",
+           "C 2",
+           "0 0",
+           "0 1 A")
+  write.table(x = data.frame(lns),
+              file = temp_file,
+              row.names = FALSE, col.names = FALSE, quote = FALSE)
+
+  sampler <- sys::exec_internal(cmd = mds,
+                                args = c("nonsymmetric",
+                                         temp_file, 100))
+  text <- sprintf("first 5 sampled DAGs:\n%s",
+                  paste(sys::as_text(sampler$stdout)[seq_len(5)],
+                        collapse = "\n"))
+  debug_cli(debug, cli::cli_alert, "{text}")
+
+  debug_cli(debug, cli::cli_alert_success,
+            "successfully executed {.pkg mds} github examples")
+}

@@ -71,8 +71,8 @@ testthat::expect_identical(dim(graph), dim(bnlearn::amat(bn.fit)))
 
 
 ## test bida github examples
-
 bcb:::test_bida(debug = debug)
 
-
+## test mds github examples
+bcb:::test_mds(debug = debug)
 
