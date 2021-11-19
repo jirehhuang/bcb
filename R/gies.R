@@ -10,7 +10,10 @@ estimate_gies <- function(ps,
                           settings,
                           interventions,
                           dag = TRUE,
-                          debug = FALSE){
+                          debug = 0){
+
+  debug_cli(debug >= 2, cli::cli_alert_info,
+            "estimating graph with gies")
 
   nodes <- settings$nodes
   score <- new("lookup_score", ps = ps,
@@ -21,7 +24,7 @@ estimate_gies <- function(ps,
 
   gies <- pcalg::gies(score = score, maxDegree = settings$max_parents,
                       phase = c("forward", "backward", "turning"),
-                      iterate = TRUE, verbose = debug)
+                      iterate = TRUE, verbose = max(0, debug - 2))
 
   amat <- 1 * as(gies$essgraph, "matrix")
   rownames(amat) <- colnames(amat) <- nodes

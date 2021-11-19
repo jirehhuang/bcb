@@ -32,6 +32,6 @@ score <- new("bnlearn_score", data = data,
              nodes = settings$nodes, score = "bge")
 gies <- pcalg::gies(score = score, maxDegree = settings$max_parents,
                     phase = c("forward", "backward", "turning"),
-                    iterate = TRUE, verbose = debug)
+                    iterate = TRUE, verbose = max(0, debug - 2))
 dag <- as(gies$essgraph, "matrix")
 testthat::expect_true(all(dag == bnlearn::amat(bn.fit)))

@@ -315,7 +315,7 @@ setRefClass("bnlearn_score",
                                    targets = .nodes[vertex],
                                    extra.args = extra.args,
                                    interventions = pp.dat$interventions,
-                                   debug = FALSE))
+                                   debug = 0))
               },
 
               ## placeholder to avoid error; doesn't do anything

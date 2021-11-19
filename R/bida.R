@@ -139,7 +139,7 @@ compute_scores <- function(data,
           ## compute and store score
           scr <- local_score(network = network, data = data, score = score,
                              targets = settings$nodes[i], extra.args = extra.args,
-                             interventions = interventions, debug = debug >= 3)
+                             interventions = interventions, debug = debug >= 4)
 
           ## TODO: can I increase nsmall
 
@@ -303,7 +303,7 @@ local_score <- function(network,
 
     scores[targets_obs] <- bnlearn:::per.node.score(network = network, data = data,
                                                     score = score, targets = targets_obs,
-                                                    extra.args = extra.args, debug = debug)
+                                                    extra.args = extra.args, debug = debug >= 4)
   }
   if (length(targets_obs) < length(targets)){
 
@@ -315,7 +315,7 @@ local_score <- function(network,
       scores[target] <- bnlearn:::per.node.score(network = network,
                                                  data = data[interventions != target,,drop=FALSE],
                                                  score = score, targets = target,
-                                                 extra.args = extra.args, debug = debug)
+                                                 extra.args = extra.args, debug = debug >= 4)
     }
   }
   return(scores)
@@ -656,7 +656,7 @@ compile_bida <- function(aps_dir = get_bida(dir = TRUE),
     if (length(make$stderr)){
 
       debug_cli(debug >= 2, cli::cli_alert_success,
-                "successfully compiled {.pkg bida} aps")
+                "successfully compiled {.pkg bida} aps in {make_time} secs")
     } else{
 
       debug_cli(debug >= 2, cli::cli_alert_success,
