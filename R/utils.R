@@ -9,9 +9,9 @@ debug_cli <- function(debug,
 
   if (debug){
 
-    ## identify calling function in bcb namespace
-    which <- -1
+    ## identify calling function in namespace
     ns <- ls(getNamespace(name = "bcb"))
+    which <- -1
     repeat{
       fn <- sys.call(which = which)[1]
       fn <- gsub("\\(.*", "", as.character(fn))
@@ -75,6 +75,17 @@ debug_cli <- function(debug,
     }
     do.call(what = fun, args = args)
   }
+}
+
+
+
+# Determine minimum debug width
+
+debug_width <- function(){
+
+  ns <- ls(getNamespace(name = "bcb"))
+  ns <- ns[!grepl("_bcb", ns)]  # exclude _bcb*
+  max(nchar(ns)) + 2
 }
 
 
@@ -185,17 +196,6 @@ random_id <- function(n = 12){
   bank <- c(letters, LETTERS, 0:9)
 
   return(paste(sample(bank, size = n, replace = TRUE), collapse = ""))
-}
-
-
-
-# Determine minimum debug width
-
-debug_width <- function(){
-
-  ns <- ls(getNamespace(name = "bcb"))
-  ns <- ns[!grepl("_bcb", ns)]  # exclude _bcb*
-  max(nchar(ns)) + 2
 }
 
 

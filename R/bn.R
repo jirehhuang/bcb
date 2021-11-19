@@ -404,8 +404,7 @@ bn.fit2data_row <- function(bn.fit,
 
 # Extract pairwise causal effects
 
-bn.fit2effects <- function(bn.fit,
-                           debug = FALSE){
+bn.fit2effects <- function(bn.fit){
 
   bnlearn:::check.bn.or.fit(bn.fit)
 
@@ -441,7 +440,7 @@ bn.fit2effects <- function(bn.fit,
     for (int in intervene){
 
       data <- ribn(x = bn.fit0, fix = TRUE,
-                   intervene = list(int), debug = FALSE)
+                   intervene = list(int), debug = 0)
       node <- intersect(names(int), nodes)
       effects_list[[node]][-match(node,
                                   nodes)] <- unlist(data[-match(node, nodes)])

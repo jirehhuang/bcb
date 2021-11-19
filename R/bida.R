@@ -190,7 +190,7 @@ compute_ps <- function(data,
             "don't use on datasets with more than 20 variables")
 
   debug_cli(debug >= 2, cli::cli_alert_info,
-            "computing parent supports for {nnodes} nodes")
+            "computing parent set probabilities for {nnodes} nodes")
 
   ## calculate parent scores and save as temporary files
   if (!file.exists(sprintf("%s_score", temp_file))){
@@ -219,7 +219,7 @@ compute_ps <- function(data,
   ps <- threshold_ps(ps = ps, threshold = settings$threshold, debug = debug)
 
   debug_cli(debug >= 2, cli::cli_alert_success,
-            "computed parent supports for {nnodes} nodes")
+            "computed parent set probabilities for {nnodes} nodes")
 
   return(ps)
 }
@@ -242,9 +242,6 @@ compute_arp <- function(data,
 
   debug_cli(nnodes > 20, cli::abort(),
             "don't use on datasets with more than 20 variables")
-
-  debug_cli(debug >= 2, cli::cli_alert_success,
-            "computed parent supports for {nnodes} nodes")
 
   ## calculate parent scores and save as temporary files
   if (!file.exists(sprintf("%s_score", temp_file))){
@@ -273,8 +270,8 @@ compute_arp <- function(data,
   rownames(arp) <- colnames(arp) <- settings$nodes
   arp <- t(exp(arp - arp[1, 1]))
 
-  # Delete temporary files
-  file.remove(sprintf("%s_arp", temp_file))
+  debug_cli(debug >= 2, cli::cli_alert_success,
+            "computed ancestor relation probabilities for {nnodes} nodes")
 
   return(arp)
 }

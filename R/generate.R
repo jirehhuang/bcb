@@ -1,108 +1,4 @@
-#' Build data grid.
-#'
-#' Builds and formats a data grid of simulations.
-#'
-#' @param network character value indicating network name.
-#' @param debug logical value that activates printing debugging output.
-#' @return data.frame with grid of network settings.
-#' @author Jireh Huang (\email{jirehhuang@@ucla.edu})
-#' @examples
-#' ## Default data_grid
-#' build_data_grid()
-#' @export
-
-build_data_grid <- function(network = "survey",
-                            data_type = "gaussian",
-                            n_dat = 0,
-                            n_obs = 0,
-                            target = "",
-                            reg_lb = 0,
-                            reg_ub = 1,
-                            var_lb = 0.5,
-                            var_ub = 1,
-                            coef_lb = 0.5,
-                            coef_ub = 1,
-                            normalize = TRUE,
-                            copies = 1,
-                            debug = 0){
-
-  ## TODO:
-  # check functions
-  # manual network structures
-  # random network structures
-  # data_type: discrete
-  # var_ub: merge discrete levels
-  # manipulate cpts
-  # add and remove discrete edges
-  # max_in_deg and max_out_deg
-  # tiling
-
-  ## dormant parameters
-  k <- 1
-  avg_deg <- 4
-  max_in_deg <- Inf
-  max_out_deg <- Inf
-
-  data_grid <- expand.grid(normalize = normalize,
-                           coef_ub = coef_ub,
-                           coef_lb = coef_lb,
-                           var_ub = var_ub,
-                           var_lb = var_lb,
-                           reg_ub = reg_ub,
-                           reg_lb = reg_lb,
-                           target = target,
-                           max_out_deg = max_out_deg,
-                           max_in_deg = max_out_deg,
-                           avg_deg = avg_deg,
-                           n_obs = n_obs,
-                           n_dat = n_dat,
-                           k = k,
-                           data_type = data_type,
-                           network = network,
-                           id = seq_len(copies),
-                           stringsAsFactors = FALSE)
-
-  data_grid <- check_data_grid(data_grid)
-
-  return(data_grid)
-}
-
-
-
-check_data_grid <- function(data_grid){
-
-  ## TODO: check values
-
-  ## column names
-  nms <- c("index", "id", "seed", "network", "data_type", "k",
-           "n_dat", "n_obs", "avg_deg", "max_in_deg", "max_out_deg",
-           "target", "reg_lb", "reg_ub", "var_lb", "var_ub",
-           "coef_lb", "coef_ub", "normalize", "n_node", "n_edge", "n_within",
-           "n_between", "n_compelled", "n_reversible", "n_params")
-
-  ## remove extra columns
-  data_grid <- data_grid[, intersect(names(data_grid), nms)]
-
-  ## remove duplicates
-  data_grid <- data_grid[! duplicated(data_grid), , drop = FALSE]
-
-  ## add missing columns
-  data_grid$index <- stringr::str_pad(string = seq_len(nrow(data_grid)),
-                                      width = nchar(nrow(data_grid)),
-                                      side = "left", pad = "0")
-  data_grid$index <- sprintf("%s_", data_grid$index)
-  if (is.null(data_grid$id))
-    data_grid$id <- 1
-  data_grid[setdiff(nms, names(data_grid))] <- 0
-
-  ## rearrange columns
-  data_grid <- data_grid[, nms, drop = FALSE]
-
-  return(data_grid)
-}
-
-
-
+# Generate data grid
 #' @export
 
 gen_data_grid <- function(data_grid = build_data_grid(),
@@ -112,7 +8,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
                           seed0 = 0,
                           regenerate = FALSE,
                           recache = FALSE,
-                          debug = TRUE){
+                          debug = 1){
 
   ## initialize output directory
   if (is.null(path)){
@@ -214,7 +110,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
                             normalize = data_row$normalize)
 
             ## check if invalid
-            temp_mat <- effects_list2mat(bn.fit2effects(gnet, debug = debug))
+            temp_mat <- effects_list2mat(bn.fit2effects(bn.fit = gnet))
             temp_row <- bn.fit2data_row(gnet, data_row, temp_mat)
             invalid <- temp_row$reg_lb < data_row$reg_lb ||
               temp_row$reg_ub > data_row$reg_ub
@@ -241,7 +137,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
         true_cpdag <- bnlearn::amat(bnlearn::cpdag(bn.fit))
 
         ## get true effect sizes
-        effects_list <- bn.fit2effects(bn.fit, debug = debug)
+        effects_list <- bn.fit2effects(bn.fit = bn.fit)
         effects_mat <- effects_list2mat(effects_list,
                                         level = 2)  # only applicable for discrete
 
@@ -295,7 +191,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
   )
   rownames(dataset_grid) <- NULL
 
-  ## TODO: dataset_grid for gen_fn() (difficult with true_scores)
+  ## TODO: dataset_grid for gen_fn() (tricky with true_scores)
 
   ## function for generating datasets
   gen_fn <- function(i){
@@ -338,7 +234,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
           ## read bn.fit object
           bn.fit <- readRDS(file.path(data_dir, "bn.fit.rds"))
 
-          if (!regenerate &&
+          if (!regenerate &  # to create data_file
               file.exists(data_file <- file.path(data_dir,
                                                  sprintf("data%g.txt", j)))){
 
@@ -424,15 +320,15 @@ gen_data_grid <- function(data_grid = build_data_grid(),
           return(NULL)
 
         j <- data_row$dataset
-        if (!recache &&
-            file.exists(file.path(data_dir,
-                                  sprintf("rounds%g.rds", j)))){
+        if (!recache &  # to create rounds_dir
+            file.exists(rounds_dir <- file.path(data_dir,
+                                                sprintf("rounds%g.rds", j)))){
 
           debug_cli(debug, cli::cli_alert_success,
                     "{i} already cached rounds {j} of {data_row$n_dat} for network {data_row$network}",
                     .envir = environment())
 
-          next
+          return(NULL)
         }
         debug_cli(debug, "",
                   "{i} caching rounds {j} of {data_row$n_dat} for network {data_row$network}",
@@ -443,13 +339,13 @@ gen_data_grid <- function(data_grid = build_data_grid(),
 
         settings <- list(method = "cache", target = data_row$target,
                          run = j, n_run = data_row$n_dat, n_obs = data_row$n_obs, n_int = 0)
-        settings <- check_settings(bn.fit = bn.fit, settings = settings, debug = debug)
+        settings <- check_settings(bn.fit = bn.fit,
+                                   settings = settings, debug = debug)
 
         ## execute bandit
         roundsj <- bandit(bn.fit = bn.fit, settings = settings, debug = debug)
 
         ## write results in folder roundsj and as roundsj.rds
-        rounds_dir <- file.path(data_dir, sprintf("rounds%g", settings$run))
         write_rounds(rounds = roundsj, where = rounds_dir)
         write_rounds(rounds = roundsj, where = sprintf("%s.rds", rounds_dir))
 
@@ -487,7 +383,8 @@ ribn <- function(x,
   ## generate observational data if no intervention specified
   if (missing(intervene) || is.null(intervene) || length(intervene) == 0){
 
-    return(bnlearn:::rbn.backend(x = x, n = n, fix = fix, debug = debug))
+    return(bnlearn:::rbn.backend(x = x, n = n, fix = fix,
+                                 debug = debug >= 4))
   }
 
   debug_cli(! class(x)[2] %in% c("bn.fit.gnet", "bn.fit.dnet"), cli::cli_abort,
@@ -507,7 +404,8 @@ ribn <- function(x,
 
     debug_cli(debug, "",
               c("generating {int$n} samples with ",
-                "{sum(names(int) %in% nodes} interventions"))
+                "{sum(names(int) %in% nodes)} interventions"),
+              .envir = environment())
 
     ## convert to bn_list
     xi <- lapply(x, function(y) lapply(y, function(z) z))
@@ -561,11 +459,117 @@ ribn <- function(x,
     xi <- bn_list2bn.fit(xi)
 
     ## return interventional data
-    bnlearn:::rbn.backend(x = xi, n = int$n, fix = fix, debug = debug)
+    bnlearn:::rbn.backend(x = xi, n = int$n, fix = fix,
+                          debug = debug >= 4)
   })
 
   ## generally faster than do.call(rbind, )
   data <- as.data.frame(data.table::rbindlist(data))
 
   return(data)
+}
+
+
+
+#' Build data grid.
+#'
+#' Builds and formats a data grid of simulations.
+#'
+#' @param network character value indicating network name.
+#' @param debug logical value that activates printing debugging output.
+#' @return data.frame with grid of network settings.
+#' @author Jireh Huang (\email{jirehhuang@@ucla.edu})
+#' @examples
+#' ## Default data_grid
+#' build_data_grid()
+#' @export
+
+build_data_grid <- function(network = "survey",
+                            data_type = "gaussian",
+                            n_dat = 0,
+                            n_obs = 0,
+                            target = "",
+                            reg_lb = 0,
+                            reg_ub = 1,
+                            var_lb = 0.5,
+                            var_ub = 1,
+                            coef_lb = 0.5,
+                            coef_ub = 1,
+                            normalize = TRUE,
+                            copies = 1,
+                            debug = 0){
+
+  ## TODO:
+  # check functions
+  # manual network structures
+  # random network structures
+  # data_type: discrete
+  # var_ub: merge discrete levels
+  # manipulate cpts
+  # add and remove discrete edges
+  # max_in_deg and max_out_deg
+  # tiling
+
+  ## dormant parameters
+  k <- 1
+  avg_deg <- 4
+  max_in_deg <- Inf
+  max_out_deg <- Inf
+
+  data_grid <- expand.grid(normalize = normalize,
+                           coef_ub = coef_ub,
+                           coef_lb = coef_lb,
+                           var_ub = var_ub,
+                           var_lb = var_lb,
+                           reg_ub = reg_ub,
+                           reg_lb = reg_lb,
+                           target = target,
+                           max_out_deg = max_out_deg,
+                           max_in_deg = max_out_deg,
+                           avg_deg = avg_deg,
+                           n_obs = n_obs,
+                           n_dat = n_dat,
+                           k = k,
+                           data_type = data_type,
+                           network = network,
+                           id = seq_len(copies),
+                           stringsAsFactors = FALSE)
+
+  data_grid <- check_data_grid(data_grid)
+
+  return(data_grid)
+}
+
+
+
+check_data_grid <- function(data_grid){
+
+  ## TODO: check values
+
+  ## column names
+  nms <- c("index", "id", "seed", "network", "data_type", "k",
+           "n_dat", "n_obs", "avg_deg", "max_in_deg", "max_out_deg",
+           "target", "reg_lb", "reg_ub", "var_lb", "var_ub",
+           "coef_lb", "coef_ub", "normalize", "n_node", "n_edge", "n_within",
+           "n_between", "n_compelled", "n_reversible", "n_params")
+
+  ## remove extra columns
+  data_grid <- data_grid[, intersect(names(data_grid), nms)]
+
+  ## remove duplicates
+  data_grid <- data_grid[! duplicated(data_grid), , drop = FALSE]
+
+  ## add missing columns
+  data_grid$index <- stringr::str_pad(string = seq_len(nrow(data_grid)),
+                                      width = nchar(nrow(data_grid)),
+                                      side = "left", pad = "0")
+  data_grid$index <- sprintf("%s_", data_grid$index)
+  if (is.null(data_grid$id))
+    data_grid$id <- 1
+  data_grid[setdiff(nms, names(data_grid))] <- 0
+
+  ## rearrange columns
+  data_grid <- data_grid[, nms, drop = FALSE]
+
+  return(data_grid)
 }

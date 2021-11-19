@@ -576,7 +576,7 @@ initialize_rounds <- function(bn.fit,
         selected = data.frame(arm = integer(n_obs + n_int),
                               interventions = character(1), reward = numeric(1),
                               simple_reward = numeric(1), time = numeric(1)),
-        effects_true = effects_list2mat(bn.fit2effects(bn.fit, debug = debug)),
+        effects_true = effects_list2mat(bn.fit2effects(bn.fit = bn.fit)),
         ps = list(),
         bda = list()
         # bda_list = list(),  # TODO: remove; temp for debugging
@@ -609,7 +609,7 @@ build_arms <- function(bn.fit, settings, debug = 0){
 
   if (is.null(settings$arms)){
 
-    debug_cli(debug >= 2, cli::cli_info, "initializing default arms")
+    debug_cli(debug >= 2, cli::cli_alert_info, "initializing default arms")
 
     ## exclude target
     ex <- which(settings$nodes == settings$target)
@@ -639,7 +639,7 @@ build_arms <- function(bn.fit, settings, debug = 0){
     }))
   } else{
 
-    debug_cli(debug >= 2, cli::cli_info, "loading arms from settings")
+    debug_cli(debug >= 2, cli::cli_alert_info, "loading arms from settings")
 
     ## TODO: check validity of arms
 
@@ -656,7 +656,7 @@ check_settings <- function(bn.fit,
                            settings,
                            debug = 0){
 
-  debug_cli(debug >= 2, cli::cli_info,
+  debug_cli(debug >= 2, cli::cli_alert_info,
             "checking {length(settings)} settings")
 
   ## TODO:
@@ -835,9 +835,11 @@ check_settings <- function(bn.fit,
 
   ## check temp_dir
   if (is.null(settings$temp_dir) || ! dir.exists(settings$temp_dir)){
-    settings$temp_dir <- file.path(path.expand("~"),
-                                   "Documents/ucla/research/projects/current",
-                                   "simulations", "temp")
+    # settings$temp_dir <- file.path(path.expand("~"),
+    #                                "Documents/ucla/research/projects/current",
+    #                                "simulations", "temp")
+    settings$temp_dir <- file.path(gsub("/tests.*", "", getwd()),
+                                   "tests", "temp")
     debug_cli(debug >= 3, "", "default temp_dir = {settings$temp_dir}")
   }
   dir_check(settings$temp_dir)

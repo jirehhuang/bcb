@@ -18,7 +18,7 @@ build_data_grid(
   coef_ub = 1,
   normalize = TRUE,
   copies = 1,
-  debug = FALSE
+  debug = 0
 )
 }
 \arguments{
