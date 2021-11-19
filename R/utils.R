@@ -32,11 +32,8 @@ debug_cli <- function(debug,
     ## prepare and execute function
     if (!is.function(fun)){
 
+      ## TODO: replace with cli::cli_text
       fun <- cli::cli_alert
-    }
-    if (identical(fun, cli::cli_abort)){
-
-      cli::cli_status_clear()  # TODO: test if this works
     }
     if (identical(fun, cli::cli_progress_bar)){
 
@@ -56,6 +53,11 @@ debug_cli <- function(debug,
     } else if ("msg" %in% formals_nms){
 
       args$msg <- text
+
+    } else if ("message" %in% formals_nms){
+
+      ## TODO: check glue behavior of cli::cli_abort()
+      args$message <- text
 
     } else if ("format" %in% formals_nms){
 
@@ -212,6 +214,8 @@ read_dir <- function(dir,
                      envir = sys.frame(-1),
                      exclude = "data"){
 
+  ## TODO: rename to dir2env()
+
   files <- list.files(dir)
   files <- files[grepl(".txt|.rds", files)]
   files <- files[!grepl(exclude, files)]
@@ -232,6 +236,20 @@ read_dir <- function(dir,
                       names(objs))
   list2env(x = objs,
            envir = envir)
+}
+
+
+
+# Clear temporary files
+
+clear_temp <- function(settings){
+
+  temp_file <- file.path(settings$temp_dir, settings$id)
+
+  sapply(c("score", "support", "arp"), function(x){
+
+    file.remove(sprintf("%s_%s", temp_file, x))
+  })
 }
 
 
@@ -263,7 +281,76 @@ random_id <- function(n = 12){
 
 
 # Determine minimum debug width
+
 debug_width <- function(){
 
   max(nchar(ls(getNamespace(name = "bcb")))) + 2
+}
+
+
+
+# Load an example, for testing
+
+load_example <- function(eg = c("gnet"),
+                         network = "survey",
+                         envir = sys.frame(-1)){
+
+  eg <- match.arg(eg)
+  temp_dir <- file.path(gsub("/tests.*", "", getwd()),
+                        "tests", "temp")
+
+  if (file.exists(rds <- file.path(temp_dir, sprintf("%s_%s.rds",
+                                                     eg, network)))){
+    objs <- readRDS(file = rds)
+
+  } else{
+
+    if (eg == "gnet"){
+
+      bn.fit <- phsl::bnrepository(x = network)
+      bn.fit <- rename_bn.fit(bn.fit)
+      bn.fit <- bn2gnet(bn = bn.fit, seed = 1,
+                        coefs = c(0.5, 1), vars = c(0.5, 1))
+
+      score <- "bge"
+      intervene <- c(
+        list(list(n = 100)),
+        lapply(names(bn.fit), function(x){
+          int <- list(1, 10)
+          names(int) <- c(x, "n")
+          return(int)
+        })
+      )
+      interventions <- c(rep("", 100),
+                         do.call(c, lapply(intervene[-1], function(x){
+
+                           rep(names(x)[1], x$n)
+                         })))
+    } else{
+
+      browser()
+
+      ## TODO: add more examples
+    }
+    data <- ribn(x = bn.fit, intervene = intervene, seed = 1)
+
+    ## prepare settings
+    settings <- list(method = "bcb", target = "V6", n_obs = 100, n_int = 100,
+                     score = score, max_parents = 5, nodes = names(data),
+                     temp_dir = temp_dir)
+    settings <- bcb:::check_settings(bn.fit = bn.fit, settings = settings)
+
+    objs <- list(bn.fit = bn.fit,
+                 data = data,
+                 settings = settings,
+                 interventions = interventions)
+
+    saveRDS(objs, file = rds)
+  }
+
+  ## just in case, compile bida and mds
+  compile_bida()
+  compile_mds()
+
+  list2env(objs, envir = envir)
 }
