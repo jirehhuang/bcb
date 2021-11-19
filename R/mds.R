@@ -4,28 +4,36 @@
 
 
 
+# Execute modular DAG sampler
+
 execute_mds <- function(ps,
                         settings,
                         seed = 1,
-                        debug = FALSE){
+                        debug = 0){
 
-  cache_file <- file.path(settings$temp_dir, settings$id)
+  debug_cli(debug >= 2, cli::cli_alert_info,
+            "sampling DAG with {.pkg mds}")
+
+  temp_file <- file.path(settings$temp_dir, settings$id)
   gob <- ps2gobnilp(ps = ps, settings = settings, debug = debug)
 
   ## write table
   write.table(x = data.frame(gob),
-              file = sprintf("%s_gobnilp", cache_file),
+              file = sprintf("%s_gobnilp", temp_file),
               row.names = FALSE, col.names = FALSE, quote = FALSE)
 
   start_time <- Sys.time()
   sampler <- sys::exec_internal(cmd = get_mds(),
                                 args = c("nonsymmetric",
-                                         sprintf("%s_gobnilp", cache_file),
+                                         sprintf("%s_gobnilp", temp_file),
                                          seed))
   end_time <- Sys.time()
   sampler_time <- as.numeric(end_time - start_time, units = "secs")
 
   # browser()  # TODO: temporary for debugging
+
+  # text <- sys::as_text(sampler$stdout)
+  # return(Reduce(`+`, lapply(text, sampler2amat)) / length(text))
 
   ## convert to amat
   text <- sys::as_text(sampler$stdout)
@@ -43,9 +51,11 @@ execute_mds <- function(ps,
 
 
 
+# Convert parent support to GOBNILP format
+
 ps2gobnilp <- function(ps,
                        settings,
-                       debug = FALSE){
+                       debug = 0){
 
   p <- length(ps)
   seq_p <- seq_len(p)
@@ -72,6 +82,8 @@ ps2gobnilp <- function(ps,
 }
 
 
+
+# Convert output of sampler to adjacency matrix
 
 sampler2amat <- function(text){
 
@@ -119,10 +131,10 @@ get_mds <- function(dir = FALSE){
 # Compile mds using make
 
 compile_mds <- function(mds_dir = get_mds(dir = TRUE),
-                        debug = FALSE){
+                        debug = 0){
 
-  debug_cli_sprintf(debug, "info",
-                    "Compiling mds using make")
+  debug_cli(debug >= 2, cli::cli_alert_info,
+            "compiling {.pkg mds} using make")
 
   ## check operating system
   check_os()
@@ -134,9 +146,8 @@ compile_mds <- function(mds_dir = get_mds(dir = TRUE),
   end_time <- Sys.time()
   make_time <- as.numeric(end_time - start_time, units = "secs")
 
-  debug_cli_sprintf(debug, "success",
-                    "Successfully copmiled mds in %g secs",
-                    make_time)
+  debug_cli(debug >= 2, cli::cli_alert_success,
+            "successfully compiled {.pkg mds} in {make_time} secs")
 }
 
 
