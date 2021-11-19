@@ -146,7 +146,7 @@ setRefClass("Score",
               }
             )
 )
-#' @noRd  # jirehhuang
+# @noRd  # jirehhuang
 
 setRefClass("DataScore",
             contains = "Score",
@@ -225,7 +225,7 @@ setRefClass("DataScore",
               }
             )
 )
-#' @noRd  # jirehhuang
+# @noRd  # jirehhuang
 
 
 
