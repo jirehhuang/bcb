@@ -1,3 +1,73 @@
+debug <- 3
+
+
+
+######################################################################
+## Gaussian
+######################################################################
+
+bcb:::load_example(eg = "gnet", network = "asia")
+
+
+
+## compute_scores()
+scores <- bcb:::compute_scores(data = data, settings = settings,
+                               interventions = interventions,
+                               output = TRUE, debug = debug)
+
+## compute_ps()
+ps <- bcb:::compute_ps(settings = settings,
+                       interventions = interventions, debug = debug)
+
+## ps2es()
+bma <- bcb:::ps2es(ps = ps, settings = settings)
+
+## es2mpg()
+mpg <- bcb:::es2mpg(es = bma)
+
+## convert_ps()
+testthat::expect_identical(
+  ps,
+  ## list -> data.frame -> list
+  bcb:::convert_ps(bcb:::convert_ps(ps, "data.frame"), "list")
+)
+
+## lookup(), lookup_scores(), lookup_scores_cpp()
+lu <- all(unlist(lapply(settings$nodes, function(node){
+
+  apply(ps[[node]], 1, function(row){
+
+    parents <- row[seq_len(settings$max_parents)]
+
+    row[settings$max_parents + 1] ==
+      c(
+        ps[[node]][bcb:::lookup(parents = parents[!is.na(parents)],
+                             ps_i = ps[[node]]), settings$max_parents + 1],
+        bcb:::lookup_score(target = node,
+                           parents = parents,
+                           ps = ps),
+        bcb:::lookup_score_cpp(parents = parents[!is.na(parents)],
+                               ps_i = ps[[node]]),
+        bcb:::lookup_score_cpp(parents = parents[!is.na(parents)],
+                               ps_i = ps[[node]],
+                               score_col = match("score",
+                                                 names(ps[[node]]))-1)
+      )
+  })
+})))
+testthat::expect_true(lu)
+
+
+
+######################################################################
+## General
+######################################################################
+
+
+
 ## test bida github examples
 
-test_bida(debug = TRUE)
+bcb:::test_bida(debug = debug)
+
+
+
