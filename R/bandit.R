@@ -8,7 +8,7 @@
 
 bandit <- function(bn.fit,
                    settings = list(),
-                   debug = FALSE){
+                   debug = 0){
 
   start_time <- Sys.time()
 
@@ -49,6 +49,8 @@ bandit <- function(bn.fit,
   }
   rounds <- summarize_rounds(bn.fit = bn.fit, settings = settings, rounds = rounds)
 
+  clear_temp(settings = settings)  # clear _score/support/arp
+
   return(rounds)
 }
 
@@ -60,7 +62,7 @@ apply_method <- function(t,
                          bn.fit,
                          settings,
                          rounds,
-                         debug = FALSE){
+                         debug = 0){
 
   ## load settings
   list2env(settings[c("method")], envir = environment())
@@ -88,7 +90,7 @@ apply_method <- function(t,
 
     }
     ## generate data based on arm
-    data_t <- ribn(x = bn.fit, debug = FALSE,
+    data_t <- ribn(x = bn.fit, debug = 0,
                    intervene = arm2intervene(rounds$arms[[a]]))
 
     ## update rounds: posterior distribution, estimates, variances, med
@@ -177,7 +179,7 @@ update_rounds <- function(t,
                           data_t,
                           settings,
                           rounds,
-                          debug = FALSE){
+                          debug = 0){
 
   ## load settings
   list2env(settings[c("target", "n_obs", "n_int")], envir = environment())
@@ -191,13 +193,11 @@ update_rounds <- function(t,
     rounds$selected$interventions[t] <- rounds$arms[[a]]$node
   }
 
-  cache_scores(data = data, settings = settings,
-               interventions = interventions, debug = debug > 1)
-  rounds$cache <- read_cache(settings = settings)
+  compute_scores(data = data, settings = settings,
+                 interventions = interventions, debug = debug)
   rounds$ps <- compute_ps(data = data,
                           settings = settings,
                           interventions = interventions,
-                          threshold = settings$threshold,
                           debug = debug)
   if (t > n_obs){
 
@@ -215,10 +215,10 @@ update_rounds <- function(t,
                             target = NULL, debug = debug)
 
   rounds$mds[t,] <- execute_mds(ps = rounds$ps, settings = settings,
-                                seed = t, debug = debug > 1)
-  rounds$gies[t,] <- estimate_gies(cache = rounds$cache,
-                                   settings = settings,
-                                   dag = TRUE, debug = debug > 1)
+                                seed = t, debug = debug)
+  rounds$gies[t,] <- estimate_gies(ps = rounds$ps, settings = settings,
+                                   interventions = interventions,
+                                   dag = TRUE, debug = debug)
 
   ## TODO: remove; temporary for debugging
   # if (t == 10 || t %% 100 == 0 || t == (n_obs + n_int))
@@ -250,7 +250,7 @@ update_rounds <- function(t,
                                   rounds = rounds, metric = "se_bda")
 
     ## est
-    if (settings$method %in% c("cache", "bcb-bma")){
+    if (settings$method %in% c("cache", "bcb", "bcb-bma")){
 
       rounds$effects_est[t,] <- expect_post(rounds = rounds, metric = "est_est")
       rounds$se_est[t,] <-  # E(Var(X)) + Var(E(X)) = E(Var(X)) + (E(X^2) - E(X)^2)
@@ -332,6 +332,10 @@ summarize_rounds <- function(bn.fit, settings, rounds){
   rounds$selected$cumulative[!ind_obs] <-
     cumsum((max_effect - rounds$selected$reward)[!ind_obs])
 
+  ## clear rownames
+  rownames(rounds$arms) <- rownames(rounds$data) <-
+    rownames(rounds$selected) <- NULL
+
   ## graph metrics
   true <- bnlearn::amat(bn.fit)
   for (graph in c("mpg", "mds", "gies")){
@@ -345,6 +349,8 @@ summarize_rounds <- function(bn.fit, settings, rounds){
                                                                 `[[`, "dag"))
     rounds[[sprintf("%s_cpdag", graph)]] <- do.call(rbind, lapply(cp_dag,
                                                                   `[[`, "cpdag"))
+    rownames(rounds[[sprintf("%s_dag", graph)]]) <-
+      rownames(rounds[[sprintf("%s_cpdag", graph)]]) <- NULL
   }
 
   ## mse of edge support
@@ -413,13 +419,12 @@ write_rounds <- function(rounds, where){
 
     for (nm in setdiff(names(rounds), c("settings", "ps", "bda", "bda_list"))){
 
-      write.table(rounds[[nm]], file = file.path(where, sprintf("%s.txt", nm)))
+      write.table(rounds[[nm]], file = file.path(where, sprintf("%s.txt", nm)),
+                  row.names = nm == "effects_true")
     }
 
     write.table(convert_ps(ps = rounds$ps, new_class = "data.frame"),
                 file.path(where, "ps.txt"))
-    write.table(convert_ps(ps = rounds$cache, new_class = "data.frame"),
-                file.path(where, "cache.txt"))
     write.table(convert_bda(bda = rounds$bda, new_class = "data.frame"),
                 file.path(where, "bda.txt"))
 
@@ -438,22 +443,22 @@ read_rounds <- function(where){
 
   if (grepl(".rds", where)){
 
-    debug_cli_sprintf(! file.exists(where),
-                      "abort", "Specified file does not exist")
+    debug_cli(! file.exists(where), cli::cli_abort,
+              "specified file does not exist")
 
     rounds <- readRDS(where)
 
   } else{
 
-    debug_cli_sprintf(! dir.exists(where),
-                      "abort", "Specified directory does not exist")
+    debug_cli(! dir.exists(where), cli::cli_abort,
+              "specified directory does not exist")
 
-    nms <- c("arms", "data", "selected", "effects_true", "ps", "cache", "bda",
+    nms <- c("arms", "data", "selected", "effects_true", "ps", "bda",
              mat <- c(avail_bda, sprintf("effects_%s", c(avail_bda, "int", "est")),
                       sprintf("se_%s", c(avail_bda, "int", "est")),
                       "E_Var_bda", "E_Var_int", "E_Var_est", "Var_E_bda", "Var_E_int", "Var_E_est"),
              unlist(lapply(avail_bda[-1], function(x) sprintf("%s_%s", x, c("dag", "cpdag")))),
-             "med_dag", "med_cpdag", "settings")
+             "settings")
 
     mat <- c("effects_true", mat)
     mat <- sprintf("%s.txt", mat)
@@ -463,7 +468,8 @@ read_rounds <- function(where){
 
     rounds <- lapply(files, function(file){
 
-      temp <- read.table(file.path(where, file), as.is = TRUE)
+      temp <- read.table(file.path(where, file),
+                         header = TRUE, as.is = TRUE)
       rownames(temp) <- NULL
 
       if (file %in% mat)
@@ -473,7 +479,8 @@ read_rounds <- function(where){
 
         for (nm in names(temp)){
 
-          mode(temp[[nm]]) <- switch(nm, node = "character", ordering = "integer", "numeric")
+          mode(temp[[nm]]) <- switch(nm, node = "character",
+                                     ordering = "integer", "numeric")
         }
       }
       return(temp)
@@ -484,20 +491,15 @@ read_rounds <- function(where){
                                             "", rounds$selected$interventions)
 
     rounds$ps <- convert_ps(ps = rounds$ps, new_class = "list")
-    rounds$cache <- convert_ps(ps = rounds$cache, new_class = "list",
-                               list_matrix = TRUE)
     rounds$bda <- convert_bda(bda = rounds$bda, new_class = "list")
+
+    rownames(rounds$effects_true) <- colnames(rounds$effects_true)
 
     rounds$settings <- as.list(rounds$settings)
     rounds$settings$nodes <- strsplit(rounds$settings$nodes, ", ")[[1]]
   }
   return(rounds)
 }
-
-
-
-
-## TODO: read_rounds()
 
 
 
@@ -543,7 +545,7 @@ arm2intervene <- function(arm){
 
 initialize_rounds <- function(bn.fit,
                               settings,
-                              debug = FALSE){
+                              debug = 0){
 
   ## load settings
   list2env(settings[c("n_obs", "n_int")], envir = environment())
@@ -553,9 +555,8 @@ initialize_rounds <- function(bn.fit,
 
     browser()
 
-    debug_cli_sprintf(n_obs > settings$rounds$n_obs,
-                      "abort", "Attempting to borrow %g > %g observations",
-                      n_obs, settings$rounds$n_obs)
+    debug_cli(n_obs > settings$rounds$n_obs, cli::cli_abort,
+              "attempting to borrow {n_obs} > {settings$rounds$n_obs} observations")
 
     ## TODO: borrow previous rounds
 
@@ -577,7 +578,6 @@ initialize_rounds <- function(bn.fit,
                               simple_reward = numeric(1), time = numeric(1)),
         effects_true = effects_list2mat(bn.fit2effects(bn.fit, debug = debug)),
         ps = list(),
-        cache = list(),
         bda = list()
         # bda_list = list(),  # TODO: remove; temp for debugging
       ),
@@ -605,11 +605,11 @@ initialize_rounds <- function(bn.fit,
 
 # Function for building arms, a list of interventions
 
-build_arms <- function(bn.fit, settings, debug = FALSE){
+build_arms <- function(bn.fit, settings, debug = 0){
 
   if (is.null(settings$arms)){
 
-    debug_cli_sprintf(debug, "info", "Initializing default arms")
+    debug_cli(debug >= 2, cli::cli_info, "initializing default arms")
 
     ## exclude target
     ex <- which(settings$nodes == settings$target)
@@ -639,7 +639,7 @@ build_arms <- function(bn.fit, settings, debug = FALSE){
     }))
   } else{
 
-    debug_cli_sprintf(debug, "info", "Loading arms from settings")
+    debug_cli(debug >= 2, cli::cli_info, "loading arms from settings")
 
     ## TODO: check validity of arms
 
@@ -654,10 +654,10 @@ build_arms <- function(bn.fit, settings, debug = FALSE){
 
 check_settings <- function(bn.fit,
                            settings,
-                           debug = FALSE){
+                           debug = 0){
 
-  debug_cli_sprintf(debug, "info",
-                    "Checking %g settings", length(settings))
+  debug_cli(debug >= 2, cli::cli_info,
+            "checking {length(settings)} settings")
 
   ## TODO:
   # simplify
@@ -670,51 +670,51 @@ check_settings <- function(bn.fit,
   if (is.null(settings$method) ||
       ! ((settings$method <- tolower(settings$method)) %in%
          avail_methods)){
-    settings$method <- "greedy"
-    debug_cli_sprintf(debug, "", "Default method = %s", settings$method)
+    settings$method <- "cache"
+    debug_cli(debug >= 3, "", "default method = {settings$method}")
   }
 
   ## check target
   if (is.null(settings$target) ||
       settings$target == ""){
     settings$target <- bnlearn:::topological.ordering(bn.fit)[settings$nnodes]
-    debug_cli_sprintf(debug, "", "Automatically selected target = %s",
-                      settings$target)
+    debug_cli(debug >= 3, "",
+              "automatically selected target = {settings$target}")
   }
 
   ## check run
   if (is.null(settings$run) ||
       settings$run < 1){
     settings$run <- 1
-    debug_cli_sprintf(debug, "", "Default run = %s", settings$run)
+    debug_cli(debug >= 3, "", "default run = {settings$run}")
   }
 
   ## check n_run
   if (is.null(settings$n_run) ||
       settings$n_run < 1){
     settings$n_run <- 1
-    debug_cli_sprintf(debug, "", "Default n_run = %s", settings$n_run)
+    debug_cli(debug >= 3, "", "default n_run = {settings$n_run}")
   }
 
   ## check n_obs
   if (is.null(settings$n_obs) ||
       settings$n_obs < 1){
     settings$n_obs <- 1
-    debug_cli_sprintf(debug, "", "Default n_obs = %s", settings$n_obs)
+    debug_cli(debug >= 3, "", "default n_obs = {settings$n_obs}")
   }
 
   ## check n_int
   if (is.null(settings$n_int) ||
       settings$n_int < 0){
     settings$n_int <- 100
-    debug_cli_sprintf(debug, "", "Default n_int = %s", settings$n_int)
+    debug_cli(debug >= 3, "", "default n_int = {settings$n_int}")
   }
 
   ## check n_ess
   if (is.null(settings$n_ess) ||
       settings$n_ess < 1){
     settings$n_ess <- 0
-    debug_cli_sprintf(debug, "", "Default n_ess = %s", settings$n_ess)
+    debug_cli(debug >= 3, "", "default n_ess = {settings$n_ess}")
   }
 
   ## check n_t
@@ -722,20 +722,20 @@ check_settings <- function(bn.fit,
       settings$n_t < 1 ||
       settings$n_t > settings$n_int){
     settings$n_t <- 1
-    debug_cli_sprintf(debug, "", "Default n_t = %s", settings$n_t)
+    debug_cli(debug >= 3, "", "default n_t = {settings$n_t}")
   }
 
   ## check int_parents
   if (is.null(settings$int_parents)){
     settings$int_parents <- TRUE
-    debug_cli_sprintf(debug, "", "Default int_parents = %s", settings$int_parents)
+    debug_cli(debug >= 3, "", "default int_parents = {settings$int_parents}")
   }
 
   ## check optimistic
   if (is.null(settings$optimistic) ||
       settings$optimistic < 0){
     settings$optimistic <- 0
-    debug_cli_sprintf(debug, "", "Default optimistic = %s", settings$optimistic)
+    debug_cli(debug >= 3, "", "default optimistic = {settings$optimistic}")
   }
 
   ## check score
@@ -744,13 +744,13 @@ check_settings <- function(bn.fit,
       settings$score <- "bge"
     else if (class(bn.fit)[2] == "bn.fit.dnet")
       settings$score <- "bde"
-    debug_cli_sprintf(debug, "", "Selected score = %s", settings$score)
+    debug_cli(debug >= 3, "", "selected score = {settings$score}")
   }
 
   ## check max_parents
   if (is.null(settings$max_parents) || settings$max_parents < 0){
-    settings$max_parents <- 5
-    debug_cli_sprintf(debug, "", "Default max_parents = %s", settings$max_parents)
+    settings$max_parents <- min(5, settings$nnodes - 1)
+    debug_cli(debug >= 3, "", "default max_parents = {settings$max_parents}")
   }
   settings$max_parents <- min(settings$nnodes-1, settings$max_parents)
 
@@ -758,21 +758,22 @@ check_settings <- function(bn.fit,
   if (is.null(settings$threshold) ||
       settings$threshold < 0 || settings$threshold > 1){
     settings$threshold <- 0.999
-    debug_cli_sprintf(debug, "", "Default threshold = %s", settings$threshold)
+    debug_cli(debug >= 3, "", "default threshold = {settings$threshold}")
   }
 
   ## check eta
   if (is.null(settings$eta) ||
       settings$eta < 0 || settings$eta > 1){
     settings$eta <- 0
-    debug_cli_sprintf(debug, "", "Default eta = %s", settings$eta)
+    debug_cli(debug >= 3, "", "default eta = {settings$eta}")
   }
 
   ## check borrow
+  ## TODO: remove borrow
   if (is.null(settings$borrow) ||
       settings$borrow < 0){
     settings$borrow <- 0
-    debug_cli_sprintf(debug, "", "Default borrow = %s", settings$borrow)
+    debug_cli(debug >= 3, "", "default borrow = {settings$borrow}")
   }
 
   settings[c("epsilon", "c")] <- 0
@@ -788,8 +789,7 @@ check_settings <- function(bn.fit,
         settings$epsilon > 1 ||
         settings$epsilon < 0){
       settings$epsilon <- 0
-      debug_cli_sprintf(debug, "", "Default epsilon = %s for greedy",
-                        settings$epsilon)
+      debug_cli(debug >= 3, "", "default epsilon = {settings$epsilon} for greedy")
     }
     settings$n_ess <- 0
 
@@ -799,7 +799,7 @@ check_settings <- function(bn.fit,
     if (is.null(settings$c) ||
         settings$c < 0){
       settings$c <- 1
-      debug_cli_sprintf(debug, "", "Default c = %s for UCB", settings$c)
+      debug_cli(debug >= 3, "", "default c = {settings$c} for UCB")
     }
     settings$n_ess <- 0
 
@@ -809,7 +809,7 @@ check_settings <- function(bn.fit,
 
     ## TODO: implement thompson sampling
 
-  } else if (settings$method == "bcb"){
+  } else if (grepl("bcb", settings$method)){
 
     ## TODO: figure out better names
 
@@ -817,14 +817,12 @@ check_settings <- function(bn.fit,
     if (is.null(settings$c) ||
         settings$c < 0){
       settings$c <- 1
-      debug_cli_sprintf(debug, "", "Default c = %s for BCB", settings$c)
+      debug_cli(debug >= 3, "", "default c = {settings$c} for BCB")
     }
 
   } else{
 
     ## TODO: further checks
-
-    # debug_cli_sprintf(TRUE, "abort", "`%s` is not a valid method", settings$method)
   }
 
   ## additional
@@ -832,7 +830,7 @@ check_settings <- function(bn.fit,
   ## check type
   if (is.null(settings$type)){
     settings$type <- class(bn.fit)[2]
-    debug_cli_sprintf(debug, "", "bn.fit type = %s", settings$type)
+    debug_cli(debug >= 3, "", "bn.fit type = {settings$type}")
   }
 
   ## check temp_dir
@@ -840,21 +838,28 @@ check_settings <- function(bn.fit,
     settings$temp_dir <- file.path(path.expand("~"),
                                    "Documents/ucla/research/projects/current",
                                    "simulations", "temp")
-    debug_cli_sprintf(debug, "", "Default temp_dir = %s", settings$temp_dir)
+    debug_cli(debug >= 3, "", "default temp_dir = {settings$temp_dir}")
   }
   dir_check(settings$temp_dir)
 
   ## check aps_dir
   if (is.null(settings$aps_dir)){
     settings$aps_dir <- get_bida(dir = TRUE)
-    debug_cli_sprintf(debug, "", "Detected aps_dir = %s", settings$aps_dir)
+    debug_cli(debug >= 3, "", "detected aps_dir = {settings$aps_dir}")
   }
   compile_bida(aps_dir = settings$aps_dir, debug = debug)
+
+  ## check mds_dir
+  if (is.null(settings$mds_dir)){
+    settings$mds_dir <- get_mds(dir = TRUE)
+    debug_cli(debug >= 3, "", "detected mds_dir = {settings$mds_dir}")
+  }
+  compile_mds(mds_dir = settings$mds_dir, debug = debug)
 
   ## check id
   if (is.null(settings$id)){
     settings$id <- random_id(n = 12)
-    debug_cli_sprintf(debug, "", "Generated id = %s", settings$id)
+    debug_cli(debug >= 3, "", "generated id = {settings$id}")
   }
 
   ## check data_obs
@@ -886,8 +891,8 @@ check_settings <- function(bn.fit,
                                                   function(x) as.factor))
     }
   }
-  debug_cli_sprintf(!is.data.frame(settings$data_obs),
-                    "abort", "data_obs is not a data.frame")
+  debug_cli(!is.data.frame(settings$data_obs), cli::cli_abort,
+            "data_obs is not a data.frame")
 
   ## TODO: remove; temporary for debugging
   settings$bn.fit <- bn.fit
@@ -897,7 +902,8 @@ check_settings <- function(bn.fit,
            "n_ess", "n_t", "int_parents", "optimistic", "epsilon",
            "c", "score", "max_parents", "threshold", "eta", "borrow")
   settings <- settings[union(nms, c("nodes", "nnodes", "type", "temp_dir",
-                                    "aps_dir", "id", "data_obs", "bn.fit"))]
+                                    "aps_dir", "mds_dir", "id", "data_obs",
+                                    "bn.fit"))]
 
   return(settings)
 }

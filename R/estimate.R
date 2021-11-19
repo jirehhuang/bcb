@@ -15,7 +15,7 @@ compute_bda <- function(data,
                         b_0 = 1,
                         m_0 = 0,
                         Lambda_0 = 1,
-                        debug = FALSE){
+                        debug = 0){
 
   t <- nrow(data)
   p <- settings$nnodes
@@ -35,9 +35,10 @@ compute_bda <- function(data,
 
     }) < (settings$max_parents + 2))
   }
-  debug_cli_sprintf(debug > 1, "info",
-                    "Computing back-door effects with %s linear model",
-                    ifelse(nig_bda, "Bayesian Normal-inverse-gamma", "standard"))
+  debug_cli(debug >= 3, cli::cli_alert_info,
+            c("computing back-door effects with ",
+              ifelse(nig_bda, "Bayesian Normal-inverse-gamma", "standard"),
+              " linear model"))
 
   ## initialize storage structure
   if (length(rounds[["bda"]]) == 0){
@@ -70,21 +71,21 @@ compute_bda <- function(data,
       bool_data <- get_bool_data(t = t, i = i,
                                  settings = settings, rounds = rounds)
 
-      pars <- as.matrix(rounds$ps[[i]][parents])
+      pars <- as.matrix(rounds$ps[[i]][, parents, drop = FALSE])
       temp <- bda[[i]]
       n <- sum(bool_data)
 
       Xy <- as.matrix(data[bool_data, , drop=FALSE])
       if (max(abs(apply(Xy, 2, mean))) > 1e-6){
-        debug_cli_sprintf(debug > 1, "",
-                          "Assumes zero-centered data")
+        debug_cli(debug >= 3, cli::cli_alert,
+                  "centering {ncol(Xy)} variables")
         Xy <- apply(Xy, 2, function(x) x - mean(x))
       }
       XytXy <- t(Xy) %*% Xy
 
-      for (l in rounds$ps[[i]]$ordering){
+      for (l in rounds$ps[[i]][, "ordering"]){
 
-        if (rounds$ps[[i]]$support[l] == 0) break
+        if (rounds$ps[[i]][l, "prob"] == 0) break
 
         k <- pars[l, !is.na(pars[l, ])]  # indices of parents
         n_parents <- length(k)  # number of parents
@@ -178,7 +179,7 @@ expect_post <- function(rounds,
     for (j in seq_p[-i]){
 
       post_mean[i, j] <-
-        sum(rounds$ps[[i]]$support *
+        sum(rounds$ps[[i]][, "prob"] *
             rounds$bda[[i]][[j]][[metric]]^(1 + squared), na.rm = TRUE)
     }
   }
@@ -206,7 +207,7 @@ dag_bda <- function(dag,
   effects <- t(sapply(seq_p, function(i){
 
     row_index <- lookup(parents = edge_list[[i]],
-                        cache = as.matrix(rounds$ps[[i]]))
+                        ps_i = rounds$ps[[i]])
 
     sapply(seq_p, function(j){
 
@@ -235,7 +236,7 @@ get_bool_data <- function(t,
                           i,
                           settings,
                           rounds,
-                          debug = FALSE){
+                          debug = 0){
 
   bool_data <- rep(TRUE, t)
 
@@ -252,9 +253,9 @@ get_bool_data <- function(t,
     bool_data[rounds$selected$arm[seq_len(t)] > 0] <-
       bool_arms[rounds$selected$arm[seq_len(t)]]
 
-    debug_cli_sprintf(debug && sum(bool_data) > settings$n_obs, "",
-                      "Using %g rows of experimental data for back-door adjustment",
-                      sum(bool_data) - settings$n_obs)
+    debug_cli(debug >= 3 && sum(bool_data) > settings$n_obs, "",
+              c("using {sum(bool_data) - settings$n_obs} rows of ",
+                "experimental data for back-door adjustment"))
   }
   return(bool_data)
 }
@@ -266,11 +267,11 @@ get_bool_data <- function(t,
 convert_bda <- function(bda,
                         new_class = switch(class(bda), list = "data.frame", `data.frame` = "list")){
 
-  debug_cli_sprintf(! class(bda) %in% c("list", "data.frame"),
-                    "abort", "bda must be a list or data.frame")
+  debug_cli(! class(bda) %in% c("list", "data.frame"), cli::cli_abort,
+            "bda must be a list or a data.frame")
 
-  debug_cli_sprintf(! new_class %in% c("list", "data.frame"),
-                    "abort", "new_class must be a list or data.frame")
+  debug_cli(! new_class %in% c("list", "data.frame"), cli::cli_abort,
+            "new_class must be a list or a data.frame")
 
   if (class(bda) == new_class)
     return(bda)
