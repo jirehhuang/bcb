@@ -400,8 +400,10 @@ read_ps <- function(settings){
 
     ps_raw_i <- ps_raw[seq(pos, pos + n_parents - 1), ]
 
-    map <- map_parent_sets(sorted = ps[[i]][, seq_len(max_parents)],
-                           unsorted = ps_raw_i[, seq_len(max_parents) + 2],
+    map <- map_parent_sets(sorted = ps[[i]][, seq_len(max_parents),
+                                            drop = FALSE],
+                           unsorted = ps_raw_i[, seq_len(max_parents) + 2,
+                                               drop = FALSE],
                            revert = TRUE)  # map unsorted -> sorted
 
     probs <- ps_raw_i[map, 1]  # log(weights)
@@ -547,10 +549,7 @@ map_parent_sets <- function(sorted,
 
   map <- apply(unsorted, 1, function(set){
 
-    set <- set[seq_len(settings$max_parents)]
-    set <- set[!is.na(set)]
-
-    lookup(parents = set, ps_i = sorted)
+    lookup(parents = set[!is.na(set)], ps_i = sorted)
   })
   if (revert){
 
@@ -558,7 +557,8 @@ map_parent_sets <- function(sorted,
     pam[map] <- seq_len(length(map))
 
     ## TODO: remove this check after testing
-    if (all.equal(sorted, unsorted[pam,], check.attributes = FALSE) != TRUE){
+    if (all.equal(sorted, unsorted[pam, , drop = FALSE],
+                  check.attributes = FALSE) != TRUE){
 
       debug_cli(TRUE, cli::cli_alert_danger,
                 "mapping incorrect")
@@ -569,7 +569,8 @@ map_parent_sets <- function(sorted,
   } else{
 
     ## TODO: remove this check after testing
-    if (all.equal(sorted[map,], unsorted, check.attributes = FALSE) != TRUE){
+    if (all.equal(sorted[map, , drop = FALSE], unsorted,
+                  check.attributes = FALSE) != TRUE){
 
       debug_cli(TRUE, cli::cli_alert_danger,
                 "mapping incorrect")
