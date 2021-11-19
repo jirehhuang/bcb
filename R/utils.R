@@ -284,7 +284,9 @@ random_id <- function(n = 12){
 
 debug_width <- function(){
 
-  max(nchar(ls(getNamespace(name = "bcb")))) + 2
+  ns <- ls(getNamespace(name = "bcb"))
+  ns <- ns[!grepl("_bcb", ns)]  # exclude _bcb*
+  max(nchar(ns)) + 2
 }
 
 
