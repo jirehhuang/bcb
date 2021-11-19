@@ -24,7 +24,7 @@ build_data_grid <- function(network = "survey",
                             coef_ub = 1,
                             normalize = TRUE,
                             copies = 1,
-                            debug = FALSE){
+                            debug = 0){
 
   ## TODO:
   # check functions
@@ -443,7 +443,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
 
         settings <- list(method = "cache", target = data_row$target,
                          run = j, n_run = data_row$n_dat, n_obs = data_row$n_obs, n_int = 0)
-        settings <- check_settings(bn.fit = bn.fit, settings = settings, debug = debug > 1)
+        settings <- check_settings(bn.fit = bn.fit, settings = settings, debug = debug)
 
         ## execute bandit
         roundsj <- bandit(bn.fit = bn.fit, settings = settings, debug = debug)
@@ -477,7 +477,7 @@ ribn <- function(x,
                  fix = TRUE,
                  intervene = list(),
                  seed = NULL,
-                 debug = FALSE){
+                 debug = 0){
 
   if (!is.null(seed))
     set.seed(seed)
