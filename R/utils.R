@@ -133,7 +133,7 @@ dir_check <- function(path,
 # .txt and .rds files in a directory
 #' @export
 
-read_dir <- function(dir,
+dir2env <- function(dir,
                      envir = sys.frame(-1),
                      exclude = "data"){
 
