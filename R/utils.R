@@ -1,5 +1,5 @@
 # Print debugging output with cli
-# TODO: remove; temporary
+# TODO: remove; temporarily exported for debugging
 #' @export
 
 debug_cli <- function(debug,
@@ -22,8 +22,8 @@ debug_cli <- function(debug,
     if (length(fn) == 0)
       fn <- "[UNKNOWN]"
 
-    fn <- sprintf("{.strong %s}:", fn)
-    fn <- stringr::str_pad(fn, width = max(debug_width() + 10,
+    fn <- sprintf("{.field {.strong %s}}:", fn)
+    fn <- stringr::str_pad(fn, width = max(debug_width() + 10 + 9,
                                            nchar(fn) + 2), side = "right")
 
     ## text message
@@ -79,82 +79,6 @@ debug_cli <- function(debug,
 
 
 
-# Print debugging output
-#
-# Convenience function for printing debugging output.
-#
-# @param debug logical value that activates printing debugging output.
-# @param fmt character value input to \code{\link[base]{sprintf}}.
-# @param ... additional arguments passed into \code{\link[base]{sprintf}}.
-# @return None.
-# @author Jireh Huang (\email{jirehhuang@@ucla.edu})
-# @examples
-# fn <- function(debug = FALSE){
-#
-#   set.seed(1)
-#   number <- rnorm(1)
-#   string = "error"
-#
-#   debug_cli_sprintf(debug, style = "",
-#                     "number = %g, string = %s",
-#                     number, string)
-# }
-# fn(debug = TRUE)
-# TODO: remove; temporary
-#' @export
-
-debug_cli_sprintf <- function(debug,
-                              style = c("", "info", "success", "warning", "danger",
-                                        "abort", "warn", "inform", "cat", "message"),
-                              fmt, ...){
-
-  if (debug){
-
-    name <- "bcb"
-
-    ## identify calling function in namespace, avoiding tryCatch()
-    which <- -1
-    ns <- ls(getNamespace(name = name))
-    repeat{
-      fn <- sys.call(which = which)[1]
-      fn <- gsub("\\(.*", "", as.character(fn))
-      fn <- gsub(".*:", "", fn)
-      if (length(fn) == 0 || fn %in% ns) break
-      which <- which - 1
-    }
-    if (length(fn) == 0)
-      fn <- "[UNKNOWN]"
-
-    fn <- sprintf("%s:", fn)
-
-    ## style
-    style <- ifelse(style == "", style,
-                    match.arg(style))
-
-    ## function for printing
-    fun <- switch(style,
-                  info = cli::cli_alert_info,
-                  success = cli::cli_alert_success,
-                  warning = cli::cli_alert_warning,
-                  danger = cli::cli_alert_danger,
-                  abort = cli::cli_abort,
-                  warn = cli::cli_warn,
-                  inform = cli::cli_inform,
-                  cat = base::cat,
-                  message = base::message,
-                  cli::cli_alert)  # default
-
-    ## message
-    msg <- sprintf("%s%s\n",
-                   stringr::str_pad(fn, width = max(DEBUG_WIDTH, nchar(fn) + 2),
-                                    side = "right"),
-                   sprintf(fmt, ...))
-    fun(msg)
-  }
-}
-
-
-
 #' Check directory
 #'
 #' Checks if a directory exists, creating folder(s) if necessary.
@@ -176,9 +100,8 @@ dir_check <- function(path,
   folders <- folders[folders != ""]  # trim blank "" from the end(s)
 
   ## stop if not enough folders
-  debug_cli_sprintf(length(folders) < min_depth,
-                    "abort", "%s only contains %s < %s folders",
-                    path, length(folders), min_depth)
+  debug_cli(length(folders) < min_depth, cli::cli_abort,
+            "{path} only contains {length(folders)} < {min_depth} folders")
 
   ## check directories from root upwards,
   ## creating folder(s) if necessary
@@ -189,16 +112,16 @@ dir_check <- function(path,
     if (i < min_depth){
 
       ## if root folder(s) do not exist, there was likely a typo in path
-      debug_cli_sprintf(!dir.exists(temp_path),
-                        "abort", "Cannot find path `%s` because it does not exist",
-                        temp_path)
+      debug_cli(!dir.exists(temp_path), cli::cli_abort,
+                "cannot find path {temp_path} because it does not exist")
 
     } else if (!dir.exists(temp_path)) {
 
       ## create directory if at least minimum depth and doesn't exist
       dir.create(file.path(temp_path))
-      debug_cli_sprintf(TRUE, "success", "Created folder `%s`%s", folders[i],
-                        ifelse(i <= 1, "", sprintf(" in `%s`", folders[i-1])))
+      debug_cli(TRUE, cli::cli_alert_success,
+                c("created folder `{folders[i]}`",
+                  ifelse(i <= 1, "", " in `{folders[i-1]}`")))
     }
   }
 }
@@ -236,20 +159,6 @@ read_dir <- function(dir,
                       names(objs))
   list2env(x = objs,
            envir = envir)
-}
-
-
-
-# Clear temporary files
-
-clear_temp <- function(settings){
-
-  temp_file <- file.path(settings$temp_dir, settings$id)
-
-  sapply(c("score", "support", "arp"), function(x){
-
-    file.remove(sprintf("%s_%s", temp_file, x))
-  })
 }
 
 
@@ -355,4 +264,80 @@ load_example <- function(eg = c("gnet"),
   compile_mds()
 
   list2env(objs, envir = envir)
+}
+
+
+
+# Print debugging output
+#
+# Convenience function for printing debugging output.
+#
+# @param debug logical value that activates printing debugging output.
+# @param fmt character value input to \code{\link[base]{sprintf}}.
+# @param ... additional arguments passed into \code{\link[base]{sprintf}}.
+# @return None.
+# @author Jireh Huang (\email{jirehhuang@@ucla.edu})
+# @examples
+# fn <- function(debug = FALSE){
+#
+#   set.seed(1)
+#   number <- rnorm(1)
+#   string = "error"
+#
+#   debug_cli_sprintf(debug, style = "",
+#                     "number = %g, string = %s",
+#                     number, string)
+# }
+# fn(debug = TRUE)
+# TODO: remove; temporary, deprecated
+#' @export
+
+debug_cli_sprintf <- function(debug,
+                              style = c("", "info", "success", "warning", "danger",
+                                        "abort", "warn", "inform", "cat", "message"),
+                              fmt, ...){
+
+  if (debug){
+
+    name <- "bcb"
+
+    ## identify calling function in namespace, avoiding tryCatch()
+    which <- -1
+    ns <- ls(getNamespace(name = name))
+    repeat{
+      fn <- sys.call(which = which)[1]
+      fn <- gsub("\\(.*", "", as.character(fn))
+      fn <- gsub(".*:", "", fn)
+      if (length(fn) == 0 || fn %in% ns) break
+      which <- which - 1
+    }
+    if (length(fn) == 0)
+      fn <- "[UNKNOWN]"
+
+    fn <- sprintf("%s:", fn)
+
+    ## style
+    style <- ifelse(style == "", style,
+                    match.arg(style))
+
+    ## function for printing
+    fun <- switch(style,
+                  info = cli::cli_alert_info,
+                  success = cli::cli_alert_success,
+                  warning = cli::cli_alert_warning,
+                  danger = cli::cli_alert_danger,
+                  abort = cli::cli_abort,
+                  warn = cli::cli_warn,
+                  inform = cli::cli_inform,
+                  cat = base::cat,
+                  message = base::message,
+                  cli::cli_alert)  # default
+
+    ## message
+    msg <- sprintf("%s%s\n",
+                   stringr::str_pad(fn, width = max(DEBUG_WIDTH, nchar(fn) + 2),
+                                    side = "right"),
+                   sprintf(fmt, ...))
+    fun(msg)
+  }
 }

@@ -598,6 +598,23 @@ lookup_score <- function(target,
 
 
 
+# Clear temporary files
+
+clear_temp <- function(settings){
+
+  temp_file <- file.path(settings$temp_dir, settings$id)
+
+  sapply(c("score", "support", "arp"), function(x){
+
+    if (file.exists(file <- sprintf("%s_%s", temp_file, x))){
+
+      file.remove(file)
+    }
+  })
+}
+
+
+
 ######################################################################
 ## Compile and test
 ######################################################################
