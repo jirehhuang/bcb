@@ -284,6 +284,19 @@ gen_data_grid <- function(data_grid = build_data_grid(),
   data_grid <- as.data.frame(data.table::rbindlist(data_rows))
   write.table(data_grid, dg_path)
 
+  ## expand data.grid so one dataset per thread
+  dataset_grid <- do.call(
+    rbind,
+    lapply(seq_len(nrow(data_grid)), function(i){
+
+      cbind(dataset = seq_len(data_grid[i, "n_dat"]),
+            data_grid[rep(i, data_grid[i, "n_dat"]), ])
+    })
+  )
+  rownames(dataset_grid) <- NULL
+
+  ## TODO: dataset_grid for gen_fn() (difficult with true_scores)
+
   ## function for generating datasets
   gen_fn <- function(i){
 
@@ -399,7 +412,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
     error <- tryCatch(
       {
         ## prepare data row and directory
-        data_row <- data_grid[i, , drop = FALSE]
+        data_row <- dataset_grid[i, , drop = FALSE]
         data_dir <- file.path(path,
                               sprintf("%s%g_%s_%g",
                                       data_row$index, data_row$id,
@@ -410,50 +423,36 @@ gen_data_grid <- function(data_grid = build_data_grid(),
             data_row$n_dat <= 0)
           return(NULL)
 
+        j <- data_row$dataset
         if (!recache &&
-            all(sapply(seq_len(data_row$n_dat), function(j)
-              file.exists(file.path(data_dir,
-                                    sprintf("rounds%g.rds", j)))))){
+            file.exists(file.path(data_dir,
+                                  sprintf("rounds%g.rds", j)))){
 
           debug_cli(debug, cli::cli_alert_success,
-                    "{i} already cached {data_row$n_dat} sets of rounds for network {data_row$network}",
+                    "{i} already cached rounds {j} of {data_row$n_dat} for network {data_row$network}",
                     .envir = environment())
 
-          return(NULL)
+          next
         }
+        debug_cli(debug, "",
+                  "{i} caching rounds {j} of {data_row$n_dat} for network {data_row$network}",
+                  .envir = environment())
 
-        ## cache rounds
-        for (j in seq_len(data_row$n_dat)){
+        ## read bn.fit object
+        bn.fit <- readRDS(file.path(data_dir, "bn.fit.rds"))
 
-          if (!recache &&
-              file.exists(file.path(data_dir,
-                                    sprintf("rounds%g.rds", j)))){
+        settings <- list(method = "cache", target = data_row$target,
+                         run = j, n_run = data_row$n_dat, n_obs = data_row$n_obs, n_int = 0)
+        settings <- check_settings(bn.fit = bn.fit, settings = settings, debug = debug > 1)
 
-            debug_cli(debug, cli::cli_alert_success,
-                      "{i} already cached rounds {j} of {data_row$n_dat} for network {data_row$network}",
-                      .envir = environment())
+        ## execute bandit
+        roundsj <- bandit(bn.fit = bn.fit, settings = settings, debug = debug)
 
-            next
-          }
-          debug_cli(debug, "",
-                    "{i} caching rounds {j} of {data_row$n_dat} for network {data_row$network}",
-                    .envir = environment())
+        ## write results in folder roundsj and as roundsj.rds
+        rounds_dir <- file.path(data_dir, sprintf("rounds%g", settings$run))
+        write_rounds(rounds = roundsj, where = rounds_dir)
+        write_rounds(rounds = roundsj, where = sprintf("%s.rds", rounds_dir))
 
-          ## read bn.fit object
-          bn.fit <- readRDS(file.path(data_dir, "bn.fit.rds"))
-
-          settings <- list(method = "cache", target = data_row$target,
-                           run = j, n_run = data_row$n_dat, n_obs = data_row$n_obs, n_int = 0)
-          settings <- check_settings(bn.fit = bn.fit, settings = settings, debug = debug > 1)
-
-          ## execute bandit
-          roundsj <- bandit(bn.fit = bn.fit, settings = settings, debug = debug)
-
-          ## write results in folder roundsj and as roundsj.rds
-          rounds_dir <- file.path(data_dir, sprintf("rounds%g", settings$run))
-          write_rounds(rounds = roundsj, where = rounds_dir)
-          write_rounds(rounds = roundsj, where = sprintf("%s.rds", rounds_dir))
-        }
         return(NULL)
       }
       , error = function(err){
@@ -464,7 +463,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
       }
     )
   }
-  null <- mclapply(seq_len(nrow(data_grid)), mc.cores = n_cores,
+  null <- mclapply(seq_len(nrow(dataset_grid)), mc.cores = n_cores,
                    mc.preschedule = FALSE, obs_fn)
 }
 
@@ -491,8 +490,9 @@ ribn <- function(x,
     return(bnlearn:::rbn.backend(x = x, n = n, fix = fix, debug = debug))
   }
 
-  debug_cli_sprintf(! class(x)[2] %in% c("bn.fit.gnet", "bn.fit.dnet"),
-                    "abort", "Currently only bn.fit.gnet and bn.fit.dnet supported for generating interventional data")
+  debug_cli(! class(x)[2] %in% c("bn.fit.gnet", "bn.fit.dnet"), cli::cli_abort,
+            c("currently only bn.fit.gnet and bn.fit.dnet supported for ",
+              "generating interventional data"))
 
   ## TODO: check intervene
 
@@ -505,9 +505,9 @@ ribn <- function(x,
   ## for each intervention
   data <- lapply(intervene, function(int){
 
-    debug_cli_sprintf(debug, "",
-                      "Generating %g samples with %g interventions",
-                      int$n, sum(names(int) %in% nodes))
+    debug_cli(debug, "",
+              c("generating {int$n} samples with ",
+                "{sum(names(int) %in% nodes} interventions"))
 
     ## convert to bn_list
     xi <- lapply(x, function(y) lapply(y, function(z) z))
