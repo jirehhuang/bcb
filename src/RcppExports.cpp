@@ -62,26 +62,27 @@ BEGIN_RCPP
 END_RCPP
 }
 // lookup
-double lookup(const arma::vec parents, const arma::mat cache);
-RcppExport SEXP _bcb_lookup(SEXP parentsSEXP, SEXP cacheSEXP) {
+int lookup(const arma::vec parents, const arma::mat ps_i);
+RcppExport SEXP _bcb_lookup(SEXP parentsSEXP, SEXP ps_iSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const arma::vec >::type parents(parentsSEXP);
-    Rcpp::traits::input_parameter< const arma::mat >::type cache(cacheSEXP);
-    rcpp_result_gen = Rcpp::wrap(lookup(parents, cache));
+    Rcpp::traits::input_parameter< const arma::mat >::type ps_i(ps_iSEXP);
+    rcpp_result_gen = Rcpp::wrap(lookup(parents, ps_i));
     return rcpp_result_gen;
 END_RCPP
 }
 // lookup_score_cpp
-double lookup_score_cpp(const arma::vec parents, const arma::mat cache);
-RcppExport SEXP _bcb_lookup_score_cpp(SEXP parentsSEXP, SEXP cacheSEXP) {
+double lookup_score_cpp(const arma::vec parents, const arma::mat ps_i, int score_col);
+RcppExport SEXP _bcb_lookup_score_cpp(SEXP parentsSEXP, SEXP ps_iSEXP, SEXP score_colSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const arma::vec >::type parents(parentsSEXP);
-    Rcpp::traits::input_parameter< const arma::mat >::type cache(cacheSEXP);
-    rcpp_result_gen = Rcpp::wrap(lookup_score_cpp(parents, cache));
+    Rcpp::traits::input_parameter< const arma::mat >::type ps_i(ps_iSEXP);
+    Rcpp::traits::input_parameter< int >::type score_col(score_colSEXP);
+    rcpp_result_gen = Rcpp::wrap(lookup_score_cpp(parents, ps_i, score_col));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -91,7 +92,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_bcb_lm_nig", (DL_FUNC) &_bcb_lm_nig, 10},
     {"_bcb_lm_nig0", (DL_FUNC) &_bcb_lm_nig0, 9},
     {"_bcb_lookup", (DL_FUNC) &_bcb_lookup, 2},
-    {"_bcb_lookup_score_cpp", (DL_FUNC) &_bcb_lookup_score_cpp, 2},
+    {"_bcb_lookup_score_cpp", (DL_FUNC) &_bcb_lookup_score_cpp, 3},
     {NULL, NULL, 0}
 };
 

@@ -13,11 +13,11 @@ lm_nig0 <- function(X, y, m_0, Lambda_0, a_0, b_0, n, beta, se) {
     invisible(.Call(`_bcb_lm_nig0`, X, y, m_0, Lambda_0, a_0, b_0, n, beta, se))
 }
 
-lookup <- function(parents, cache) {
-    .Call(`_bcb_lookup`, parents, cache)
+lookup <- function(parents, ps_i) {
+    .Call(`_bcb_lookup`, parents, ps_i)
 }
 
-lookup_score_cpp <- function(parents, cache) {
-    .Call(`_bcb_lookup_score_cpp`, parents, cache)
+lookup_score_cpp <- function(parents, ps_i, score_col = -1L) {
+    .Call(`_bcb_lookup_score_cpp`, parents, ps_i, score_col)
 }
 
