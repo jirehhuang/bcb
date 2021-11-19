@@ -57,6 +57,11 @@ lu <- all(unlist(lapply(settings$nodes, function(node){
 })))
 testthat::expect_true(lu)
 
+## execute_mds()
+graph <- bcb:::execute_mds(ps = ps, settings = settings,
+                           seed = 1, debug = debug)
+testthat::expect_identical(dim(graph), dim(bnlearn::amat(bn.fit)))
+
 
 
 ######################################################################
