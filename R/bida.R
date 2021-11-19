@@ -204,8 +204,10 @@ compute_ps <- function(data,
 
   ## calculate parent support using the APS solver
   aps_type <- "modular"
-  system(sprintf("%s/aps %s %s_score %s_support", aps_dir,
-                 aps_type, shQuote(temp_file), shQuote(temp_file)))
+  sys::exec_internal(cmd = sprintf("%s/aps", aps_dir),
+                     args = c(aps_type,
+                              sprintf("%s_%s", temp_file,
+                                      c("score", "support"))))
 
   debug_cli(!file.exists(sprintf("%s_support", temp_file)), cli::abort(),
             "support file missing")
@@ -256,8 +258,10 @@ compute_arp <- function(data,
 
   ## calculate parent support using the APS solver
   aps_type <- "ar_modular"
-  system(sprintf("%s/aps %s %s_score %s_arp", aps_dir,
-                 aps_type, shQuote(temp_file), shQuote(temp_file)))
+  sys::exec_internal(cmd = sprintf("%s/aps", aps_dir),
+                     args = c(aps_type,
+                              sprintf("%s_%s", temp_file,
+                                      c("score", "arp"))))
 
   debug_cli(!file.exists(sprintf("%s_arp", temp_file)), cli::abort(),
             "arp file missing")
