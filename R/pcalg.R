@@ -360,7 +360,7 @@ setRefClass("lookup_score",
                 targets <- int2targets(interventions = interventions,
                                        nodes = nodes)
                 callSuper(data = matrix(0, nrow = length(targets$target.index),
-                                        ncol = max(unlist(targets$targets))),
+                                        ncol = max(unlist(targets$targets), 2)),
                           targets = targets$targets,
                           target.index = targets$target.index,
                           nodes = nodes,
@@ -385,10 +385,12 @@ setRefClass("lookup_score",
               ## calculates the local score of a vertex and its parents
               local.score = function(vertex, parents, ...) {
 
-                ## Check validity of arguments
+                ## check validity of arguments
                 validate.vertex(vertex)
                 validate.parents(parents)
 
+                ## scores not stored in ps have -1e100 score
+                ## and thus zero weight; see lookup_score_cpp()
                 return(lookup_score(target = vertex,
                                     parents = parents,
                                     ps = pp.dat$ps))

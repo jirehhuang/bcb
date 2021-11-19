@@ -55,6 +55,10 @@ double lookup_score_cpp(const arma::vec parents,
 
   int i = lookup(parents, ps_i) - 1L;
 
+  // if can't find, zero weight
+  if (i < 0)
+    return -1e100;
+
   // [default] structure of ps: parents | score | prob | ordering (last col)
   if (score_col < 0)
     score_col = ps_i.n_cols - 3;
