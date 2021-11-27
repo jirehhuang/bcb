@@ -6,6 +6,21 @@ using namespace Rcpp;
 
 
 // [[Rcpp::export]]
+void beta_cpp(arma::mat& X,
+              arma::vec& y,
+              arma::vec& beta){
+
+  // coefficients
+  arma::vec betas = arma::solve(X, y);
+  for (int i = 0; i < beta.size(); i++){
+
+    beta(i) = betas(i);
+  }
+}
+
+
+
+// [[Rcpp::export]]
 void lm_cpp(arma::mat& X,
             arma::vec& y,
             arma::vec& beta,
@@ -17,12 +32,19 @@ void lm_cpp(arma::mat& X,
   // standard errors
   arma::vec resid = y - X * betas;
   arma::vec stderrs = arma::sqrt(
-    arma::dot(resid, resid) / (X.n_rows - X.n_cols - 1) *
+    arma::dot(resid, resid) / (X.n_rows - X.n_cols) *  // assumes intercept included in X
       arma::diagvec(arma::inv(arma::trans(X) * X))
   );
 
+  // for (int i = 0; i < beta.size(); i++){
+  //
+  //   beta(i) = betas(i);
+  //   se(i) = stderrs(i);
+  // }
   beta(0) = betas(0);
   se(0) = stderrs(0);
+  // beta(beta.size() - 1) = betas(betas.size() - 1);
+  // se(se.size() - 1) = stderrs(stderrs.size() - 1);
 }
 
 
@@ -46,8 +68,15 @@ void lm_nig(arma::vec& Xty,
                       arma::dot(m_0, Lambda_0 * m_0) -
                       arma::dot(m_n, Lambda_n * m_n)) / 2;
 
+  // for (int i = 0; i < beta.size(); i++){
+  //
+  //   beta(i) = m_n(i);
+  //   se(i) = std::sqrt(b_n / a_n * V_n(i, i));  // standard error
+  // }
   beta(0) = m_n(0);
-  se(0) = b_n / a_n * V_n(0, 0);  // standard error
+  se(0) = std::sqrt(b_n / a_n * V_n(0));
+  // beta(beta.size() - 1) = m_n(m_n.size() - 1);
+  // se(se.size() - 1) = std::sqrt(b_n / a_n * V_n(V_n.size() - 1));
 }
 
 

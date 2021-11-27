@@ -5,12 +5,14 @@
 
 
 # Compute back-door adjustment estimates
+# Some parts modified from calc_bida_post()
 
 compute_bda <- function(data,
                         settings,
                         rounds,
-                        target = settings$target,
+                        target = NULL,
                         nig_bda = NULL,
+                        intercept = TRUE,  # TODO: remove, because keep TRUE
                         a_0 = 1,
                         b_0 = 1,
                         m_0 = 0,
@@ -40,32 +42,49 @@ compute_bda <- function(data,
               ifelse(nig_bda, "Bayesian Normal-inverse-gamma", "standard"),
               " linear model"))
 
-  ## initialize storage structure
-  if (length(rounds[["bda"]]) == 0){
+  x_a <- sapply(settings$nodes, function(node){
 
-    bda <- lapply(seq_p, function(i){
+    unique(do.call(c, sapply(rounds$arms, function(x)
+      if (x$node == node) x$value else NULL)))
+  }, simplify = FALSE)
 
-      temp <- lapply(seq_p, function(j) if (j != i){
-
-        # for bda estimate and joint estimate:
-        # last t where updated, estimate, and standard error
-        data.frame(t_bda = rep(NA, nrow(rounds$ps[[i]])),
-                   est_bda = NA, se_bda = NA,
-                   t_est = NA, est_est = NA, se_est = NA)
-
-      } else NULL)
-      names(temp) <- nodes
-      return(temp)
-    })
-    names(bda) <- nodes
-
-  } else{
-
-    bda <- rounds$bda
-  }
+  ## Gaussian implementation
   if (settings$type == "bn.fit.gnet"){
 
-    ## Gaussian implementation
+    ## initialize storage structure
+    if (length(rounds[["bda"]]) == 0){
+
+      bda <- lapply(seq_p, function(i){
+
+        temp <- lapply(seq_p, function(j) if (j != i){
+
+          ## for bda estimate and joint estimate:
+          ## last t where bda updated, effect estimate, residual sum of squared
+          ## deviations, and mean estimates for each intervention value
+          ## TODO: simplify
+          as.data.frame(sapply(c("t_bda", "beta", "rss", "t_int",
+                                 sprintf("mu%g_bda", seq_len(length(x_a[[i]]))),
+                                 sprintf("se%g_bda", seq_len(length(x_a[[i]]))),
+                                 sprintf("mu%g_est", seq_len(length(x_a[[i]]))),
+                                 sprintf("se%g_est", seq_len(length(x_a[[i]])))),
+                               function(x) rep(NA, nrow(rounds$ps[[i]]))))
+
+          # # for bda estimate and joint estimate:
+          # # last t where updated, estimate, and standard error
+          # data.frame(t_bda = rep(NA, nrow(rounds$ps[[i]])),
+          #            beta = NA, beta_se = NA,
+          #            beta0 = NA, beta0_se = NA)
+
+        } else NULL)
+        names(temp) <- nodes
+        return(temp)
+      })
+      names(bda) <- nodes
+
+    } else{
+
+      bda <- rounds$bda
+    }
     for (i in seq_p){
 
       bool_data <- get_bool_data(t = t, i = i,
@@ -76,11 +95,8 @@ compute_bda <- function(data,
       n <- sum(bool_data)
 
       Xy <- as.matrix(data[bool_data, , drop=FALSE])
-      if (max(abs(apply(Xy, 2, mean))) > 1e-6){
-        debug_cli(debug >= 3, cli::cli_alert,
-                  "centering {ncol(Xy)} variables")
-        Xy <- apply(Xy, 2, function(x) x - mean(x))
-      }
+      if (intercept)
+        Xy <- cbind(Xy, rep(1, nrow(Xy)))
       XytXy <- t(Xy) %*% Xy
 
       for (l in rounds$ps[[i]][, "ordering"]){
@@ -89,53 +105,110 @@ compute_bda <- function(data,
 
         k <- pars[l, !is.na(pars[l, ])]  # indices of parents
         n_parents <- length(k)  # number of parents
+        ik <- c(i, k)  # predictor and parent
+        if (intercept)
+          ik <- union(ik, p + 1)
 
         if (nig_bda){
 
           # prior hyperparameters
-          m_0 <- matrix(m_00, n_parents + 1, 1)  # prior mean
-          Lambda_0 <- diag(n_parents + 1) / Lambda_00  # prior variance
+          m_0 <- matrix(m_00, n_parents + 1 +
+                          intercept, 1)  # prior mean
+          Lambda_0 <- diag(n_parents + 1 +
+                             intercept) / Lambda_00  # prior variance
 
           # update hyperparameters
-          Lambda_n <- XytXy[c(i, k), c(i, k), drop = FALSE] + Lambda_0
+          Lambda_n <- XytXy[ik, ik, drop = FALSE] + Lambda_0
           a_n <- a_0 + n / 2
           V_n <- solve(Lambda_n)
         }
 
+        ## i -> j
         for (j in if (is.null(target)) seq_p[-i] else target){
 
           if (j %in% k){  # j -> i, so i -/-> j
 
-            temp[[j]][l, seq(1, 6)] <- rep(0, 6)
+            temp[[j]][l, seq_len(ncol(temp[[j]]))] <- numeric(ncol(temp[[j]]))
 
-          } else {
+          } else{
 
             ## compute bda effect
-            if (is.na(temp[[j]][l, 1]) ||  # not computed bda effect
-                any(bool_data[seq(temp[[j]][l, 1] + 1, t)])){  # added obs data
+            if (is.na(temp[[j]][l, 1]) ||  # have not computed bda effect
+                any(bool_data[seq(temp[[j]][l, 1] + 1, t)])){  # have added obs data
 
-              beta <- 0
-              se <- 0
+              beta <- matrix(numeric(length(ik)), ncol = 1)
+              beta_cpp(X = Xy[, ik, drop = FALSE], y = Xy[, j], beta = beta)
 
-              if (nig_bda){
+              temp[[j]]$beta[l] <- beta[1]
 
-                ## normal inverse gamma linear model
-                lm_nig(Xty = XytXy[c(i, k), j], m_0 = m_0, Lambda_0 = Lambda_0,
-                       Lambda_n = Lambda_n, V_n = V_n, yty = XytXy[j, j],
-                       a_n = a_n, b_0 = b_0, beta = beta, se = se)
-              } else{
+              phi <- matrix(unlist(c(0,  # placeholder for intervention on i
+                                     sapply(k, function(x) mean(Xy[, k])),  # parents of i
+                                     1)))  # intercept
 
-                ## standard linear model
-                lm_cpp(X = Xy[, c(i, k), drop = FALSE], y = Xy[, j],
-                       beta = beta, se = se)
+              for (a in seq_len(length(x_a[[i]]))){
+
+                phi[1] <- x_a[[i]][a]
+
+                temp[[j]][[sprintf("mu%g_bda", a)]][l] <- t(phi) %*% beta
+                temp[[j]][[sprintf("se%g_bda", a)]][l] <-
+                  sqrt(t(phi) %*% solve(t(Xy[, ik, drop = FALSE]) %*%
+                                          Xy[, ik, drop = FALSE]) %*% phi)
               }
-              temp[[j]][l, seq_len(3)] <- c(t, beta, se)
+              temp[[j]]$t_bda[l] <- t
+              temp[[j]]$rss[l] <- var(Xy[, j] - beta[1] * Xy[, i] * (t - 1))
+
+              # beta <- numeric(2)
+              # se <- numeric(2)
+              #
+              # if (nig_bda){
+              #
+              #   ## normal inverse gamma linear model
+              #   lm_nig(Xty = XytXy[ik, j], m_0 = m_0, Lambda_0 = Lambda_0,
+              #          Lambda_n = Lambda_n, V_n = V_n, yty = XytXy[j, j],
+              #          a_n = a_n, b_0 = b_0, beta = beta, se = se)
+              # } else{
+              #
+              #   ## standard linear model
+              #   lm_cpp(X = Xy[, ik, drop = FALSE], y = Xy[, j],
+              #          beta = beta, se = se)
+              # }
+              # temp[[j]][l, seq_len(5)] <- c(t, beta[1], se[1],
+              #                               beta[2], se[2])
+              #
+              # browser()
+              #
+              # temp <- Xy[, j] - Xy[, i] * beta[1]
+              # m <- lm(temp ~ 1)
+              # summary(m)
+
+              # Xy_df <- data.frame(Xy)
+              # m1 <- lm(as.formula(sprintf("%s ~ %s - 1", names(Xy_df)[j],
+              #                            paste(names(Xy_df)[ik],
+              #                                  collapse = " + "))),
+              #         data = data.frame(Xy_df))
+              # m <- lm(as.formula(sprintf("%s ~ %s", nodes[j],
+              #                            paste(nodes[c(i, k)],
+              #                                  collapse = " + "))),
+              #         data = data.frame(Xy[,nodes]))
+              # summary(m1)
+              # summary(m)
+
+              # if (any(is.infinite(unlist(temp[[j]][l, seq_len(5)])))){
+              #
+              #   browser()
+              # }
             }
 
             ## compute joint estimate
             if (t <= settings$n_obs){
 
-              temp[[j]][l, seq(4, 6)] <- temp[[j]][l, seq(1, 3)]
+              for (a in seq_len(length(x_a[[i]]))){
+
+                temp[[j]][[sprintf("mu%g_est", a)]][l] <-
+                  temp[[j]][[sprintf("mu%g_bda", a)]][l]
+                temp[[j]][[sprintf("se%g_est", a)]][l] <-
+                  temp[[j]][[sprintf("se%g_bda", a)]][l]
+              }
 
             } else if (temp[[j]][l, 1] == t ||  # just updated bda effect
                        rounds$selected$interventions[t] ==
@@ -165,25 +238,56 @@ compute_bda <- function(data,
 # Compute expectation over posterior mean
 
 expect_post <- function(rounds,
-                        metric = "est_bda",
+                        from = NULL,
+                        to = NULL,
+                        metric = "beta",
                         squared = FALSE){
 
   p <- length(rounds$bda)
   seq_p <- seq_len(p)
 
-  post_mean <- matrix(0, p, p)
-  rownames(post_mean) <- colnames(post_mean) <- names(rounds$bda)
+  mat <- matrix(0, p, p)
+  rownames(mat) <- colnames(mat) <- names(rounds$bda)
+  metrics <- trimws(strsplit(metric, "\\+")[[1]])
+  nms <- names(rounds$bda[[1]][[2]])
 
-  for (i in seq_p){
+  for (i in if (is.null(from)) seq_p else from){
 
-    for (j in seq_p[-i]){
+    for (j in if (is.null(to)) seq_p[-i] else to){
 
-      post_mean[i, j] <-
-        sum(rounds$ps[[i]][, "prob"] *
-            rounds$bda[[i]][[j]][[metric]]^(1 + squared), na.rm = TRUE)
+      if (metric %in% names(rounds$bda[[i]][[j]])){
+
+        mat[i, j] <-
+          sum(rounds$ps[[i]][, "prob"] *
+                rounds$bda[[i]][[j]][[metric]]^(1 + squared), na.rm = TRUE)
+      } else{
+
+        ## metric should be a character value evaluable
+        ## using eval(parse(text = metric))
+
+        ## load metrics into environment and evaluate
+        list2env(sapply(nms[sapply(nms, function(x) grepl(x, metric))],
+                        function(x) rounds$bda[[i]][[j]][[x]], simplify = FALSE),
+                 envir = environment())
+        mat[i, j] <-
+          sum(rounds$ps[[i]][, "prob"] *
+                eval(parse(text = metric))^(1 + squared), na.rm = TRUE)
+      }
     }
   }
-  return(post_mean)
+  if (!is.null(from) && !is.null(to)){
+
+    mat <- mat[from, to]
+
+  } else if (!is.null(to)){
+
+    mat <- mat[setdiff(rownames(mat), to), to, drop = TRUE]
+
+  } else if (!is.null(from)){
+
+    mat <- mat[from, setdiff(colnames(mat), from), drop = TRUE]
+  }
+  return(mat)
 }
 
 
@@ -192,34 +296,76 @@ expect_post <- function(rounds,
 
 dag_bda <- function(dag,
                     rounds,
+                    from = NULL,
+                    to = NULL,
                     metric = "est_bda",
                     squared = FALSE){
 
-  nodes <- names(rounds$ps)
   if (is.null(dim(dag)))
-    dag <- row2mat(row = dag, nodes = nodes)
+    dag <- row2mat(row = dag, nodes = names(rounds$bda))
 
-  p <- length(rounds$ps)
-  seq_p <- seq_len(p)
+  # p <- length(rounds$ps)
+  # seq_p <- seq_len(p)
+  #
+  # edge_list <- as.list(sparsebnUtils::as.edgeList(dag))
+  #
+  # effects <- t(sapply(seq_p, function(i){
+  #
+  #   row_index <- lookup(parents = edge_list[[i]],
+  #                       ps_i = rounds$ps[[i]])
+  #
+  #   sapply(seq_p, function(j){
+  #
+  #     if (i == j)
+  #       0
+  #     else
+  #       rounds$bda[[i]][[j]][row_index, metric]^(1 + squared)
+  #   })
+  # }))
+  # rownames(effects) <- colnames(effects) <- nodes
+  #
+  # browser()
 
   edge_list <- as.list(sparsebnUtils::as.edgeList(dag))
 
-  effects <- t(sapply(seq_p, function(i){
+  p <- length(rounds$bda)
+  seq_p <- seq_len(p)
+
+  mat <- matrix(0, p, p)
+  rownames(mat) <- colnames(mat) <- names(rounds$bda)
+  metrics <- trimws(strsplit(metric, "\\+")[[1]])
+
+  for (i in if (is.null(from)) seq_p else from){
 
     row_index <- lookup(parents = edge_list[[i]],
                         ps_i = rounds$ps[[i]])
 
-    sapply(seq_p, function(j){
+    for (j in if (is.null(to)) seq_p[-i] else to){
 
-      if (i == j)
-        0
-      else
-        rounds$bda[[i]][[j]][row_index, metric]^(1 + squared)
-    })
-  }))
-  rownames(effects) <- colnames(effects) <- nodes
+      if (metric %in% names(rounds$bda[[i]][[j]])){
 
-  return(effects)
+        mat[i, j] <- rounds$bda[[i]][[j]][row_index, metric]^(1 + squared)
+
+      } else{
+
+        mat[i, j] <- sum(Reduce(`+`,
+                                lapply(metrics, function(metric) rounds$bda[[i]][[j]][row_index, metric]))^(1 + squared))
+      }
+    }
+  }
+  if (!is.null(from) && !is.null(to)){
+
+    mat <- mat[from, to]
+
+  } else if (!is.null(to)){
+
+    mat <- mat[setdiff(rownames(mat), to), to, drop = TRUE]
+
+  } else if (!is.null(from)){
+
+    mat <- mat[from, setdiff(colnames(mat), from), drop = TRUE]
+  }
+  return(mat)
 }
 
 
@@ -287,7 +433,8 @@ convert_bda <- function(bda,
         else
           NULL
       })))
-    })))
+    }), fill = TRUE))
+
   } else if (new_class == "list"){
 
     nodes <- unique(bda$from)

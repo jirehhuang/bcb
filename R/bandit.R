@@ -14,23 +14,27 @@ bandit <- function(bn.fit,
 
   ## check arguments and initialize
   bnlearn:::check.bn.or.fit(bn.fit)
-  settings <- check_settings(bn.fit = bn.fit, settings = settings, debug = debug)
-  rounds <- initialize_rounds(bn.fit = bn.fit, settings = settings, debug = debug)
+  settings <- check_settings(settings = settings, bn.fit = bn.fit, debug = debug)
+  rounds <- initialize_rounds(settings = settings, bn.fit = bn.fit, debug = debug)
 
   ## load settings
   list2env(settings[c("n_obs", "n_int")], envir = environment())
 
   ## TODO: set seed
 
-  tt <- if (settings$borrow <= 0){
+  tt <- if (settings$method == "cache"){
 
-    seq_len(n_obs + n_int)
+    seq_len(n_obs)
+
+  } else if (! length(rounds$bda)){
+
+    seq_len(n_int + n_obs)
 
   } else{
 
     seq_len(n_int) + n_obs
   }
-  tt <- tt[tt > settings$max_parents + 1 | tt > n_obs]
+  tt <- tt[tt > settings$max_parents + 2 | tt > n_obs]
 
   debug_cli(debug, cli::cli_progress_bar,
             c("t = {stringr::str_pad(string = t, width = nchar(tt[length(tt)]), side = 'left')} ",
@@ -87,7 +91,6 @@ apply_method <- function(t,
         cat(sprintf("random: Intervention %s = %s with estimated = %s\n",
                     rounds$arms[[a]]$node, rounds$arms[[a]]$value,
                     rounds$arms[[a]]$estimate))
-
     }
     ## generate data based on arm
     data_t <- ribn(x = bn.fit, debug = 0,
@@ -124,13 +127,11 @@ update_arms <- function(t,
 
     ## TODO: check again for int
 
-    effects_est <- row2mat(rounds$effects_est[t,],
-                           nodes = settings$nodes)
+    mu_est <- rounds$mu_est[t,]
 
     for (a in seq_len(length(rounds$arms))){
 
-      rounds$arms[[a]]$estimate <- rounds$arms[[a]]$value *
-        effects_est[rounds$arms[[a]]$node, settings$target]
+      rounds$arms[[a]]$estimate <- mu_est[a]
 
       ## TODO: increment instead
       rounds$arms[[a]]$N <- sum(rounds$selected$arm == a)
@@ -158,8 +159,7 @@ simple_reward <- function(settings,
 
     mean(sapply(chosen_arms, function(a){
 
-      rounds$effects_true[rounds$arms[[a]]$node,
-                          settings$target] * rounds$arms[[a]]$value
+      rounds$mu_true[a]
     }))
 
   } else if (settings$type == "bn.fit.dnet"){
@@ -226,76 +226,119 @@ update_rounds <- function(t,
 
   if (settings$type == "bn.fit.gnet"){
 
+    arm_nodes <- sapply(rounds$arms, `[[`, "node")
+    x_a <- sapply(settings$nodes, function(node){
+
+      unique(do.call(c, sapply(rounds$arms, function(x)
+        if (x$node == node) x$value else NULL)))
+    }, simplify = FALSE)
+
     ## bma
-    rounds$effects_bma[t,] <- expect_post(rounds = rounds, metric = "est_bda")
-    rounds$se_bma[t,] <-  # E(Var(X)) + Var(E(X)) = E(Var(X)) + (E(X^2) - E(X)^2)
-      sqrt(
-        (E_Var_bda <- expect_post(rounds = rounds, metric = "se_bda", squared = TRUE)) +
-          (Var_E_bda <- expect_post(rounds = rounds, metric = "est_bda", squared = TRUE) -
-             expect_post(rounds = rounds, metric = "est_bda")^2)
-      )
+    rounds$beta_bma[t,] <- expect_post(rounds = rounds, metric = "beta")
+    rounds$mu_bma[t,] <- sapply(rounds$arms, function(arm){
+
+      expect_post(rounds = rounds, from = arm$node, to = target,
+                  metric = sprintf("mu%g_bda", match(arm$value, x_a[[arm$node]])))
+    })
+    ## E(Var(X))
+    E_Var <- sapply(rounds$arms, function(arm){
+
+      expect_post(rounds = rounds, from = arm$node, to = target,
+                  metric = sprintf("se%g_bda", match(arm$value, x_a[[arm$node]])),
+                  squared = TRUE)
+    })
+    ## Var(E(X)) = E(E(X)^2) - E(E(X))^2
+    Var_E <- sapply(rounds$arms, function(arm){
+
+      expect_post(rounds = rounds, from = arm$node, to = target,
+                  metric = sprintf("mu%g_bda", match(arm$value, x_a[[arm$node]])),
+                  squared = TRUE) -
+        expect_post(rounds = rounds, from = arm$node, to = target,
+                    metric = sprintf("mu%g_bda", match(arm$value, x_a[[arm$node]])))^2
+    })
+    ## E(Var(X)) + Var(E(X))
+    rounds$se_bma[t,] <- sqrt(E_Var + Var_E)
 
     ## mpg, mds, gies
-    rounds$effects_mpg[t,] <- dag_bda(dag = rounds$mpg[t,],
-                                      rounds = rounds, metric = "est_bda")
-    rounds$effects_mds[t,] <- dag_bda(dag = rounds$mds[t,],
-                                      rounds = rounds, metric = "est_bda")
-    rounds$effects_gies[t,] <- dag_bda(dag = rounds$gies[t,],
-                                       rounds = rounds, metric = "est_bda")
-    rounds$se_mpg[t,] <- dag_bda(dag = rounds$mpg[t,],
-                                 rounds = rounds, metric = "se_bda")
-    rounds$se_mds[t,] <- dag_bda(dag = rounds$mds[t,],
-                                 rounds = rounds, metric = "se_bda")
-    rounds$se_gies[t,] <- dag_bda(dag = rounds$gies[t,],
-                                  rounds = rounds, metric = "se_bda")
+    for (est in c("mpg", "mds", "gies")){
 
-    ## est
-    if (settings$method %in% c("cache", "bcb", "bcb-bma")){
+      # rounds[[sprintf("beta_%s", est)]][t,] <- dag_bda(dag = rounds[[est]][t,], rounds = rounds, metric = "beta")
+      #
+      # beta <- dag_bda(dag = rounds[[est]][t,], rounds = rounds, target = target, metric = "beta")
+      # beta0 <- dag_bda(dag = rounds[[est]][t,], rounds = rounds, target = target, metric = "beta0")
+      # rounds[[sprintf("mu_%s", est)]][t,] <- sapply(rounds$arms, function(arm){
+      #
+      #   beta0[arm$node] + arm$value * beta[arm$node]
+      # })
+      # rounds[[sprintf("se_%s", est)]][t,] <- sqrt(dag_bda(dag = rounds[[est]][t,], rounds = rounds,
+      #                                                     target = target, metric = "beta", squared = TRUE) +
+      #                                               dag_bda(dag = rounds[[est]][t,], rounds = rounds,
+      #                                                       target = target, metric = "beta0", squared = TRUE))[arm_nodes]
 
-      rounds$effects_est[t,] <- expect_post(rounds = rounds, metric = "est_est")
-      rounds$se_est[t,] <-  # E(Var(X)) + Var(E(X)) = E(Var(X)) + (E(X^2) - E(X)^2)
-        sqrt(
-          (E_Var_est <- expect_post(rounds = rounds, metric = "se_est", squared = TRUE)) +
-            (Var_E_est <- expect_post(rounds = rounds, metric = "est_est", squared = TRUE) -
-               expect_post(rounds = rounds, metric = "est_est")^2)
-        )
-    } else{
+      rounds[[sprintf("beta_%s", est)]][t,] <- dag_bda(dag = rounds[[est]][t,],
+                                                          rounds = rounds, metric = "beta")
+      rounds[[sprintf("mu_%s", est)]][t,] <- sapply(rounds$arms, function(arm){
 
-      if (settings$method == "bcb-mpg"){
+        dag_bda(dag = rounds[[est]][t,], rounds = rounds, from = arm$node, to = target,
+                metric = sprintf("mu%g_bda", match(arm$value, x_a[[arm$node]])))
+      })
+      ## E(Var(X))
+      E_Var <- sapply(rounds$arms, function(arm){
 
-        dag <- rounds$mpg[t,]
+        dag_bda(dag = rounds[[est]][t,], rounds = rounds, from = arm$node, to = target,
+                metric = sprintf("se%g_bda", match(arm$value, x_a[[arm$node]])),
+                squared = TRUE)
+      })
+      ## Var(E(X)) = E(E(X)^2) - E(E(X))^2
+      Var_E <- sapply(rounds$arms, function(arm){
 
-      } else if (settings$method == "bcb-mds"){
-
-        dag <- rounds$mds[t,]
-
-      } else if (settings$method == "bcb-gies"){
-
-        dag <- rounds$gies[t,]
-      }
-      rounds$effects_est[t,] <- dag_bda(dag = dag, rounds = rounds, metric = "est_est")
-      rounds$se_est[t,] <- dag_bda(dag = dag, rounds = rounds, metric = "se_est")
+        dag_bda(dag = rounds[[est]][t,], rounds = rounds, from = arm$node, to = target,
+                metric = sprintf("mu%g_bda", match(arm$value, x_a[[arm$node]])),
+                squared = TRUE) -
+          dag_bda(dag = rounds[[est]][t,], rounds = rounds, from = arm$node, to = target,
+                  metric = sprintf("mu%g_bda", match(arm$value, x_a[[arm$node]])))^2
+      })
+      ## E(Var(X)) + Var(E(X))
+      rounds[[sprintf("se_%s", est)]][t,] <- sqrt(E_Var + Var_E)
     }
 
-    ## TODO: remove; temporary for debugging
-    rounds$E_Var_bda[t,] <- E_Var_bda[setdiff(settings$nodes,
-                                              target), target]
-    rounds$Var_E_bda[t,] <- Var_E_bda[setdiff(settings$nodes,
-                                              target), target]
+    ## est
+    if (t <= n_obs ||
+        settings$method %in% c("cache")){
 
-    if (settings$method %in% c("cache", "bcb-bma")){
+      rounds$mu_est[t,] <- rounds$mu_bma[t,]
+      rounds$se_est[t,] <- rounds$se_bma[t,]
 
-      rounds$E_Var_est[t,] <- E_Var_est[setdiff(settings$nodes,
-                                                target), target]
-      rounds$Var_E_est[t,] <- Var_E_est[setdiff(settings$nodes,
-                                                target), target]
+    } else if (grepl("bcb", settings$method)){  # t > n_obs
+
+      N <- sapply(rounds$arms, `[[`, "N")
+      est <- switch(settings$method,
+                    `bcb-mpg` = "mpg",
+                    `bcb-mds` = "mds",
+                    `bcb-gies` = "gies",
+                    "bma")  # default bma
+
+      rounds$mu_est[t,] <- rounds[[sprintf("mu_%s", est)]][t,]
+      rounds$se_est[t,] <- rounds[[sprintf("se_%s", est)]][t,]
+
+      ## TODO: maybe update beta_est?
+      rounds$mu_est[t,] <-
+        ifelse(N <= 0, rounds$mu_est[t,]
+               (rounds$mu_est[t,] * n_obs + rounds$mu_int[t,] * N) / (n_obs + N))
+      rounds$se_est[t,] <-
+        ifelse(N <= 0, rounds$se_est[t,]
+               (rounds$se_est[t,] * n_obs + rounds$se_int[t,] * N) / (n_obs + N))
+
+    } else{  # t > n_obs
+
+      browser()
     }
 
   } else if (settings$type == "bn.fit.dnet"){
 
     browser()
 
-    ## TODO: discrete implementation; should be the same
+    ## TODO: discrete implementation; should be similar
   }
   rounds$arms <- update_arms(t = t, settings = settings, rounds = rounds)
   rounds$selected$simple_reward[t] <- simple_reward(settings, rounds)
@@ -310,27 +353,25 @@ summarize_rounds <- function(bn.fit, settings, rounds){
 
   ## arms
   rounds$arms <- do.call(rbind, lapply(rounds$arms, as.data.frame))
-  rounds$arms$effect_true <-
-    rounds$effects_true[rounds$arms$node, settings$target] *
-    rounds$arms$value  # true effects
+  rounds$arms$mu_true <- rounds$mu_true
 
   ## expected reward from pulled arms
-  max_effect <- max(abs(rounds$arms$effect_true))
+  max_reward <- max(rounds$arms$mu_true)
   rounds$selected$expected <- 0
   rounds$selected$expected[rounds$selected$arm != 0] <-
-    rounds$arms$effect_true[rounds$selected$arm]
+    rounds$arms$mu_true[rounds$selected$arm]
 
   ## whether or not correct arm would be simple_reward
-  rounds$selected$correct <- 1 * (rounds$selected$simple_reward == max_effect)
+  rounds$selected$correct <- 1 * (rounds$selected$simple_reward == max_reward)
 
   ## simple and cumulative regret
-  rounds$selected$simple_regret <- max_effect - rounds$selected$simple_reward
+  rounds$selected$simple_regret <- max_reward - rounds$selected$simple_reward
   ind_obs <- rounds$selected$interventions == ""
   rounds$selected$cumulative <- 0
   rounds$selected$cumulative[ind_obs] <-
-    cumsum((max_effect - rounds$selected$reward)[ind_obs])
+    cumsum((max_reward - rounds$selected$reward)[ind_obs])
   rounds$selected$cumulative[!ind_obs] <-
-    cumsum((max_effect - rounds$selected$reward)[!ind_obs])
+    cumsum((max_reward - rounds$selected$reward)[!ind_obs])
 
   ## clear rownames
   rownames(rounds$arms) <- rownames(rounds$data) <-
@@ -338,61 +379,65 @@ summarize_rounds <- function(bn.fit, settings, rounds){
 
   ## graph metrics
   true <- bnlearn::amat(bn.fit)
-  for (graph in c("mpg", "mds", "gies")){
+  for (graph in c(avail_bda[-1])){
 
     cp_dag <- apply(rounds[[graph]], 1, function(row){
       est <- row2mat(row = row, nodes = settings$nodes)
       list(dag = eval_graph(est = est, true = true, cp = FALSE),
            cpdag = eval_graph(est = est, true = true, cp = TRUE))
     })
-    rounds[[sprintf("%s_dag", graph)]] <- do.call(rbind, lapply(cp_dag,
+    rounds[[sprintf("dag_%s", graph)]] <- do.call(rbind, lapply(cp_dag,
                                                                 `[[`, "dag"))
-    rounds[[sprintf("%s_cpdag", graph)]] <- do.call(rbind, lapply(cp_dag,
+    rounds[[sprintf("cpdag_%s", graph)]] <- do.call(rbind, lapply(cp_dag,
                                                                   `[[`, "cpdag"))
-    rownames(rounds[[sprintf("%s_dag", graph)]]) <-
-      rownames(rounds[[sprintf("%s_cpdag", graph)]]) <- NULL
+    rownames(rounds[[sprintf("dag_%s", graph)]]) <-
+      rownames(rounds[[sprintf("cpdag_%s", graph)]]) <- NULL
   }
 
-  ## mse of edge support
+  ## mse of edge support (bma)
   not_diag <- diag(settings$nnodes) == 0
-  rounds$selected$mse_es <- apply(rounds$bma, 1, function(row){
+  rounds$selected$mse_bma <- apply(rounds$bma, 1, function(row){
 
-    est <- row2mat(row = row, nodes = settings$nodes)
-    mean((est - true)[not_diag]^2)
+    mat <- row2mat(row = row, nodes = settings$nodes)
+    mean((mat - true)[not_diag]^2)
   })
 
-  ## causal effects mse and sum of variances
-  rv <- which(settings$nodes == settings$target)  # reward variable
-  # if (!is.null(settings$int_parents) && !settings$int_parents){
-  #   rv <- c(rv, which(names(bn.fit) %in% bn.fit[[settings$target]]$parents))
-  # }
-  for (effects in c(avail_bda, "int", "est")){
+  ## mse of means and sum of variances
+  for (est in c(avail_bda, "int", "est")){
 
-    ## pairwise
-    rounds$selected[[sprintf("mse_%s", effects)]] <- 0
-    rounds$selected[[sprintf("se_%s", effects)]] <- 0
+    rounds$selected[[sprintf("mu_%s", est)]] <- 0
+    rounds$selected[[sprintf("se_%s", est)]] <- 0
 
-    ## on target variable
-    rounds$selected[[sprintf("mse_%s_target", effects)]] <- 0
-    rounds$selected[[sprintf("se_%s_target", effects)]] <- 0
+    for (t in seq_len(nrow(rounds$selected))){
 
-    for (i in seq_len(nrow(rounds$selected))){
+      ## mse of means
+      rounds$selected[[sprintf("mu_%s", est)]][t] <-
+        mean((rounds[[sprintf("mu_%s", est)]][t,] - rounds$mu_true)^2)
 
-      row <- rounds[[sprintf("effects_%s", effects)]][i,]
-      est <- row2mat(row = row, nodes = settings$nodes)
-
-      rounds$selected[[sprintf("mse_%s", effects)]][i] <-
-        mean((est - rounds$effects_true)[not_diag]^2)
-      rounds$selected[[sprintf("mse_%s_target", effects)]][i] <-
-        mean((est - rounds$effects_true)[-rv, rv]^2)
-
-      row <- rounds[[sprintf("se_%s", effects)]][i,]
-      est <- row2mat(row = row, nodes = settings$nodes)
-
-      rounds$selected[[sprintf("se_%s", effects)]][i] <- sum(est^2)
-      rounds$selected[[sprintf("se_%s_target", effects)]][i] <- sum(est[-rv, rv]^2)
+      ## sum of variances
+      rounds$selected[[sprintf("se_%s", est)]][t] <-
+        sum(rounds[[sprintf("se_%s", est)]][t,]^2)
     }
   }
+  ## mse of effects
+  for (est in c(avail_bda)){
+
+    rounds$selected[[sprintf("beta_%s", est)]] <- 0
+
+    for (t in seq_len(nrow(rounds$selected))){
+
+      row <- rounds[[sprintf("beta_%s", est)]][t,]
+      mat <- row2mat(row = row, nodes = settings$nodes)
+
+      ## mse of effects
+      rounds$selected[[sprintf("beta_%s", est)]][t] <-
+        mean((mat - rounds$beta_true)[not_diag]^2)
+    }
+  }
+
+  ## fill columns for all data.frames
+  rounds$bda <- convert_bda(bda = convert_bda(bda = rounds$bda, new_class = "data.frame"), "list")
+
   ## delete ps and bda and add settings
   # rounds <- rounds[setdiff(names(rounds), c("ps", "bda", "arp"))]
   settings <- settings[setdiff(names(settings), c("rounds"))]
@@ -420,7 +465,7 @@ write_rounds <- function(rounds, where){
     for (nm in setdiff(names(rounds), c("settings", "ps", "bda", "bda_list"))){
 
       write.table(rounds[[nm]], file = file.path(where, sprintf("%s.txt", nm)),
-                  row.names = nm == "effects_true")
+                  row.names = nm == "beta_true")
     }
 
     write.table(convert_ps(ps = rounds$ps, new_class = "data.frame"),
@@ -453,15 +498,17 @@ read_rounds <- function(where){
     debug_cli(! dir.exists(where), cli::cli_abort,
               "specified directory does not exist")
 
-    nms <- c("arms", "data", "selected", "effects_true", "ps", "bda",
-             mat <- c(avail_bda, sprintf("effects_%s", c(avail_bda, "int", "est")),
-                      sprintf("se_%s", c(avail_bda, "int", "est")),
-                      "E_Var_bda", "E_Var_int", "E_Var_est", "Var_E_bda", "Var_E_int", "Var_E_est"),
-             unlist(lapply(avail_bda[-1], function(x) sprintf("%s_%s", x, c("dag", "cpdag")))),
+    nms <- c("arms", "data", "selected", "ps", "bda", "beta_true",
+             vec <- c("mu_true"),
+             mat <- c(avail_bda, sprintf("beta_%s", c(avail_bda)),
+                      sprintf("mu_%s", c(avail_bda, "int", "est")),
+                      sprintf("se_%s", c(avail_bda, "int", "est"))),
+             unlist(lapply(avail_bda[-1], function(x) sprintf("%s_%s", c("dag", "cpdag"), x))),
              "settings")
 
-    mat <- c("effects_true", mat)
+    mat <- c("beta_true", mat)
     mat <- sprintf("%s.txt", mat)
+    vec <- sprintf("%s.txt", vec)
 
     files <- sprintf("%s.txt", nms)
     files <- files[files %in% list.files(where)]
@@ -474,6 +521,9 @@ read_rounds <- function(where){
 
       if (file %in% mat)
         temp <- as.matrix(temp)
+
+      if (file %in% vec)
+        temp <- unname(as.vector(unlist(temp)))
 
       if (file == "ps.txt"){
 
@@ -493,7 +543,7 @@ read_rounds <- function(where){
     rounds$ps <- convert_ps(ps = rounds$ps, new_class = "list")
     rounds$bda <- convert_bda(bda = rounds$bda, new_class = "list")
 
-    rownames(rounds$effects_true) <- colnames(rounds$effects_true)
+    rownames(rounds$beta_true) <- colnames(rounds$beta_true)
 
     rounds$settings <- as.list(rounds$settings)
     rounds$settings$nodes <- strsplit(rounds$settings$nodes, ", ")[[1]]
@@ -543,8 +593,8 @@ arm2intervene <- function(arm){
 
 ## Initialize rounds
 
-initialize_rounds <- function(bn.fit,
-                              settings,
+initialize_rounds <- function(settings,
+                              bn.fit,
                               debug = 0){
 
   ## load settings
@@ -562,41 +612,46 @@ initialize_rounds <- function(bn.fit,
 
   } else{
 
-    ## structure to store a p x p matrix in each row
-    matrices <- matrix(0, nrow = n_obs + n_int,
-                       ncol = settings$nnodes^2)
-    rounds <- c(
-      list(
-        arms = build_arms(bn.fit = bn.fit, settings = settings, debug = debug),
-        data = rbind(
-          settings$data_obs,
-          as.data.frame(sapply(settings$nodes,
-                               function(x) integer(n_int), simplify = FALSE))
-        ),
-        selected = data.frame(arm = integer(n_obs + n_int),
-                              interventions = character(1), reward = numeric(1),
-                              simple_reward = numeric(1), time = numeric(1)),
-        effects_true = effects_list2mat(bn.fit2effects(bn.fit = bn.fit)),
-        ps = list(),
-        bda = list()
-        # bda_list = list(),  # TODO: remove; temp for debugging
+    rounds <- list(
+      arms = build_arms(bn.fit = bn.fit, settings = settings, debug = debug),
+      data = rbind(
+        settings$data_obs[seq_len(n_obs), , drop = FALSE],
+        as.data.frame(sapply(settings$nodes,
+                             function(x) integer(n_int), simplify = FALSE))
       ),
-      sapply(c(avail_bda,
-               sprintf("effects_%s", c(avail_bda, "int", "est")),
-               sprintf("se_%s", c(avail_bda, "int", "est"))),
-             function(x) matrices,
-             simplify = FALSE, USE.NAMES = TRUE)
+      selected = data.frame(arm = integer(n_obs + n_int),
+                            interventions = character(1), reward = numeric(1),
+                            simple_reward = numeric(1), time = numeric(1)),
+      ps = list(),
+      bda = list(),
+      # bda_list = list(),  # TODO: remove; temp for debugging
+      beta_true = bn.fit2effects(bn.fit = bn.fit)
     )
     rounds$selected$reward[seq_len(n_obs)] <-
       rounds$data[[settings$target]][seq_len(n_obs)]
 
-    ## TODO: remove; temp for debugging
-    rounds <- c(rounds,
-                sapply(c(sprintf("E_Var_%s", c("bda", "int", "est")),
-                         sprintf("Var_E_%s", c("bda", "int", "est"))),
-                       function(x) matrix(0, nrow = n_obs + n_int,
-                                          ncol = settings$nnodes - 1),
-                       simplify = FALSE, USE.NAMES = TRUE))
+    rounds$mu_true <- sapply(rounds$arms, function(arm){
+
+      rounds$beta_true[arm$node, settings$target, 2] +
+        arm$value * rounds$beta_true[arm$node, settings$target, 1]
+    })
+    rounds$beta_true <- rounds$beta_true[, , 1]
+
+    acal <- matrix(0, nrow = n_obs + n_int,
+                   ncol = length(rounds$arms))  # one column for each arm
+    pxp <- matrix(0, nrow = n_obs + n_int,
+                  ncol = settings$nnodes^2)  # store a p x p matrix in each row
+    rounds <- c(
+      rounds,
+      sapply(c(avail_bda,
+               sprintf("beta_%s", c(avail_bda))),
+             function(x) pxp,
+             simplify = FALSE, USE.NAMES = TRUE),
+      sapply(c(sprintf("mu_%s", c(avail_bda, "int", "est")),
+               sprintf("se_%s", c(avail_bda, "int", "est"))),
+             function(x) acal,
+             simplify = FALSE, USE.NAMES = TRUE)
+    )
   }
   return(rounds)
 }
@@ -652,8 +707,8 @@ build_arms <- function(bn.fit, settings, debug = 0){
 
 # Function for checking settings
 
-check_settings <- function(bn.fit,
-                           settings,
+check_settings <- function(settings,
+                           bn.fit,
                            debug = 0){
 
   debug_cli(debug >= 2, cli::cli_alert_info,
@@ -690,11 +745,11 @@ check_settings <- function(bn.fit,
   }
 
   ## check n_run
-  if (is.null(settings$n_run) ||
-      settings$n_run < 1){
-    settings$n_run <- 1
-    debug_cli(debug >= 3, "", "default n_run = {settings$n_run}")
-  }
+  # if (is.null(settings$n_run) ||
+  #     settings$n_run < 1){
+  #   settings$n_run <- 1
+  #   debug_cli(debug >= 3, "", "default n_run = {settings$n_run}")
+  # }
 
   ## check n_obs
   if (is.null(settings$n_obs) ||
@@ -770,11 +825,11 @@ check_settings <- function(bn.fit,
 
   ## check borrow
   ## TODO: remove borrow
-  if (is.null(settings$borrow) ||
-      settings$borrow < 0){
-    settings$borrow <- 0
-    debug_cli(debug >= 3, "", "default borrow = {settings$borrow}")
-  }
+  # if (is.null(settings$borrow) ||
+  #     settings$borrow < 0){
+  #   settings$borrow <- 0
+  #   debug_cli(debug >= 3, "", "default borrow = {settings$borrow}")
+  # }
 
   settings[c("epsilon", "c")] <- 0
   if (settings$method == "random"){
@@ -900,9 +955,9 @@ check_settings <- function(bn.fit,
   settings$bn.fit <- bn.fit
 
   ## sort settings
-  nms <- c("method", "target", "run", "n_run", "n_obs", "n_int",
+  nms <- c("method", "target", "run", "n_obs", "n_int",
            "n_ess", "n_t", "int_parents", "optimistic", "epsilon",
-           "c", "score", "max_parents", "threshold", "eta", "borrow")
+           "c", "score", "max_parents", "threshold", "eta")
   settings <- settings[union(nms, c("nodes", "nnodes", "type", "temp_dir",
                                     "aps_dir", "mds_dir", "id", "data_obs",
                                     "bn.fit"))]
