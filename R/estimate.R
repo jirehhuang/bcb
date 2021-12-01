@@ -235,9 +235,51 @@ compute_bda <- function(data,
 
 
 
+# Compute intervention effects
+
+compute_int <- function(t,
+                        settings,
+                        rounds,
+                        debug = 0){
+
+  if (t <= settings$n_obs) return(rounds)
+
+  ## load settings
+  list2env(settings[c("n_obs", "n_int", "target")],
+           envir = environment())
+
+  debug_cli(debug >= 3, cli::cli_alert_info,
+            "computing intervention effects")
+
+  rounds$mu_int[t,] <- rounds$mu_int[t-1,]
+  rounds$se_int[t,] <- rounds$se_int[t-1,]
+
+  if (settings$type == "bn.fit.gnet"){
+
+    ## compute Gaussian effects
+    a <- rounds$selected$arm[t]
+    rounds$mu_int[t, a] <- mean(rounds$data[N <- rounds$selected$arm == a, target])
+    rounds$se_int[t, a] <- sd(rounds$data[N, target]) / sqrt((N <- sum(N)))  # s / sqrt(n)
+
+    ## TODO: optimistic
+
+  } else if (settings$type == "bn.fit.dnet"){
+
+    ## compute discrete effects
+
+    browser()
+
+    ## TODO: discrete implementation
+  }
+  return(rounds)
+}
+
+
+
 # Compute expectation over posterior mean
 
 expect_post <- function(rounds,
+                        dag = NULL,
                         from = NULL,
                         to = NULL,
                         metric = "beta",
