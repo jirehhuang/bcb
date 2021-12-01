@@ -12,6 +12,7 @@ compute_bda <- function(data,
                         rounds,
                         target = NULL,
                         nig_bda = NULL,
+                        nig_est = FALSE,
                         intercept = TRUE,  # TODO: remove, because keep TRUE
                         a_0 = 1,
                         b_0 = 1,
@@ -33,7 +34,7 @@ compute_bda <- function(data,
 
     nig_bda <- any(sapply(seq_p, function(i){
 
-      sum(get_bool_data(t = t, i = i, settings = settings, rounds = rounds))
+      sum(bool_bda(t = t, i = i, settings = settings, rounds = rounds))
 
     }) < (settings$max_parents + 2))
   }
@@ -41,12 +42,6 @@ compute_bda <- function(data,
             c("computing back-door effects with ",
               ifelse(nig_bda, "Bayesian Normal-inverse-gamma", "standard"),
               " linear model"))
-
-  x_a <- sapply(settings$nodes, function(node){
-
-    unique(do.call(c, sapply(rounds$arms, function(x)
-      if (x$node == node) x$value else NULL)))
-  }, simplify = FALSE)
 
   ## Gaussian implementation
   if (settings$type == "bn.fit.gnet"){
@@ -61,20 +56,14 @@ compute_bda <- function(data,
           ## for bda estimate and joint estimate:
           ## last t where bda updated, effect estimate, residual sum of squared
           ## deviations, and mean estimates for each intervention value
-          ## TODO: simplify
-          as.data.frame(sapply(c("t_bda", "beta", "rss", "t_int",
-                                 sprintf("mu%g_bda", seq_len(length(x_a[[i]]))),
-                                 sprintf("se%g_bda", seq_len(length(x_a[[i]]))),
-                                 sprintf("mu%g_est", seq_len(length(x_a[[i]]))),
-                                 sprintf("se%g_est", seq_len(length(x_a[[i]])))),
+          i_values <- rounds$node_values[[i]]
+          as.data.frame(sapply(c("t_bda", "n_bda", "beta", "rss", "t_int",
+                                 sprintf("nu%g", seq_len(length(i_values))),
+                                 sprintf("mu%g_bda", seq_len(length(i_values))),
+                                 sprintf("se%g_bda", seq_len(length(i_values))),
+                                 sprintf("mu%g_est", seq_len(length(i_values))),
+                                 sprintf("se%g_est", seq_len(length(i_values)))),
                                function(x) rep(NA, nrow(rounds$ps[[i]]))))
-
-          # # for bda estimate and joint estimate:
-          # # last t where updated, estimate, and standard error
-          # data.frame(t_bda = rep(NA, nrow(rounds$ps[[i]])),
-          #            beta = NA, beta_se = NA,
-          #            beta0 = NA, beta0_se = NA)
-
         } else NULL)
         names(temp) <- nodes
         return(temp)
@@ -87,12 +76,14 @@ compute_bda <- function(data,
     }
     for (i in seq_p){
 
-      bool_data <- get_bool_data(t = t, i = i,
-                                 settings = settings, rounds = rounds)
+      bool_data <- bool_bda(t = t, i = i,
+                            settings = settings, rounds = rounds)
 
       pars <- as.matrix(rounds$ps[[i]][, parents, drop = FALSE])
       temp <- bda[[i]]
       n <- sum(bool_data)
+
+      i_values <- rounds$node_values[[i]]
 
       Xy <- as.matrix(data[bool_data, , drop=FALSE])
       if (intercept)
@@ -134,7 +125,7 @@ compute_bda <- function(data,
 
             ## compute bda effect
             if (is.na(temp[[j]][l, 1]) ||  # have not computed bda effect
-                any(bool_data[seq(temp[[j]][l, 1] + 1, t)])){  # have added obs data
+                any(bool_data[seq(temp[[j]][l, 1] + 1, t)])){  # have added bda-eligible data
 
               beta <- matrix(numeric(length(ik)), ncol = 1)
               beta_cpp(X = Xy[, ik, drop = FALSE], y = Xy[, j], beta = beta)
@@ -145,78 +136,73 @@ compute_bda <- function(data,
                                      sapply(k, function(x) mean(Xy[, k])),  # parents of i
                                      1)))  # intercept
 
-              for (a in seq_len(length(x_a[[i]]))){
+              for (b in seq_len(length(i_values))){
 
-                phi[1] <- x_a[[i]][a]
+                phi[1] <- i_values[b]
 
-                temp[[j]][[sprintf("mu%g_bda", a)]][l] <- t(phi) %*% beta
-                temp[[j]][[sprintf("se%g_bda", a)]][l] <-
-                  sqrt(t(phi) %*% solve(t(Xy[, ik, drop = FALSE]) %*%
+                temp[[j]][[sprintf("nu%g", b)]][l] <-
+                  1 / (t(phi) %*% solve(t(Xy[, ik, drop = FALSE]) %*%
                                           Xy[, ik, drop = FALSE]) %*% phi)
+                temp[[j]][[sprintf("mu%g_bda", b)]][l] <- t(phi) %*% beta
+                # temp[[j]][[sprintf("se%g_bda", b)]][l] <-
+                #   sd(Xy[, j] - Xy[, ik, drop = FALSE] %*% beta) *  # sd of residuals
+                #   sqrt((t - 1) / (t - length(ik))) /  # n-1 -> n-k
+                #   sqrt(temp[[j]][[sprintf("nu%g", b)]][l])  # divide by sqrt(nu)
+                temp[[j]][[sprintf("se%g_bda", b)]][l] <- sqrt(
+                  var(Xy[, j] - Xy[, ik, drop = FALSE] %*% beta) *  # var of residuals
+                    (t - 1) / (t - length(ik)) /  # n-1 -> n-k
+                    temp[[j]][[sprintf("nu%g", b)]][l]  # divide by nu
+                )
               }
               temp[[j]]$t_bda[l] <- t
+              temp[[j]]$n_bda[l] <- n
               temp[[j]]$rss[l] <- var(Xy[, j] - beta[1] * Xy[, i] * (t - 1))
-
-              # beta <- numeric(2)
-              # se <- numeric(2)
-              #
-              # if (nig_bda){
-              #
-              #   ## normal inverse gamma linear model
-              #   lm_nig(Xty = XytXy[ik, j], m_0 = m_0, Lambda_0 = Lambda_0,
-              #          Lambda_n = Lambda_n, V_n = V_n, yty = XytXy[j, j],
-              #          a_n = a_n, b_0 = b_0, beta = beta, se = se)
-              # } else{
-              #
-              #   ## standard linear model
-              #   lm_cpp(X = Xy[, ik, drop = FALSE], y = Xy[, j],
-              #          beta = beta, se = se)
-              # }
-              # temp[[j]][l, seq_len(5)] <- c(t, beta[1], se[1],
-              #                               beta[2], se[2])
-              #
-              # browser()
-              #
-              # temp <- Xy[, j] - Xy[, i] * beta[1]
-              # m <- lm(temp ~ 1)
-              # summary(m)
-
-              # Xy_df <- data.frame(Xy)
-              # m1 <- lm(as.formula(sprintf("%s ~ %s - 1", names(Xy_df)[j],
-              #                            paste(names(Xy_df)[ik],
-              #                                  collapse = " + "))),
-              #         data = data.frame(Xy_df))
-              # m <- lm(as.formula(sprintf("%s ~ %s", nodes[j],
-              #                            paste(nodes[c(i, k)],
-              #                                  collapse = " + "))),
-              #         data = data.frame(Xy[,nodes]))
-              # summary(m1)
-              # summary(m)
-
-              # if (any(is.infinite(unlist(temp[[j]][l, seq_len(5)])))){
-              #
-              #   browser()
-              # }
             }
+            ## compute est
+            if ((t > settings$n_obs &&
+                 temp[[j]]$t_bda[l] == t) ||  # just updated bda with int data
+                rounds$selected$interventions[t] ==
+                nodes[i]){  # or most recent intervention is on i
 
-            ## compute joint estimate
-            if (t <= settings$n_obs){
+              ## compute joint estimate
+              a <- rounds$selected$arm[t]
+              value <- rounds$arms[[a]]$value
+              b <- match(value, i_values)
 
-              for (a in seq_len(length(x_a[[i]]))){
+              mu_int <- rounds$mu_int[t, a]
+              N <- sum(rounds$selected$arm == a)
 
-                temp[[j]][[sprintf("mu%g_est", a)]][l] <-
-                  temp[[j]][[sprintf("mu%g_bda", a)]][l]
-                temp[[j]][[sprintf("se%g_est", a)]][l] <-
-                  temp[[j]][[sprintf("se%g_bda", a)]][l]
+              ## design prior hyperparameters with bda data
+              m_0 <- temp[[j]][[sprintf("mu%g_bda", b)]][l]
+              # nu_0 <- temp[[j]]$n_bda[l]
+              nu_0 <- temp[[j]][[sprintf("nu%g", b)]][l]
+              a_0 <- temp[[j]]$n_bda[l] / 2
+              b_0 <- temp[[j]]$rss[l] / 2
+
+              ## update posterior
+              m_n <- (m_0 * nu_0 + mu_int * N) /
+                (nu_n <- nu_0 + N)
+              a_n <- a_0 + N / 2
+              b_n <- b_0 + sum((rounds$data[rounds$selected$arm == a,
+                                            settings$target] - mu_int)^2) / 2 +
+                N * nu_0 / (nu_n) * (mu_int - m_0)^2 / 2
+
+              ## estimates
+              temp[[j]][[sprintf("mu%g_est", b)]][l] <- m_n
+              temp[[j]][[sprintf("se%g_est", b)]][l] <- sqrt(b_n / a_n / nu_n)
+              temp[[j]]$t_int[l] <- t
+            }
+            ## purely observational; no intervention yet
+            if (is.na(temp[[j]]$t_int[l])){
+
+              ## take est from bda, since no int
+              for (b in seq_len(length(i_values))){
+
+                temp[[j]][[sprintf("mu%g_est", b)]][l] <-
+                  temp[[j]][[sprintf("mu%g_bda", b)]][l]
+                temp[[j]][[sprintf("se%g_est", b)]][l] <-
+                  temp[[j]][[sprintf("se%g_bda", b)]][l]
               }
-
-            } else if (temp[[j]][l, 1] == t ||  # just updated bda effect
-                       rounds$selected$interventions[t] ==
-                       nodes[i]){  # most recent intervention is on i
-
-              browser()
-
-              ## TODO: joint estimate
             }
           }
         }
@@ -293,27 +279,56 @@ expect_post <- function(rounds,
   metrics <- trimws(strsplit(metric, "\\+")[[1]])
   nms <- names(rounds$bda[[1]][[2]])
 
-  for (i in if (is.null(from)) seq_p else from){
+  if (is.null(dag)){
 
-    for (j in if (is.null(to)) seq_p[-i] else to){
+    ## expectation over posterior distribution
+    for (i in if (is.null(from)) seq_p else from){
 
-      if (metric %in% names(rounds$bda[[i]][[j]])){
+      for (j in if (is.null(to)) seq_p[-i] else to){
 
-        mat[i, j] <-
-          sum(rounds$ps[[i]][, "prob"] *
-                rounds$bda[[i]][[j]][[metric]]^(1 + squared), na.rm = TRUE)
-      } else{
+        if (metric %in% names(rounds$bda[[i]][[j]])){
 
-        ## metric should be a character value evaluable
-        ## using eval(parse(text = metric))
+          mat[i, j] <-
+            sum(rounds$ps[[i]][, "prob"] *
+                  rounds$bda[[i]][[j]][[metric]]^(1 + squared), na.rm = TRUE)
+        } else{
 
-        ## load metrics into environment and evaluate
-        list2env(sapply(nms[sapply(nms, function(x) grepl(x, metric))],
-                        function(x) rounds$bda[[i]][[j]][[x]], simplify = FALSE),
-                 envir = environment())
-        mat[i, j] <-
-          sum(rounds$ps[[i]][, "prob"] *
-                eval(parse(text = metric))^(1 + squared), na.rm = TRUE)
+          ## metric should be a character value evaluable
+          ## using eval(parse(text = metric))
+
+          ## load metrics into environment and evaluate
+          list2env(sapply(nms[sapply(nms, function(x) grepl(x, metric))],
+                          function(x) rounds$bda[[i]][[j]][[x]], simplify = FALSE),
+                   envir = environment())
+          mat[i, j] <-
+            sum(rounds$ps[[i]][, "prob"] *
+                  eval(parse(text = metric))^(1 + squared), na.rm = TRUE)
+        }
+      }
+    }
+  } else{
+
+    ## concentrate posterior around a dag structure
+    if (is.null(dim(dag)))
+      dag <- row2mat(row = dag, nodes = names(rounds$bda))
+    edge_list <- as.list(sparsebnUtils::as.edgeList(dag))
+
+    for (i in if (is.null(from)) seq_p else from){
+
+      row_index <- lookup(parents = edge_list[[i]],
+                          ps_i = rounds$ps[[i]])
+
+      for (j in if (is.null(to)) seq_p[-i] else to){
+
+        if (metric %in% names(rounds$bda[[i]][[j]])){
+
+          mat[i, j] <- rounds$bda[[i]][[j]][row_index, metric]^(1 + squared)
+
+        } else{
+
+          mat[i, j] <- sum(Reduce(`+`,
+                                  lapply(metrics, function(metric) rounds$bda[[i]][[j]][row_index, metric]))^(1 + squared))
+        }
       }
     }
   }
@@ -330,6 +345,66 @@ expect_post <- function(rounds,
     mat <- mat[from, setdiff(colnames(mat), from), drop = TRUE]
   }
   return(mat)
+}
+
+
+
+# Compute mu and se
+
+compute_mu_se <- function(t,
+                          rounds,
+                          target,
+                          dag = NULL,
+                          type = c("bda", "est"),  # back-door adjustment or joint est
+                          post = avail_bda,  # posterior distr (bma or around dag)
+                          est = post){  # where to store in rounds
+
+  type <- match.arg(type)
+  post <- match.arg(post)
+  # est <- match.arg(est)
+
+  if (post == "bma")
+    dag <- NULL
+
+  ## E(X)
+  rounds[[sprintf("mu_%s", est)]][t,] <- sapply(rounds$arms, function(arm){
+
+    int_index <- match(arm$value, rounds$node_values[[arm$node]])
+    expect_post(rounds = rounds, dag = dag,
+                from = arm$node, to = target,
+                metric = sprintf("mu%g_%s", int_index, type))
+  })
+  ## E(Var(X))
+  E_Var <- sapply(rounds$arms, function(arm){
+
+    int_index <- match(arm$value, rounds$node_values[[arm$node]])
+    expect_post(rounds = rounds, dag = dag,
+                from = arm$node, to = target,
+                metric = sprintf("se%g_%s", int_index, type),
+                squared = TRUE)
+  })
+  ## Var(E(X)) = E(E(X)^2) - E(E(X))^2
+  Var_E <- if (is.null(dag)){
+
+    sapply(rounds$arms, function(arm){
+
+      int_index <- match(arm$value, rounds$node_values[[arm$node]])
+      expect_post(rounds = rounds, dag = dag,
+                  from = arm$node, to = target,
+                  metric = sprintf("mu%g_%s", int_index, type),
+                  squared = TRUE) -
+        expect_post(rounds = rounds, dag = dag,
+                    from = arm$node, to = target,
+                    metric = sprintf("mu%g_%s", int_index, type))^2
+    })
+  } else{
+
+    numeric(length(rounds$arms))
+  }
+  ## E(Var(X)) + Var(E(X))
+  rounds[[sprintf("se_%s", est)]][t,] <- sqrt(E_Var +
+                                                Var_E)
+  return(rounds)
 }
 
 
@@ -420,11 +495,11 @@ dag_bda <- function(dag,
 
 # Indicate data rows that can be used for bda
 
-get_bool_data <- function(t,
-                          i,
-                          settings,
-                          rounds,
-                          debug = 0){
+bool_bda <- function(t,
+                     i,
+                     settings,
+                     rounds,
+                     debug = 0){
 
   bool_data <- rep(TRUE, t)
 
