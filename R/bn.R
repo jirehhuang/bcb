@@ -142,7 +142,8 @@ bn2gnet <- function(bn,
                     seed,
                     coefs = c(0, 0),
                     vars = c(0, 0),
-                    normalize = TRUE){
+                    normalize = TRUE,
+                    intercept = TRUE){
 
   ## TODO: check arguments
 
@@ -158,12 +159,13 @@ bn2gnet <- function(bn,
   dist <- lapply(gnet$nodes, function(node){
 
     ## sample coefficients and standard deviations
-    params <- list(coef = c(0,  # zero mean
-                            sample(c(-1, 1),  # negative or positive
-                                   length(node$parents), replace = TRUE) *
-                              runif(length(node$parents),  # magnitudes
+    params <- list(coef = c(sample(c(-1, 1),  # negative or positive
+                                   length(node$parents) + 1, replace = TRUE) *
+                              runif(length(node$parents) + 1,  # magnitudes
                                     coefs[1], coefs[2])),
                    sd = runif(1, sqrt(vars[1]), sqrt(vars[2])))
+    if (! intercept)
+      params$coef[1] <- 0
 
     names(params$coef) <- c("(Intercept)", node$parents)
 
