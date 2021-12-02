@@ -243,6 +243,9 @@ compute_arp <- function(data,
   debug_cli(nnodes > 20, cli::abort(),
             "don't use on datasets with more than 20 variables")
 
+  debug_cli(debug >= 2, cli::cli_alert_success,
+            "computing ancestor relation probabilities for {nnodes} nodes")
+
   ## calculate parent scores and save as temporary files
   if (!file.exists(sprintf("%s_score", temp_file))){
 
@@ -602,17 +605,31 @@ lookup_score <- function(target,
 
 # Clear temporary files
 
-clear_temp <- function(settings){
+clear_temp <- function(settings, every = FALSE){
 
   temp_file <- file.path(settings$temp_dir, settings$id)
 
-  sapply(c("score", "support", "arp"), function(x){
+  sapply(c("score", "support", "arp", "gobnilp"), function(x){
 
     if (file.exists(file <- sprintf("%s_%s", temp_file, x))){
 
       file.remove(file)
     }
   })
+  if (every){
+
+    files <- list.files(settings$temp_dir)
+
+    sapply(files, function(x){
+
+      if (any(sapply(c("_score", "_support", "_arp", "_gobnilp"),
+                     function(y) grepl(y, x)))){
+
+        file <- file.path(settings$temp_dir, x)
+        file.remove(file)
+      }
+    })
+  }
 }
 
 
@@ -675,7 +692,7 @@ compile_bida <- function(aps_dir = get_bida(dir = TRUE),
     if (length(make$stderr)){
 
       debug_cli(debug >= 2, cli::cli_alert_success,
-                "successfully compiled {.pkg bida} aps in {make_time} secs")
+                "successfully compiled {.pkg bida} aps in {prettyunits::pretty_sec(make_time)}")
     } else{
 
       debug_cli(debug >= 2, cli::cli_alert_success,
