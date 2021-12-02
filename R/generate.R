@@ -76,7 +76,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
         dir_check(data_dir)
 
         ## files already completed
-        if (all(c("bn.fit.rds", "effects_list.rds",
+        if (all(c("bn.fit.rds", "effects_array.rds",
                   "true_dag.txt", "true_cpdag.txt",
                   "effects_mat.txt", "order_mat.txt") %in% list.files(data_dir))){
 
@@ -110,13 +110,15 @@ gen_data_grid <- function(data_grid = build_data_grid(),
                             normalize = data_row$normalize)
 
             ## check if invalid
-            temp_mat <- effects_list2mat(bn.fit2effects(bn.fit = gnet))
-            temp_row <- bn.fit2data_row(gnet, data_row, temp_mat)
+            temp_row <- bn.fit2data_row(gnet, data_row)
             invalid <- temp_row$reg_lb < data_row$reg_lb ||
               temp_row$reg_ub > data_row$reg_ub
 
             debug_cli(debug, ifelse(invalid, cli::cli_alert_danger, cli::cli_alert_success),
-                      "gnet {ifelse(invalid, 'violates', 'satisfies')} regret constraints on attempt {attempt}",
+                      c("gnet {ifelse(invalid, 'violates', 'satisfies')} regret constraints ",
+                        "on attempt {attempt} with (",
+                        "{format(temp_row$reg_lb, digits = 3, nsmall = 3)}, ",
+                        "{format(temp_row$reg_ub, digits = 3, nsmall = 3)})"),
                       .envir = environment())
 
             if (! invalid){
@@ -136,10 +138,9 @@ gen_data_grid <- function(data_grid = build_data_grid(),
         true_dag <- bnlearn::amat(bn.fit)
         true_cpdag <- bnlearn::amat(bnlearn::cpdag(bn.fit))
 
-        ## get true effect sizes
-        effects_list <- bn.fit2effects(bn.fit = bn.fit)
-        effects_mat <- effects_list2mat(effects_list,
-                                        level = 2)  # only applicable for discrete
+        ## get true effects
+        effects_array <- bn.fit2effects(bn.fit = bn.fit)
+        effects_mat <- effects_array[,,1]
 
         ## random orderings
         set.seed(data_row$seed)
@@ -150,12 +151,12 @@ gen_data_grid <- function(data_grid = build_data_grid(),
         )
 
         ## update data_row
-        data_row <- bn.fit2data_row(bn.fit, data_row, effects_mat)
+        data_row <- bn.fit2data_row(bn.fit, data_row)
 
         ## write files
         write.table(data_row, file.path(data_dir, "data_row.txt"))
         saveRDS(bn.fit, file.path(data_dir, "bn.fit.rds"))
-        saveRDS(effects_list, file.path(data_dir, "effects_list.rds"))
+        saveRDS(effects_array, file.path(data_dir, "effects_array.rds"))
         write.table(true_dag, file.path(data_dir, "true_dag.txt"))
         write.table(true_cpdag, file.path(data_dir, "true_cpdag.txt"))
         write.table(effects_mat, file.path(data_dir, "effects_mat.txt"))
