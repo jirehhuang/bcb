@@ -19,6 +19,10 @@ scores <- bcb:::compute_scores(data = data, settings = settings,
 ps <- bcb:::compute_ps(settings = settings,
                        interventions = interventions, debug = debug)
 
+## compute_arp()
+arp <- bcb:::compute_arp(settings = settings,
+                         interventions = interventions, debug = debug)
+
 ## ps2es()
 bma <- bcb:::ps2es(ps = ps, settings = settings)
 
