@@ -314,14 +314,15 @@ gen_data_grid <- function(data_grid = build_data_grid(),
                                       data_row$index, data_row$id,
                                       data_row$network, data_row$n_obs))
         dir_check(data_dir)
+        dir_check(file.path(data_dir, "rds"))
 
         if (data_row$n_obs <= 0 ||
             data_row$n_dat <= 0)
           return(NULL)
 
         j <- data_row$dataset
-        if (!recache &  # to create rounds_dir
-            file.exists(rounds_dir <- file.path(data_dir,
+        if (!recache &  # to create rounds_rds
+            file.exists(rounds_rds <- file.path(data_dir, "rds",
                                                 sprintf("rounds%g.rds", j)))){
 
           debug_cli(debug, cli::cli_alert_success,
@@ -346,8 +347,10 @@ gen_data_grid <- function(data_grid = build_data_grid(),
         roundsj <- bandit(bn.fit = bn.fit, settings = settings, debug = debug)
 
         ## write results in folder roundsj and as roundsj.rds
-        write_rounds(rounds = roundsj, where = rounds_dir)
-        write_rounds(rounds = roundsj, where = sprintf("%s.rds", rounds_dir))
+        write_rounds(rounds = roundsj,
+                     where = file.path(data_dir, "txt",
+                                       sprintf("rounds%g", j)))
+        write_rounds(rounds = roundsj, where = rounds_rds)
 
         return(NULL)
       }
@@ -489,10 +492,10 @@ build_data_grid <- function(network = "survey",
                             n_dat = 0,
                             n_obs = 0,
                             target = "",
-                            reg_lb = 0,
-                            reg_ub = 1,
-                            var_lb = 0.5,
-                            var_ub = 1,
+                            reg_lb = 0,  # regret prop lower bound
+                            reg_ub = 1,  # regret prop upper bound
+                            var_lb = 0.1,
+                            var_ub = 0.2,
                             coef_lb = 0.5,
                             coef_ub = 1,
                             normalize = TRUE,

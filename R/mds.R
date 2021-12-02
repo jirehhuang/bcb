@@ -147,7 +147,7 @@ compile_mds <- function(mds_dir = get_mds(dir = TRUE),
   make_time <- as.numeric(end_time - start_time, units = "secs")
 
   debug_cli(debug >= 2, cli::cli_alert_success,
-            "successfully compiled {.pkg mds} in {make_time} secs")
+            "successfully compiled {.pkg mds} in {prettyunits::pretty_sec(make_time)}")
 }
 
 

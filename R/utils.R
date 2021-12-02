@@ -221,7 +221,7 @@ load_example <- function(eg = c("gnet"),
       bn.fit <- phsl::bnrepository(x = network)
       bn.fit <- rename_bn.fit(bn.fit)
       bn.fit <- bn2gnet(bn = bn.fit, seed = 1,
-                        coefs = c(0.5, 1), vars = c(0.5, 1))
+                        coefs = c(0.5, 1), vars = c(0.1, 0.2))
 
       score <- "bge"
       intervene <- c(
@@ -246,7 +246,8 @@ load_example <- function(eg = c("gnet"),
     data <- ribn(x = bn.fit, intervene = intervene, seed = 1)
 
     ## prepare settings
-    settings <- list(method = "bcb", target = "V6", n_obs = 100, n_int = 100,
+    method <- "random"  # whatever method is being worked on
+    settings <- list(method = method, n_obs = 100, n_int = 100,
                      score = score, max_parents = 5, nodes = names(data),
                      temp_dir = temp_dir)
     settings <- bcb:::check_settings(bn.fit = bn.fit, settings = settings)
