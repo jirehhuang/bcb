@@ -24,15 +24,14 @@ BEGIN_RCPP
 END_RCPP
 }
 // lm_cpp
-void lm_cpp(arma::mat& X, arma::vec& y, arma::vec& beta, arma::vec& se);
-RcppExport SEXP _bcb_lm_cpp(SEXP XSEXP, SEXP ySEXP, SEXP betaSEXP, SEXP seSEXP) {
+void lm_cpp(arma::mat& X, arma::vec& y, arma::vec& values);
+RcppExport SEXP _bcb_lm_cpp(SEXP XSEXP, SEXP ySEXP, SEXP valuesSEXP) {
 BEGIN_RCPP
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< arma::mat& >::type X(XSEXP);
     Rcpp::traits::input_parameter< arma::vec& >::type y(ySEXP);
-    Rcpp::traits::input_parameter< arma::vec& >::type beta(betaSEXP);
-    Rcpp::traits::input_parameter< arma::vec& >::type se(seSEXP);
-    lm_cpp(X, y, beta, se);
+    Rcpp::traits::input_parameter< arma::vec& >::type values(valuesSEXP);
+    lm_cpp(X, y, values);
     return R_NilValue;
 END_RCPP
 }
@@ -101,7 +100,7 @@ END_RCPP
 
 static const R_CallMethodDef CallEntries[] = {
     {"_bcb_beta_cpp", (DL_FUNC) &_bcb_beta_cpp, 3},
-    {"_bcb_lm_cpp", (DL_FUNC) &_bcb_lm_cpp, 4},
+    {"_bcb_lm_cpp", (DL_FUNC) &_bcb_lm_cpp, 3},
     {"_bcb_lm_nig", (DL_FUNC) &_bcb_lm_nig, 10},
     {"_bcb_lm_nig0", (DL_FUNC) &_bcb_lm_nig0, 9},
     {"_bcb_lookup", (DL_FUNC) &_bcb_lookup, 2},

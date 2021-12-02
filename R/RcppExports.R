@@ -5,8 +5,8 @@ beta_cpp <- function(X, y, beta) {
     invisible(.Call(`_bcb_beta_cpp`, X, y, beta))
 }
 
-lm_cpp <- function(X, y, beta, se) {
-    invisible(.Call(`_bcb_lm_cpp`, X, y, beta, se))
+lm_cpp <- function(X, y, values) {
+    invisible(.Call(`_bcb_lm_cpp`, X, y, values))
 }
 
 lm_nig <- function(Xty, m_0, Lambda_0, Lambda_n, V_n, yty, a_n, b_0, beta, se) {

@@ -23,28 +23,19 @@ void beta_cpp(arma::mat& X,
 // [[Rcpp::export]]
 void lm_cpp(arma::mat& X,
             arma::vec& y,
-            arma::vec& beta,
-            arma::vec& se){
+            arma::vec& values){
 
   // coefficients
   arma::vec betas = arma::solve(X, y);
+  values(0) = betas(0);
 
   // standard errors
+  // arma::vec resid = y - X.col(0) * betas(0);
+  // resid = resid - arma::mean(resid);
   arma::vec resid = y - X * betas;
-  arma::vec stderrs = arma::sqrt(
-    arma::dot(resid, resid) / (X.n_rows - X.n_cols) *  // assumes intercept included in X
-      arma::diagvec(arma::inv(arma::trans(X) * X))
-  );
-
-  // for (int i = 0; i < beta.size(); i++){
-  //
-  //   beta(i) = betas(i);
-  //   se(i) = stderrs(i);
-  // }
-  beta(0) = betas(0);
-  se(0) = stderrs(0);
-  // beta(beta.size() - 1) = betas(betas.size() - 1);
-  // se(se.size() - 1) = stderrs(stderrs.size() - 1);
+  values(2) = arma::dot(resid, resid);  // sum of squared residuals
+  values(3) = arma::dot(X.col(0), X.col(0));  // XtX
+  values(1) = std::sqrt(values(2) / (X.n_rows - X.n_cols) / values(3));
 }
 
 
