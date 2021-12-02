@@ -13,7 +13,6 @@ compute_bda <- function(data,
                         target = NULL,
                         nig_bda = NULL,
                         nig_est = FALSE,
-                        intercept = TRUE,  # TODO: remove, because keep TRUE
                         a_0 = 1,
                         b_0 = 1,
                         m_0 = 0,
@@ -57,12 +56,11 @@ compute_bda <- function(data,
           ## last t where bda updated, effect estimate, residual sum of squared
           ## deviations, and mean estimates for each intervention value
           i_values <- rounds$node_values[[i]]
-          as.data.frame(sapply(c("t_bda", "n_bda", "beta", "rss", "t_int",
-                                 sprintf("nu%g", seq_len(length(i_values))),
+          as.data.frame(sapply(c("t_bda", "t_int", "n_bda", "xtx", "rss",
+                                 "beta_bda", "se_bda",
                                  sprintf("mu%g_bda", seq_len(length(i_values))),
-                                 sprintf("se%g_bda", seq_len(length(i_values))),
-                                 sprintf("mu%g_est", seq_len(length(i_values))),
-                                 sprintf("se%g_est", seq_len(length(i_values)))),
+                                 "beta_est", "se_est",
+                                 sprintf("mu%g_est", seq_len(length(i_values)))),
                                function(x) rep(NA, nrow(rounds$ps[[i]]))))
         } else NULL)
         names(temp) <- nodes
@@ -86,8 +84,6 @@ compute_bda <- function(data,
       i_values <- rounds$node_values[[i]]
 
       Xy <- as.matrix(data[bool_data, , drop=FALSE])
-      if (intercept)
-        Xy <- cbind(Xy, rep(1, nrow(Xy)))
       XytXy <- t(Xy) %*% Xy
 
       for (l in rounds$ps[[i]][, "ordering"]){
@@ -97,16 +93,12 @@ compute_bda <- function(data,
         k <- pars[l, !is.na(pars[l, ])]  # indices of parents
         n_parents <- length(k)  # number of parents
         ik <- c(i, k)  # predictor and parent
-        if (intercept)
-          ik <- union(ik, p + 1)
 
         if (nig_bda){
 
           # prior hyperparameters
-          m_0 <- matrix(m_00, n_parents + 1 +
-                          intercept, 1)  # prior mean
-          Lambda_0 <- diag(n_parents + 1 +
-                             intercept) / Lambda_00  # prior variance
+          m_0 <- matrix(m_00, n_parents + 1, 1)  # prior mean
+          Lambda_0 <- diag(n_parents + 1) / Lambda_00  # prior variance
 
           # update hyperparameters
           Lambda_n <- XytXy[ik, ik, drop = FALSE] + Lambda_0
@@ -130,66 +122,77 @@ compute_bda <- function(data,
               beta <- matrix(numeric(length(ik)), ncol = 1)
               beta_cpp(X = Xy[, ik, drop = FALSE], y = Xy[, j], beta = beta)
 
-              temp[[j]]$beta[l] <- beta[1]
-
-              phi <- matrix(unlist(c(0,  # placeholder for intervention on i
-                                     sapply(k, function(x) mean(Xy[, k])),  # parents of i
-                                     1)))  # intercept
+              values <- numeric(4)
+              lm_cpp(X = Xy[, ik, drop = FALSE], y = Xy[, j], values = values)
+              temp[[j]][l, c("beta_bda", "se_bda", "rss", "xtx")] <- values
 
               for (b in seq_len(length(i_values))){
 
-                phi[1] <- i_values[b]
-
-                temp[[j]][[sprintf("nu%g", b)]][l] <-
-                  1 / (t(phi) %*% solve(t(Xy[, ik, drop = FALSE]) %*%
-                                          Xy[, ik, drop = FALSE]) %*% phi)
-                temp[[j]][[sprintf("mu%g_bda", b)]][l] <- t(phi) %*% beta
-                # temp[[j]][[sprintf("se%g_bda", b)]][l] <-
-                #   sd(Xy[, j] - Xy[, ik, drop = FALSE] %*% beta) *  # sd of residuals
-                #   sqrt((t - 1) / (t - length(ik))) /  # n-1 -> n-k
-                #   sqrt(temp[[j]][[sprintf("nu%g", b)]][l])  # divide by sqrt(nu)
-                temp[[j]][[sprintf("se%g_bda", b)]][l] <- sqrt(
-                  var(Xy[, j] - Xy[, ik, drop = FALSE] %*% beta) *  # var of residuals
-                    (t - 1) / (t - length(ik)) /  # n-1 -> n-k
-                    temp[[j]][[sprintf("nu%g", b)]][l]  # divide by nu
-                )
+                temp[[j]][[sprintf("mu%g_bda", b)]][l] <-
+                  i_values[b] * temp[[j]]$beta_bda[l]
               }
               temp[[j]]$t_bda[l] <- t
               temp[[j]]$n_bda[l] <- n
-              temp[[j]]$rss[l] <- var(Xy[, j] - beta[1] * Xy[, i] * (t - 1))
             }
             ## compute est
-            if ((t > settings$n_obs &&
+            if ((rounds$selected$arm > 0 &&
                  temp[[j]]$t_bda[l] == t) ||  # just updated bda with int data
                 rounds$selected$interventions[t] ==
                 nodes[i]){  # or most recent intervention is on i
 
-              ## compute joint estimate
               a <- rounds$selected$arm[t]
               value <- rounds$arms[[a]]$value
-              b <- match(value, i_values)
 
-              mu_int <- rounds$mu_int[t, a]
-              N <- sum(rounds$selected$arm == a)
+              ## compute joint estimate
+              if (nig_est){
 
-              ## design prior hyperparameters with bda data
-              m_0 <- temp[[j]][[sprintf("mu%g_bda", b)]][l]
-              # nu_0 <- temp[[j]]$n_bda[l]
-              nu_0 <- temp[[j]][[sprintf("nu%g", b)]][l]
-              a_0 <- temp[[j]]$n_bda[l] / 2
-              b_0 <- temp[[j]]$rss[l] / 2
+                ## TODO: incomplete
 
-              ## update posterior
-              m_n <- (m_0 * nu_0 + mu_int * N) /
-                (nu_n <- nu_0 + N)
-              a_n <- a_0 + N / 2
-              b_n <- b_0 + sum((rounds$data[rounds$selected$arm == a,
-                                            settings$target] - mu_int)^2) / 2 +
-                N * nu_0 / (nu_n) * (mu_int - m_0)^2 / 2
+                b <- match(value, i_values)
+                mu_int <- rounds$mu_int[t, a]
+                n_int <- sum(rounds$selected$arm == a)
 
-              ## estimates
-              temp[[j]][[sprintf("mu%g_est", b)]][l] <- m_n
-              temp[[j]][[sprintf("se%g_est", b)]][l] <- sqrt(b_n / a_n / nu_n)
+                ## design prior hyperparameters with bda data
+                m_0 <- temp[[j]][[sprintf("mu%g_bda", b)]][l]
+                # nu_0 <- temp[[j]]$n_bda[l]
+                nu_0 <- temp[[j]]$xtx[l]
+                a_0 <- temp[[j]]$n_bda[l] / 2
+                b_0 <- temp[[j]]$rss[l] / 2
+
+                ## update posterior
+                m_n <- (m_0 * nu_0 + mu_int * n_int) /
+                  (nu_n <- nu_0 + n_int)
+                a_n <- a_0 + n_int / 2
+                b_n <- b_0 + sum((rounds$data[rounds$selected$arm == a,
+                                              settings$target] - mu_int)^2) / 2 +
+                  n_int * nu_0 / (nu_n) * (mu_int - m_0)^2 / 2
+
+                ## estimates
+                temp[[j]][[sprintf("mu%g_est", b)]][l] <- m_n
+                temp[[j]]$se_est[l] <- sqrt(b_n / a_n / nu_n)
+
+              } else{
+
+                ## bda
+                beta_bda <- temp[[j]]$beta_bda[l]
+                se_bda <- temp[[j]]$se_bda[l]
+                n_bda <- temp[[j]]$n_bda[l]
+
+                ## int
+                beta_int <- rounds$mu_int[t, a] * value
+                se_int <- rounds$se_int[t, a]
+                se_int <- ifelse(!is.na(se_int), se_int,
+                                 2 * (beta_int - beta_bda)^2)  # or x_int^2?
+                n_int <- sum(unlist(sapply(rounds$arms, function(arm){
+                  if (arm$node == rounds$arms[[a]]$node) arm$N
+                })))
+
+                ## est
+                beta_est <- (beta_bda * n_bda + beta_int * n_int) / (n_bda +
+                                                                       n_int)
+                se_est <- sqrt((se_bda^2 * n_bda + se_int^2 * n_int) /
+                                 (n_bda + n_int))
+              }
               temp[[j]]$t_int[l] <- t
             }
             ## purely observational; no intervention yet
@@ -200,9 +203,9 @@ compute_bda <- function(data,
 
                 temp[[j]][[sprintf("mu%g_est", b)]][l] <-
                   temp[[j]][[sprintf("mu%g_bda", b)]][l]
-                temp[[j]][[sprintf("se%g_est", b)]][l] <-
-                  temp[[j]][[sprintf("se%g_bda", b)]][l]
               }
+              temp[[j]]$beta_est[l] <- temp[[j]]$beta_bda[l]
+              temp[[j]]$se_est[l] <- temp[[j]]$se_bda[l]
             }
           }
         }
@@ -243,9 +246,26 @@ compute_int <- function(t,
   if (settings$type == "bn.fit.gnet"){
 
     ## compute Gaussian effects
+
     a <- rounds$selected$arm[t]
-    rounds$mu_int[t, a] <- mean(rounds$data[N <- rounds$selected$arm == a, target])
-    rounds$se_int[t, a] <- sd(rounds$data[N, target]) / sqrt((N <- sum(N)))  # s / sqrt(n)
+    bool_int <- rounds$selected$interventions == rounds$arms[[a]]$node
+    x_int <- sapply(rounds$selected$arm[bool_int], function(x){
+
+      rounds$arms[[x]]$value
+
+    }) * rounds$data[bool_int, target]
+
+    beta_int <- mean(x_int)
+    for (aa in seq_len(length(rounds$arms))){
+
+      if (rounds$arms[[aa]]$node != rounds$arms[[a]]$node) next
+
+      rounds$mu_int[t, aa] <- beta_int * rounds$arms[[aa]]$value
+    }
+    rounds$se_int[t, a] <- sd(x_int) / sqrt(length(x_int))  # s / sqrt(n)
+    rounds$se_int[t, a] <- ifelse(is.na(rounds$se_int[t, a]),
+                                  abs(beta_int),  # sqrt((beta_int - 0)^2)
+                                  rounds$se_int[t, a])
 
     ## TODO: optimistic
 
@@ -377,10 +397,9 @@ compute_mu_se <- function(t,
   ## E(Var(X))
   E_Var <- sapply(rounds$arms, function(arm){
 
-    int_index <- match(arm$value, rounds$node_values[[arm$node]])
     expect_post(rounds = rounds, dag = dag,
                 from = arm$node, to = target,
-                metric = sprintf("se%g_%s", int_index, type),
+                metric = sprintf("se_%s", type),
                 squared = TRUE)
   })
   ## Var(E(X)) = E(E(X)^2) - E(E(X))^2
