@@ -1,26 +1,23 @@
-# Simulate method grid
+# Simulate method
 #' @export
 
 simulate_method <- function(method_num,
                             settings,
                             path,
                             n_cores = 1,
-                            seed0 = 0,
                             resimulate = FALSE,
-                            debug = 1){
+                            debug = 0){
 
   ## method
   method <- settings$method
-  method_dir <- file.path(path, sprintf("%s%s", settings$method, method_num))
+  settings$temp_dir <- file.path(path, "temp")
+  method_dir <- file.path(path, sprintf("%s%s", method, method_num))
   dir_check(method_dir)
-  # dir_check(file.path(path, "rds"))
-  # dir_check(file.path(path, "concise"))  # TODO: concise version
+  dir_check(file.path(path, "progress"))
 
   ## data_grid
   data_grid <- read.table(file.path(path, "data_grid.txt"))
   write.table(data_grid, file.path(method_dir, "data_grid.txt"))
-  # write.table(data_grid, file.path(path, "rds", "data_grid.txt"))
-  # write.table(data_grid, file.path(path, "concise", "data_grid.txt"))
 
   ## expand data.grid so one dataset per thread
   dataset_grid <- do.call(
@@ -39,7 +36,7 @@ simulate_method <- function(method_num,
   n_cores <- round(n_cores)
 
   debug_cli(debug, cli::cli_alert_info,
-            "executing {settings$method}{method_num} on {sum(data_grid$n_dat)} datasets using {n_cores} core(s)")
+            "executing {method}{method_num} on {sum(data_grid$n_dat)} datasets using {n_cores} core(s)")
 
   mclapply <- if (FALSE && ncores > 1 &&
                   Sys.info()[["sysname"]] %in% c("Windows")){
@@ -69,36 +66,50 @@ simulate_method <- function(method_num,
 
         j <- data_row$dataset
         if (!resimulate &  # to create rounds_dir
-            file.exists(file.path(method_data_dir, "rds",
-                                  sprintf("rounds%g.rds", j)))){
+            file.exists(rounds_rds <- file.path(method_data_dir, "rds",
+                                                sprintf("rounds%g.rds", j)))){
 
           debug_cli(debug, cli::cli_alert_success,
-                    "{i} already executed {settings$method}{method_num} on dataset {j} of {data_row$n_dat} for network {data_row$network}",
+                    "{i} already executed {method}{method_num} on dataset {j} of {data_row$n_dat} for network {data_row$network}",
                     .envir = environment())
 
           return(NULL)
         }
+
+        ## keep track of whether in progress
+        progressi <- file.path(path, "progress", sprintf("progress%g.txt",
+                                                         i))
+        if (file.exists(progressi)) return(NULL)  # skip if in progress or complete
+        write.table(x = 0, file = progressi,  # mark as in progress
+                    row.names = FALSE, col.names = FALSE)
+        on.exit(expr = {  # delete if failed before completion
+          if (!file.exists(rounds_rds))
+            file.remove(progressi)
+        })
+
         debug_cli(debug, "",
-                  "{i} executing {settings$method}{method_num} on dataset {j} of {data_row$n_dat} for network {data_row$network}",
+                  "{i} executing {method}{method_num} on dataset {j} of {data_row$n_dat} for network {data_row$network}",
                   .envir = environment())
 
-        ## read bn.fit object
         bn.fit <- readRDS(file.path(data_dir, "bn.fit.rds"))
         settings$rounds0 <- readRDS(file.path(data_dir, "rds",
                                               sprintf("rounds%g.rds", j)))
-
-        settings <- check_settings(settings = settings,
-                                   bn.fit = bn.fit, debug = debug)
+        settings$run <- j
 
         ## execute bandit
-        roundsj <- bandit(bn.fit = bn.fit, settings = settings, debug = debug)
+        roundsj <- bandit(bn.fit = bn.fit, settings = settings,
+                          seed0 = data_row$seed, debug = debug)
 
         ## write results in folder roundsj and as roundsj.rds
         write_rounds(rounds = roundsj, where = file.path(method_data_dir, "txt",
                                                          sprintf("rounds%g", j)))
         dir_check(file.path(method_data_dir, "rds"))
-        write_rounds(rounds = roundsj, where = file.path(method_data_dir, "rds",
-                                                         sprintf("rounds%g.rds", j)))
+        write_rounds(rounds = roundsj, where = rounds_rds)
+
+        # browser()
+
+        ## TODO: progress
+
         return(NULL)
       }
       , error = function(err){
@@ -161,9 +172,8 @@ check_method_grid <- function(method_grid){
   ## TODO: check values
 
   ## column names
-  nms <- c("method", "target", "n_run", "n_obs", "n_int",
-           "n_ess", "n_t", "int_parents", "optimistic", "epsilon",
-           "c", "score", "max_parents", "eta", "borrow")
+  nms <- c("target", "n_run", "n_obs", "n_int", "n_ess", "n_t", "int_parents",
+           "epsilon", "c", "score", "max_parents", "eta", "borrow")
 
   ## remove extra columns
   method_grid <- method_grid[, intersect(names(method_grid), nms)]
