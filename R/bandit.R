@@ -8,17 +8,25 @@
 
 bandit <- function(bn.fit,
                    settings = list(),
-                   seed = 1,
+                   seed0 = 0,
                    debug = 0){
 
-  set.seed(seed)
   start_time <- Sys.time()
 
   ## check arguments and initialize
   bnlearn:::check.bn.or.fit(bn.fit)
   bn.fit <- zero_bn.fit(bn.fit = bn.fit)
-  settings <- check_settings(settings = settings, bn.fit = bn.fit, debug = debug)
-  rounds <- initialize_rounds(settings = settings, bn.fit = bn.fit, debug = debug)
+
+  settings <- check_settings(settings = settings,
+                             bn.fit = bn.fit, debug = debug)
+  set.seed(seed0 + sum(settings$run))
+  if (is.null(settings$data_obs))
+    settings$data_obs <- ribn(x = bn.fit,
+                              n = settings$n_obs)
+  on.exit(clear_temp(settings = settings)) # score/support/arp/gobnilp
+
+  rounds <- initialize_rounds(settings = settings,
+                              bn.fit = bn.fit, debug = debug)
 
   ## load settings
   list2env(settings[c("n_obs", "n_int")], envir = environment())
@@ -29,7 +37,7 @@ bandit <- function(bn.fit,
 
   } else{
 
-    seq(match(0, rounds$selected$reward), n_obs + n_int)
+    seq(match(-1, rounds$selected$reward), n_obs + n_int)
   }
   tt <- tt[tt > settings$max_parents + 2 | tt > n_obs]
 
@@ -49,8 +57,6 @@ bandit <- function(bn.fit,
                            rounds = rounds, debug = debug)
   }
   rounds <- summarize_rounds(bn.fit = bn.fit, settings = settings, rounds = rounds)
-
-  clear_temp(settings = settings)  # clear _score/support/arp/gobnilp
 
   return(rounds)
 }
@@ -192,6 +198,8 @@ update_rounds <- function(t,
     rounds$data[t,] <- data_t
     rounds$selected$arm[t] <- a
     rounds$selected$reward[t] <- mean(data_t[[target]])
+    rounds$selected$estimate <- rounds$arms[[a]]$estimate
+    rounds$selected$criteria <- rounds$arms[[a]]$criteria
     rounds$selected$interventions[t] <- rounds$arms[[a]]$node
   }
   compute_scores(data = data, settings = settings,
@@ -210,13 +218,14 @@ update_rounds <- function(t,
   rounds$bma[t,] <- ps2es(ps = rounds$ps, settings = settings)
   rounds$mpg[t,] <- es2mpg(es = rounds$bma[t,], prob = 0.5)
 
-  rounds <- compute_int(t = t, settings = settings, rounds = rounds, debug = debug)
+  rounds <- compute_int(t = t, settings = settings,
+                        rounds = rounds, debug = debug)
   rounds$bda <- compute_bda(data = data,
                             settings = settings, rounds = rounds,
                             target = NULL, debug = debug)
 
   rounds$mds[t,] <- execute_mds(ps = rounds$ps, settings = settings,
-                                seed = t, debug = debug)
+                                seed = sample(t, size = 1), debug = debug)
   rounds$gies[t,] <- estimate_gies(ps = rounds$ps, settings = settings,
                                    interventions = interventions,
                                    dag = TRUE, debug = debug)
@@ -302,6 +311,8 @@ summarize_rounds <- function(bn.fit, settings, rounds){
   rounds$selected$simple_regret <- max_reward - rounds$selected$simple_reward
   ind_obs <- rounds$selected$interventions == ""
   rounds$selected$cumulative <- 0
+  if (rounds$selected$reward[1] == -1)
+    rounds$selected$reward[1] <- rounds$data[1, settings$target]  # reset indicator
   rounds$selected$cumulative[ind_obs] <-
     cumsum((max_reward - rounds$selected$reward)[ind_obs])
   rounds$selected$cumulative[!ind_obs] <-
@@ -538,43 +549,7 @@ initialize_rounds <- function(settings,
   list2env(settings[c("n_obs", "n_int")], envir = environment())
 
   ## borrow data from previous rounds
-  if (length(settings$rounds0)){
-
-    debug_cli(!identical(bn.fit, settings$rounds0$settings$bn.fit), cli::cli_abort,
-              "bn.fit must be identical to that of cached rounds")
-
-    nms <- names(settings$rounds0)
-    nms <- nms[!grepl("dag|settings", nms)]
-    rounds <- settings$rounds0[nms]
-
-    n_cache <- min(n_obs, settings$rounds0$settings$n_obs)
-    n_blank <- n_obs + n_int - n_cache
-
-    rounds$arms <- build_arms(bn.fit = bn.fit,
-                              settings = settings, debug = debug)
-    rounds$arms <- update_arms(t = n_obs,
-                               settings = settings, rounds = rounds)
-    rounds$selected <-
-      rbind(rounds$selected[seq_len(n_cache), seq_len(5), drop =  FALSE],
-            data.frame(arm = integer(n_blank),
-                       interventions = character(1), reward = numeric(1),
-                       simple_reward = numeric(1), time = numeric(1)))
-
-    nms <- c("data", avail_bda[-1], sprintf("beta_%s", avail_bda),
-             sprintf("mu_%s", c(avail_bda, "int", "est")),
-             sprintf("se_%s", c(avail_bda, "int", "est")))
-
-    rounds[nms] <- lapply(rounds[nms], function(x){
-
-      x <- x[seq_len(n_cache), , drop = FALSE]
-      rbind(x, matrix(0, nrow = n_blank, ncol = ncol(x)))
-    })
-    if (n_obs != settings$rounds0$settings$n_obs){
-
-      rounds$ps <- list()
-      rounds$bda <- list()
-    }
-  } else{
+  if (!length(settings$rounds0)){
 
     rounds <- list(
       arms = build_arms(bn.fit = bn.fit, settings = settings, debug = debug),
@@ -584,8 +559,9 @@ initialize_rounds <- function(settings,
                              function(x) integer(n_int), simplify = FALSE))
       ),
       selected = data.frame(arm = integer(n_obs + n_int),
-                            interventions = character(1), reward = numeric(1),
-                            simple_reward = numeric(1), time = numeric(1)),
+                            interventions = "", reward = 0,
+                            estimate = 0, criteria = 0,
+                            simple_reward = 0, time = 0),
       ps = list(),
       bda = list(),
       arp = matrix(NA, nrow = settings$nnodes, ncol = settings$nnodes),
@@ -594,6 +570,7 @@ initialize_rounds <- function(settings,
     )
     rounds$selected$reward[seq_len(n_obs)] <-
       rounds$data[[settings$target]][seq_len(n_obs)]
+    rounds$selected$reward[1] <- -1  # indicate where to begin
     rownames(rounds$arp) <- colnames(rounds$arp) <- settings$nodes
 
     rounds$mu_true <- sapply(rounds$arms, function(arm){
@@ -616,6 +593,45 @@ initialize_rounds <- function(settings,
              function(x) acal,
              simplify = FALSE, USE.NAMES = TRUE)
     )
+  } else{
+
+    debug_cli(!identical(bn.fit, settings$rounds0$settings$bn.fit), cli::cli_abort,
+              "bn.fit must be identical to that of cached rounds")
+
+    nms <- names(settings$rounds0)
+    nms <- nms[!grepl("dag|settings", nms)]
+    rounds <- settings$rounds0[nms]
+
+    n_cache <- min(n_obs, settings$rounds0$settings$n_obs)
+    n_blank <- n_obs + n_int - n_cache
+
+    rounds$arms <- build_arms(bn.fit = bn.fit,
+                              settings = settings, debug = debug)
+    rounds$arms <- update_arms(t = n_obs,
+                               settings = settings, rounds = rounds)
+    rounds$selected <-
+      rbind(rounds$selected[seq_len(n_cache),
+                            seq_len(7), drop = FALSE],
+            data.frame(arm = integer(n_blank),
+                       interventions = "", reward = 0,
+                       estimate = 0, criteria = 0,
+                       simple_reward = 0, time = 0))
+    rounds$selected$reward[n_cache + 1] <- -1  # indicate where to begin
+
+    nms <- c("data", avail_bda[-1], sprintf("beta_%s", avail_bda),
+             sprintf("mu_%s", c(avail_bda, "int", "est")),
+             sprintf("se_%s", c(avail_bda, "int", "est")))
+
+    rounds[nms] <- lapply(rounds[nms], function(x){
+
+      x <- x[seq_len(n_cache), , drop = FALSE]
+      rbind(x, matrix(0, nrow = n_blank, ncol = ncol(x)))
+    })
+    if (n_obs != settings$rounds0$settings$n_obs){
+
+      rounds$ps <- list()
+      rounds$bda <- list()
+    }
   }
   rounds$node_values <- bn.fit2values(bn.fit =
                                         bn.fit)  # used in estimate.R
@@ -654,9 +670,9 @@ build_arms <- function(bn.fit, settings, debug = 0){
         list(n = settings$n_t,  # number of trials per round
              node = node$node,  # node
              value = value,  # intervention value
-             N = ifelse(settings$optimistic == 0,
-                        0, 1),  # number of times arm is pulled
-             estimate = settings$optimistic)  # current estimate
+             N = 0,  # number of times arm is pulled
+             estimate = 0,  # current estimate
+             criteria = 0)  # criteria
       })
     }))
   } else{
@@ -705,19 +721,12 @@ check_settings <- function(settings,
               "automatically selected target = {settings$target}")
   }
 
-  ## check run
+  ## check num
   if (is.null(settings$run) ||
       settings$run < 1){
     settings$run <- 1
-    debug_cli(debug >= 3, "", "default run = {settings$run}")
+    debug_cli(debug >= 3, "", "default num = {settings$run}")
   }
-
-  ## check n_run
-  # if (is.null(settings$n_run) ||
-  #     settings$n_run < 1){
-  #   settings$n_run <- 1
-  #   debug_cli(debug >= 3, "", "default n_run = {settings$n_run}")
-  # }
 
   ## check n_obs
   if (is.null(settings$n_obs) ||
@@ -754,13 +763,6 @@ check_settings <- function(settings,
     debug_cli(debug >= 3, "", "default int_parents = {settings$int_parents}")
   }
 
-  ## check optimistic
-  if (is.null(settings$optimistic) ||
-      settings$optimistic < 0){
-    settings$optimistic <- 0
-    debug_cli(debug >= 3, "", "default optimistic = {settings$optimistic}")
-  }
-
   ## check score
   if (is.null(settings$score)){
     if (class(bn.fit)[2] == "bn.fit.gnet")
@@ -790,14 +792,6 @@ check_settings <- function(settings,
     settings$eta <- 0
     debug_cli(debug >= 3, "", "default eta = {settings$eta}")
   }
-
-  ## check borrow
-  ## TODO: remove borrow
-  # if (is.null(settings$borrow) ||
-  #     settings$borrow < 0){
-  #   settings$borrow <- 0
-  #   debug_cli(debug >= 3, "", "default borrow = {settings$borrow}")
-  # }
 
   settings[c("epsilon", "c")] <- 0
   if (settings$method == "random"){
@@ -906,11 +900,6 @@ check_settings <- function(settings,
 
     settings$data_obs <- ribn(settings$bn.fit, n = 0)
 
-  } else if (is.null(settings$data_obs) || settings$data_obs == ""){
-
-    ## generate observational data
-    settings$data_obs <- ribn(bn.fit, n = settings$n_obs)
-
   } else if (is.character(settings$data_obs)){
 
     if (dir.exists(settings$data_obs) &&
@@ -926,18 +915,19 @@ check_settings <- function(settings,
                                                   function(x) as.factor))
     }
   }
-  debug_cli(!is.data.frame(settings$data_obs), cli::cli_abort,
-            "data_obs is not a data.frame")
+  debug_cli(!is.null(settings$data_obs) && !is.data.frame(settings$data_obs),
+            cli::cli_abort, "data_obs is not a data.frame")
 
   ## TODO: remove; temporary for debugging
   settings$bn.fit <- bn.fit
 
   ## sort settings
   nms <- c("method", "target", "run", "n_obs", "n_int",
-           "n_ess", "n_t", "int_parents", "optimistic", "epsilon",
+           "n_ess", "n_t", "int_parents", "epsilon",
            "c", "score", "max_parents", "threshold", "eta",
-           "nodes", "nnodes", "type", "temp_dir", "aps_dir", "mds_dir",
-           "id", "rounds0", "data_obs")
+           "nodes", "nnodes", "type",
+           "temp_dir", "aps_dir", "mds_dir",
+           "id", "rounds0")
   settings <- settings[union(nms, c("bn.fit"))]
 
   return(settings)
