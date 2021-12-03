@@ -23,6 +23,7 @@ avail_methods <- c("cache",     # cache observational rounds
                    "greedy",    # (epsilon)-greedy interventions
                    "ucb",       # upper-confidence bounds
                    "bcb",       # bayesian causal bandit; default bma
+                   "bcb-star",  # true underlying dag
                    "bcb-bma",   # bayesian model averaging
                    "bcb-mpg",   # median probability graph
                    "bcb-mds",   # thompson sampling via modular dag sampling
@@ -32,7 +33,8 @@ avail_methods <- c("cache",     # cache observational rounds
 
 # Available back-door adjustment methods
 
-avail_bda <- c("bma",   # bayesian model averaging
+avail_bda <- c("star",  # true underlying dag
+               "bma",   # bayesian model averaging
                "mpg",   # median probability graph
                "mds",   # thompson sampling via modular dag sampling
                "gies")  # greedy interventional equivalence search
