@@ -11,8 +11,6 @@ compute_bda <- function(data,
                         settings,
                         rounds,
                         target = NULL,
-                        nig_bda = NULL,
-                        nig_est = FALSE,
                         a_0 = 1,
                         b_0 = 1,
                         m_0 = 0,
@@ -24,23 +22,12 @@ compute_bda <- function(data,
   seq_p <- seq_len(p)
   nodes <- settings$nodes
   parents <- seq_len(settings$max_parents)
-  m_00 <- m_0
-  Lambda_00 <- Lambda_0
 
-  ## use normal-inverse-gamma (nig) linear model if
-  ## observational data n < max_parents + 2
-  if (is.null(nig_bda)){
-
-    nig_bda <- any(sapply(seq_p, function(i){
-
-      sum(bool_bda(t = t, i = i, settings = settings, rounds = rounds))
-
-    }) < (settings$max_parents + 2))
-  }
   debug_cli(debug >= 3, cli::cli_alert_info,
-            c("computing back-door effects with ",
-              ifelse(nig_bda, "Bayesian Normal-inverse-gamma", "standard"),
-              " linear model"))
+            c("computing back-door adjustments with ",
+              ifelse(settings$type == "bn.fit.gnet",
+                     "Gaussian linear model",
+                     "discrete multinomial model")))
 
   ## Gaussian implementation
   if (settings$type == "bn.fit.gnet"){
@@ -80,11 +67,8 @@ compute_bda <- function(data,
       pars <- as.matrix(rounds$ps[[i]][, parents, drop = FALSE])
       temp <- bda[[i]]
       n <- sum(bool_data)
-
       i_values <- rounds$node_values[[i]]
-
       Xy <- as.matrix(data[bool_data, , drop=FALSE])
-      XytXy <- t(Xy) %*% Xy
 
       for (l in rounds$ps[[i]][, "ordering"]){
 
@@ -93,18 +77,6 @@ compute_bda <- function(data,
         k <- pars[l, !is.na(pars[l, ])]  # indices of parents
         n_parents <- length(k)  # number of parents
         ik <- c(i, k)  # predictor and parent
-
-        if (nig_bda){
-
-          # prior hyperparameters
-          m_0 <- matrix(m_00, n_parents + 1, 1)  # prior mean
-          Lambda_0 <- diag(n_parents + 1) / Lambda_00  # prior variance
-
-          # update hyperparameters
-          Lambda_n <- XytXy[ik, ik, drop = FALSE] + Lambda_0
-          a_n <- a_0 + n / 2
-          V_n <- solve(Lambda_n)
-        }
 
         ## i -> j
         for (j in if (is.null(target)) seq_p[-i] else target){
@@ -134,7 +106,7 @@ compute_bda <- function(data,
               temp[[j]]$t_bda[l] <- t
               temp[[j]]$n_bda[l] <- n
             }
-            ## compute est
+            ## compute joint estimate est
             if ((rounds$selected$arm > 0 &&
                  temp[[j]]$t_bda[l] == t) ||  # just updated bda with int data
                 rounds$selected$interventions[t] ==
@@ -142,58 +114,28 @@ compute_bda <- function(data,
 
               a <- rounds$selected$arm[t]
               value <- rounds$arms[[a]]$value
-
-              ## compute joint estimate
-              if (nig_est){
-
-                ## TODO: incomplete
-
-                b <- match(value, i_values)
-                mu_int <- rounds$mu_int[t, a]
-                n_int <- sum(rounds$selected$arm == a)
-
-                ## design prior hyperparameters with bda data
-                m_0 <- temp[[j]][[sprintf("mu%g_bda", b)]][l]
-                # nu_0 <- temp[[j]]$n_bda[l]
-                nu_0 <- temp[[j]]$xtx[l]
-                a_0 <- temp[[j]]$n_bda[l] / 2
-                b_0 <- temp[[j]]$rss[l] / 2
-
-                ## update posterior
-                m_n <- (m_0 * nu_0 + mu_int * n_int) /
-                  (nu_n <- nu_0 + n_int)
-                a_n <- a_0 + n_int / 2
-                b_n <- b_0 + sum((rounds$data[rounds$selected$arm == a,
-                                              settings$target] - mu_int)^2) / 2 +
-                  n_int * nu_0 / (nu_n) * (mu_int - m_0)^2 / 2
-
-                ## estimates
-                temp[[j]][[sprintf("mu%g_est", b)]][l] <- m_n
-                temp[[j]]$se_est[l] <- sqrt(b_n / a_n / nu_n)
-
-              } else{
-
-                ## bda
-                beta_bda <- temp[[j]]$beta_bda[l]
-                se_bda <- temp[[j]]$se_bda[l]
-                n_bda <- temp[[j]]$n_bda[l]
-
-                ## int
-                beta_int <- rounds$mu_int[t, a] * value
-                se_int <- rounds$se_int[t, a]
-                se_int <- ifelse(!is.na(se_int), se_int,
-                                 2 * (beta_int - beta_bda)^2)  # or x_int^2?
-                n_int <- sum(unlist(sapply(rounds$arms, function(arm){
-                  if (arm$node == rounds$arms[[a]]$node) arm$N
-                })))
-
-                ## est
-                beta_est <- (beta_bda * n_bda + beta_int * n_int) / (n_bda +
-                                                                       n_int)
-                se_est <- sqrt((se_bda^2 * n_bda + se_int^2 * n_int) /
-                                 (n_bda + n_int))
-              }
               temp[[j]]$t_int[l] <- t
+
+              ## bda
+              beta_bda <- temp[[j]]$beta_bda[l]
+              se_bda <- temp[[j]]$se_bda[l]
+              n_bda <- temp[[j]]$n_bda[l]
+
+              ## int
+              beta_int <- rounds$mu_int[t, a] * value
+              se_int <- rounds$se_int[t, a]
+              se_int <- ifelse(!is.na(se_int), se_int,
+                               2 * (beta_int - beta_bda)^2)  # or x_int^2?
+              n_int <- sum(unlist(sapply(rounds$arms, function(arm){
+                if (arm$node == rounds$arms[[a]]$node) arm$N
+              })))
+
+              ## est
+              beta_est <- (beta_bda * n_bda + beta_int * n_int) / (n_bda +
+                                                                     n_int)
+              se_est <- sqrt((se_bda^2 * n_bda + se_int^2 * n_int) /
+                               (n_bda + n_int))
+
             }
             ## purely observational; no intervention yet
             if (is.na(temp[[j]]$t_int[l])){
