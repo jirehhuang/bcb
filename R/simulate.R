@@ -115,7 +115,41 @@ simulate_method <- function(method_num,
 
 
 
-## TODO: sim_method_grid()
+# Simulate method grid
+#' @export
+
+sim_method_grid <- function(method,
+                            method_nums,
+                            method_grid,
+                            path,
+                            n_cores = 1,
+                            resimulate = FALSE,
+                            debug = 0){
+
+  ## write method_grid
+  write.table(method_grid, file.path(path, "method_grid.txt"))
+
+  ## execute
+  null <- lapply(method_nums, function(method_num){
+
+    settings <- as.list(method_grid[method_num,])
+    settings$method <- method
+
+    simulate_method(method_num = method_num,
+                    settings = settings,
+                    path = path,
+                    n_cores = n_cores,
+                    resimulate = resimulate,
+                    debug = debug)
+  })
+}
+
+
+
+
+######################################################################
+## Initialize and check
+######################################################################
 
 
 
