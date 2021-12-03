@@ -145,8 +145,8 @@ dir_check <- function(path,
 #' @export
 
 dir2env <- function(dir,
-                     envir = sys.frame(-1),
-                     exclude = "data"){
+                    envir = sys.frame(-1),
+                    exclude = "data"){
 
   ## TODO: rename to dir2env()
 
@@ -341,4 +341,42 @@ debug_cli_sprintf <- function(debug,
                    sprintf(fmt, ...))
     fun(msg)
   }
+}
+
+
+
+# Load projects_dir into the environment
+# TODO: remove; temporary for development
+#' @export
+
+get_projects_dir <- function(scratch = TRUE,
+                             envir = sys.frame(-1)){
+
+  user <- Sys.info()["user"]
+
+  if (user == "jireh"){
+
+    projects_dir <- "/home/jireh/Documents/ucla/research/projects"
+
+  } else if (user == "jirehhua"){
+
+    projects_dir <- ifelse(scratch, "/u/flashscratch/j/jirehhua",
+                           "/u/home/j/jirehhua/research/projects")
+
+  } else if (user == "jirehhuang"){
+
+    projects_dir <- "/Users/jirehhuang/Desktop/research/projects"
+
+  } else{
+
+    debug_cli(TRUE, cli::cli_abort,
+              "invalid user")
+  }
+  debug_cli(TRUE, cli::cli_alert_info,
+            "user = {user}, projects_dir = {projects_dir}")
+
+  list2env(x = list(projects_dir = projects_dir),
+           envir = envir)
+
+  return(projects_dir)
 }
