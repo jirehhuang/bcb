@@ -902,7 +902,7 @@ check_settings <- function(settings,
 
   } else if (is.character(settings$data_obs)){
 
-    if (dir.exists(settings$data_obs) &&
+    if (file.exists(settings$data_obs) &&
         (file.exists(fp <-
                      file.path(settings$data_obs, sprintf("data%s.txt",
                                                           settings$run)))) ||
@@ -927,7 +927,7 @@ check_settings <- function(settings,
            "c", "score", "max_parents", "threshold", "eta",
            "nodes", "nnodes", "type",
            "temp_dir", "aps_dir", "mds_dir",
-           "id", "rounds0")
+           "id", "rounds0", "data_obs")
   settings <- settings[union(nms, c("bn.fit"))]
 
   return(settings)
