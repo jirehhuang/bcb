@@ -8,8 +8,10 @@
 
 bandit <- function(bn.fit,
                    settings = list(),
+                   seed = 1,
                    debug = 0){
 
+  set.seed(seed)
   start_time <- Sys.time()
 
   ## check arguments and initialize
@@ -21,19 +23,13 @@ bandit <- function(bn.fit,
   ## load settings
   list2env(settings[c("n_obs", "n_int")], envir = environment())
 
-  ## TODO: set seed
-
   tt <- if (settings$method == "cache"){
 
     seq_len(n_obs)
 
-  } else if (! length(rounds$bda)){
-
-    seq_len(n_int + n_obs)
-
   } else{
 
-    seq_len(n_int) + n_obs
+    seq(match(0, rounds$selected$reward), n_obs + n_int)
   }
   tt <- tt[tt > settings$max_parents + 2 | tt > n_obs]
 
@@ -140,7 +136,6 @@ update_arms <- function(t,
         rounds$arms[[a]]$estimate <- rounds$mu_int[t, a]
       }
       rounds$arms[[a]]$N <-
-        # rounds$arms[[a]]$N + 1 * (rounds$selected$arm[t] == a)
         sum(rounds$selected$arm == a)
     }
   } else if (settings$type == "bn.fit.dnet"){
@@ -545,13 +540,40 @@ initialize_rounds <- function(settings,
   ## borrow data from previous rounds
   if (length(settings$rounds0)){
 
-    debug_cli(n_obs > settings$rounds0$settings$n_obs, cli::cli_abort,
-              "attempting to borrow {n_obs} > {settings$rounds$n_obs} observations")
+    debug_cli(!identical(bn.fit, settings$rounds0$settings$bn.fit), cli::cli_abort,
+              "bn.fit must be identical to that of cached rounds")
 
-    ## TODO: borrow previous rounds
+    nms <- names(settings$rounds0)
+    nms <- nms[!grepl("dag|settings", nms)]
+    rounds <- settings$rounds0[nms]
 
-    browser()
+    n_cache <- min(n_obs, settings$rounds0$settings$n_obs)
+    n_blank <- n_obs + n_int - n_cache
 
+    rounds$arms <- build_arms(bn.fit = bn.fit,
+                              settings = settings, debug = debug)
+    rounds$arms <- update_arms(t = n_obs,
+                               settings = settings, rounds = rounds)
+    rounds$selected <-
+      rbind(rounds$selected[seq_len(n_cache), seq_len(5), drop =  FALSE],
+            data.frame(arm = integer(n_blank),
+                       interventions = character(1), reward = numeric(1),
+                       simple_reward = numeric(1), time = numeric(1)))
+
+    nms <- c("data", avail_bda[-1], sprintf("beta_%s", avail_bda),
+             sprintf("mu_%s", c(avail_bda, "int", "est")),
+             sprintf("se_%s", c(avail_bda, "int", "est")))
+
+    rounds[nms] <- lapply(rounds[nms], function(x){
+
+      x <- x[seq_len(n_cache), , drop = FALSE]
+      rbind(x, matrix(0, nrow = n_blank, ncol = ncol(x)))
+    })
+    if (n_obs != settings$rounds0$settings$n_obs){
+
+      rounds$ps <- list()
+      rounds$bda <- list()
+    }
   } else{
 
     rounds <- list(
@@ -564,7 +586,6 @@ initialize_rounds <- function(settings,
       selected = data.frame(arm = integer(n_obs + n_int),
                             interventions = character(1), reward = numeric(1),
                             simple_reward = numeric(1), time = numeric(1)),
-      node_values = bn.fit2values(bn.fit = bn.fit),  # used in estimate.R
       ps = list(),
       bda = list(),
       arp = matrix(NA, nrow = settings$nnodes, ncol = settings$nnodes),
@@ -573,6 +594,7 @@ initialize_rounds <- function(settings,
     )
     rounds$selected$reward[seq_len(n_obs)] <-
       rounds$data[[settings$target]][seq_len(n_obs)]
+    rownames(rounds$arp) <- colnames(rounds$arp) <- settings$nodes
 
     rounds$mu_true <- sapply(rounds$arms, function(arm){
 
@@ -586,7 +608,7 @@ initialize_rounds <- function(settings,
     rounds <- c(
       rounds,
       sapply(c(avail_bda[-1],
-               sprintf("beta_%s", c(avail_bda))),
+               sprintf("beta_%s", avail_bda)),
              function(x) pxp,
              simplify = FALSE, USE.NAMES = TRUE),
       sapply(c(sprintf("mu_%s", c(avail_bda, "int", "est")),
@@ -594,8 +616,9 @@ initialize_rounds <- function(settings,
              function(x) acal,
              simplify = FALSE, USE.NAMES = TRUE)
     )
-    rownames(rounds$arp) <- colnames(rounds$arp) <- settings$nodes
   }
+  rounds$node_values <- bn.fit2values(bn.fit =
+                                        bn.fit)  # used in estimate.R
   return(rounds)
 }
 
