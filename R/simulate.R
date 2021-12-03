@@ -10,10 +10,9 @@ simulate_method <- function(method_num,
 
   ## method
   method <- settings$method
-  settings$temp_dir <- file.path(path, "temp")
   method_dir <- file.path(path, sprintf("%s%s", method, method_num))
-  dir_check(method_dir)
-  dir_check(file.path(path, "progress"))
+  settings$temp_dir <- file.path(method_dir, "progress")
+  dir_check(file.path(method_dir, "progress"))  # create method_dir and add progress
 
   ## data_grid
   data_grid <- read.table(file.path(path, "data_grid.txt"))
@@ -77,24 +76,49 @@ simulate_method <- function(method_num,
         }
 
         ## keep track of whether in progress
-        progressi <- file.path(path, "progress", sprintf("progress%g.txt",
-                                                         i))
-        if (file.exists(progressi)) return(NULL)  # skip if in progress or complete
+        progressi <- file.path(method_dir, "progress",
+                               sprintf("progress%g", i))
+        if (file.exists(progressi))
+          return(NULL)  # skip if in progress or complete
         write.table(x = 0, file = progressi,  # mark as in progress
                     row.names = FALSE, col.names = FALSE)
+        ## TODO: delete doesn't always work when manually stop multi-core
         on.exit(expr = {  # delete if failed before completion
-          if (!file.exists(rounds_rds))
-            file.remove(progressi)
-        })
 
+          if (!file.exists(rounds_rds)){
+
+            file.remove(progressi)
+
+          } else{
+
+            write.table(x = 1, file = progressi,  # mark as complete
+                        row.names = FALSE, col.names = FALSE)
+          }
+        })
         debug_cli(debug, "",
                   "{i} executing {method}{method_num} on dataset {j} of {data_row$n_dat} for network {data_row$network}",
                   .envir = environment())
 
+        ## settings
         bn.fit <- readRDS(file.path(data_dir, "bn.fit.rds"))
-        settings$rounds0 <- readRDS(file.path(data_dir, "rds",
-                                              sprintf("rounds%g.rds", j)))
+        if (method == "cache"){
+
+          settings$n_obs <- min(settings$n_obs, data_row$n_obs)
+
+        } else{
+
+          cache_data_dir <- gsub(sprintf("%s%s", method, method_num),
+                                 "cache", method_data_dir)
+          cache_file <- file.path(cache_data_dir, "rds",
+                                  sprintf("rounds%g.rds", j))
+          if (file.exists(cache_file))
+            settings$rounds0 <- readRDS(cache_file)
+        }
+        settings$target <- data_row$target
         settings$run <- j
+        settings$data_obs <- file.path(data_dir,
+                                       sprintf("data%g.txt", j))
+        # set <- check_settings(settings = settings, bn.fit = bn.fit)
 
         ## execute bandit
         roundsj <- bandit(bn.fit = bn.fit, settings = settings,
