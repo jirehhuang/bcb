@@ -181,6 +181,132 @@ sim_method_grid <- function(method,
 
 
 
+# Get progress
+
+get_progress <- function(path,
+                         method = "all",
+                         data_grid){
+
+  ## TODO: remove; temporary for development
+  if (!dir.exists(path)){
+
+    path <- file.path(get_projects_dir(debug = 0),
+                      "current","simulations", path)
+  }
+  methods <- list.files(path)
+  methods <- methods[grepl(paste(avail_methods,
+                                 collapse = "|"), methods)]
+  if (method != "all"){
+
+    methods <- match.arg(method, methods)
+  }
+  progress <- sapply(methods, function(method){
+
+    temp <- lapply(seq_len(nrow(data_grid)), function(i){
+
+      data_row <- data_grid[i,]
+      method_data_dir <- file.path(path, method,
+                                   sprintf("%s%g_%s_%g",
+                                           data_row$index, data_row$id,
+                                           data_row$network, data_row$n_obs))
+      ## proportion of completed rds files
+      length(list.files(file.path(method_data_dir,
+                                  "rds"))) / data_row$n_dat
+    })
+    temp <- do.call(rbind,
+                    temp)
+    return(temp)
+  })
+  ## add average progress for each method (Total)
+  progress <- rbind(progress, colMeans(progress))
+
+  ## add proportion of incomplete (in progress) executions
+  progress <- rbind(progress, sapply(methods, function(method){
+
+    progress_files <- list.files(file.path(path, method, "progress"))
+    progress_files <- progress_files[grepl("progress", progress_files)]
+    sum(sapply(progress_files, function(x)
+      read.table(file.path(path, method, "progress", x))) == 0)
+
+  }) / sum(data_grid$n_dat))
+
+  ## add average progress for all methods
+  progress <- cbind(progress, rowMeans(progress))
+
+  ## format
+  width <- 5
+  progress <- apply(format(progress, digits = 2, nsmall = 2), 1,
+                    function(x) stringr::str_pad(x, width = width, side = "right"))
+  progress <- as.data.frame(progress)
+
+  nc <- max(nchar(c(methods, "total")))
+  rownames(progress) <- stringr::str_pad(c(methods, "total"),
+                                         width = nc, side = "right")
+  colnames(progress) <- c(stringr::str_pad(stringr::str_pad("1", width = nc+2,
+                                                            side = "left"),
+                                           width = nc + width + 1, side = "right"),
+                          stringr::str_pad(seq_len(ncol(progress)-2)[-1],
+                                           width = width, side = "right"),
+                          "total", "incomplete")
+  return(progress)
+}
+
+
+
+# Clear path
+#' @export
+
+clear_path <- function(path,
+                       method = "all",
+                       clear_type = c("incomplete", "all"),
+                       match_type = c("multiple", "single"),
+                       debug = 1){
+
+  clear_type <- match.arg(clear_type)
+  match_type <- match.arg(match_type)
+
+  ## TODO: remove; temporary for development
+  if (!dir.exists(path)){
+
+    path <- file.path(get_projects_dir(debug = 0),
+                      "current","simulations", path)
+  }
+  methods <- list.files(path)
+  methods <- methods[grepl(paste(avail_methods,
+                                 collapse = "|"), methods)]
+  if (method != "all"){
+
+    methods <- switch(match_type,
+                      multiple = methods[grepl(method, methods)],
+                      single = match.arg(method, methods))
+  }
+  debug_cli(debug && length(methods), cli::cli_alert_info,
+            c("clearing {clear_type} files ",
+              "for method(s): {paste(methods, collapse = ', ')}"))
+
+  for (method in methods){
+
+    progress_dir <- file.path(path, method, "progress")
+    files <- list.files(progress_dir)
+    files <- files[grepl("progress", files)]
+
+    for (file in files){
+
+      progressi <- file.path(progress_dir, file)
+
+      if ((method != "cache" && clear_type == "all") ||
+          any(read.table(progressi) == 0)){
+
+        debug_cli(debug, cli::cli_alert,
+                  "deleting `{file}` for `{method}`")
+        file.remove(progressi)
+      }
+    }
+  }
+}
+
+
+
 
 ######################################################################
 ## Initialize and check
