@@ -250,7 +250,7 @@ load_example <- function(eg = c("gnet"),
     settings <- list(method = method, n_obs = 100, n_int = 100,
                      score = score, max_parents = 5, nodes = names(data),
                      temp_dir = temp_dir)
-    settings <- bcb:::check_settings(bn.fit = bn.fit, settings = settings)
+    settings <- check_settings(bn.fit = bn.fit, settings = settings)
 
     objs <- list(bn.fit = bn.fit,
                  data = data,
@@ -380,55 +380,4 @@ get_projects_dir <- function(scratch = TRUE,
            envir = envir)
 
   return(projects_dir)
-}
-
-
-
-# Clear method
-#' @export
-
-clear_path <- function(path,
-                       method = "all",
-                       clear_type = c("incomplete", "all"),
-                       match_type = c("multiple", "single"),
-                       debug = 1){
-
-  clear_type <- match.arg(clear_type)
-  match_type <- match.arg(match_type)
-
-  ## TODO: remove; temporary for development
-  if (!dir.exists(path)){
-
-    path <- file.path(get_projects_dir(debug = 0),
-                      "current","simulations", path)
-  }
-  folders <- list.files(path)
-  folders <- folders[grepl(paste(bcb:::avail_methods,
-                                 collapse = "|"), folders)]
-  if (method != "all"){
-
-    folders <- switch(match_type,
-                      multiple = folders[grepl(method, folders)],
-                      single = match.arg(method, folders))
-  }
-  debug_cli(debug && length(folders), cli::cli_alert_info,
-            c("clearing {clear_type} files ",
-              "for method(s): {paste(folders, collapse = ', ')}"))
-
-  for (folder in folders){
-
-    progress_dir <- file.path(path, folder, "progress")
-    files <- list.files(progress_dir)
-
-    for (file in files){
-
-      progressi <- file.path(progress_dir, file)
-
-      if (clear_type == "all" ||
-          read.table(progressi) == 0){
-
-        file.remove(progressi)
-      }
-    }
-  }
 }

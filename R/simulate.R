@@ -16,7 +16,7 @@ simulate_method <- function(method_num,
 
   ## data_grid
   data_grid <- read.table(file.path(path, "data_grid.txt"))
-  write.table(data_grid, file.path(method_dir, "data_grid.txt"))
+  write.table(x = data_grid, file = file.path(method_dir, "data_grid.txt"))
 
   ## expand data.grid so one dataset per thread
   dataset_grid <- do.call(
@@ -94,16 +94,18 @@ simulate_method <- function(method_num,
             write.table(x = 1, file = progressi,  # mark as complete
                         row.names = FALSE, col.names = FALSE)
           }
-        })
+        }, add = TRUE)
         debug_cli(debug, "",
                   "{i} executing {method}{method_num} on dataset {j} of {data_row$n_dat} for network {data_row$network}",
                   .envir = environment())
 
         ## settings
         bn.fit <- readRDS(file.path(data_dir, "bn.fit.rds"))
+        seed0 <- data_row$seed
         if (method == "cache"){
 
           settings$n_obs <- min(settings$n_obs, data_row$n_obs)
+          seed0 <- seed0 - settings$n_obs
 
         } else{
 
@@ -118,11 +120,10 @@ simulate_method <- function(method_num,
         settings$run <- j
         settings$data_obs <- file.path(data_dir,
                                        sprintf("data%g.txt", j))
-        # set <- check_settings(settings = settings, bn.fit = bn.fit)
 
         ## execute bandit
         roundsj <- bandit(bn.fit = bn.fit, settings = settings,
-                          seed0 = data_row$seed, debug = debug)
+                          seed0 = seed0, debug = debug)
 
         ## write results in folder roundsj and as roundsj.rds
         write_rounds(rounds = roundsj, where = file.path(method_data_dir, "txt",
@@ -130,13 +131,23 @@ simulate_method <- function(method_num,
         dir_check(file.path(method_data_dir, "rds"))
         write_rounds(rounds = roundsj, where = rounds_rds)
 
-        # browser()
+        ## write progress
+        progress <- get_progress(path = path, data_grid = data_grid)
+        write.table(x = progress, file = file.path(path, "progress.txt"),
+                    quote = FALSE, row.names = TRUE, col.names = TRUE)
 
-        ## TODO: progress
+        k <- trimws(rownames(progress)) == sprintf("%s%s", method,
+                                                   method_num)
+        last2 <- ncol(progress) - c(1, 0)
+        debug_cli(TRUE, cli::cli_alert,
+                  c("{sprintf('%s%s', method, method_num)} || ",
+                    "{paste(unlist(progress[k, -last2]), collapse = ' | ')} || ",
+                    "{paste(unlist(progress[k, last2]), collapse = ' | ')}"),
+                  .envir = environment())
 
         return(NULL)
-      }
-      , error = function(err){
+
+      }, error = function(err){
 
         debug_cli(TRUE, cli::cli_alert_danger, "error in {i}: {err}",
                   .envir = environment())
@@ -146,6 +157,10 @@ simulate_method <- function(method_num,
   }
   null <- mclapply(seq_len(nrow(dataset_grid)), mc.cores = n_cores,
                    mc.preschedule = FALSE, sim_fn)
+  ## write progress
+  progress <- get_progress(path = path, data_grid = data_grid)
+  write.table(x = progress, file = file.path(path, "progress.txt"),
+              quote = FALSE, row.names = TRUE, col.names = TRUE)
 }
 
 
@@ -162,7 +177,8 @@ sim_method_grid <- function(method,
                             debug = 0){
 
   ## write method_grid
-  write.table(method_grid, file.path(path, "method_grid.txt"))
+  method_grid <- check_method_grid(method_grid = method_grid)
+  write.table(x = method_grid, file = file.path(path, "method_grid.txt"))
 
   ## execute
   null <- lapply(method_nums, function(method_num){
