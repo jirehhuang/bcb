@@ -427,17 +427,17 @@ ribn <- function(x,
 
 
 
-#' Build data grid.
-#'
-#' Builds and formats a data grid of simulations.
-#'
-#' @param network character value indicating network name.
-#' @param debug logical value that activates printing debugging output.
-#' @return data.frame with grid of network settings.
-#' @author Jireh Huang (\email{jirehhuang@@ucla.edu})
-#' @examples
-#' ## Default data_grid
-#' build_data_grid()
+# Build data grid.
+#
+# Builds and formats a data grid of simulations.
+#
+# @param network character value indicating network name.
+# @param debug logical value that activates printing debugging output.
+# @return data.frame with grid of network settings.
+# @author Jireh Huang (\email{jirehhuang@@ucla.edu})
+# @examples
+# ## Default data_grid
+# build_data_grid()
 #' @export
 
 build_data_grid <- function(network = "survey",
