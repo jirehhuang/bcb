@@ -38,8 +38,8 @@ gen_data_grid <- function(data_grid = build_data_grid(),
   }
   data_grid <- check_data_grid(data_grid)
   data_grid$seed <- seed0 + data_grid$id
-  write.table(data_grid,  # write initial data_grid settings
-              file.path(path, "data_grid0.txt"))
+  write.table(x = data_grid,  # write initial data_grid settings
+              file = file.path(path, "data_grid0.txt"))
 
   ## set up parallel execution
   if (n_cores < 1)
@@ -84,7 +84,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
                     "{i} previously prepared network {data_row$network}",
                     .envir = environment())
 
-          write.table(data_row, file.path(data_dir, "data_row.txt"))
+          write.table(x = data_row, file = file.path(data_dir, "data_row.txt"))
 
           return(data_row)
         }
@@ -179,7 +179,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
   data_rows <- mclapply(seq_len(nrow(data_grid)), mc.cores = n_cores,
                         mc.preschedule = FALSE, net_fn)
   data_grid <- as.data.frame(data.table::rbindlist(data_rows))
-  write.table(data_grid, dg_path)
+  write.table(x = data_grid, file = dg_path)
 
   ## expand data.grid so one dataset per thread
   dataset_grid <- do.call(
@@ -273,7 +273,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
             }
           }
           ## write data
-          write.table(data, data_file)
+          write.table(x = data, file = data_file)
 
           ## compute log-likelihood
           true_scores[j, "loglik"] <- bnlearn:::logLik.bn.fit(bn.fit, data)
@@ -287,8 +287,8 @@ gen_data_grid <- function(data_grid = build_data_grid(),
           log(nrow(data)) / 2 * bnlearn::nparams(bn.fit)
 
         ## write scores
-        write.table(true_scores, file.path(data_dir,
-                                           sprintf("true_scores.txt")))
+        write.table(x = true_scores, file = file.path(data_dir,
+                                                      sprintf("true_scores.txt")))
 
         return(NULL)
       }

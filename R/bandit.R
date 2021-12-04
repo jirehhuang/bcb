@@ -23,7 +23,8 @@ bandit <- function(bn.fit,
   if (is.null(settings$data_obs))
     settings$data_obs <- ribn(x = bn.fit,
                               n = settings$n_obs)
-  on.exit(clear_temp(settings = settings)) # score/support/arp/gobnilp
+  on.exit(clear_temp(settings = settings),
+          add = TRUE) # score/support/arp/gobnilp
 
   rounds <- initialize_rounds(settings = settings,
                               bn.fit = bn.fit, debug = debug)
