@@ -104,7 +104,9 @@ dir_check <- function(path,
                       min_depth = 2){
 
   ## append path to getwd() if home directory not included
-  if (! grepl(path.expand("~"), path)){
+  ## TODO: revert; temporary for development
+  # if (! grepl(path.expand("~"), path)){
+  if (! grepl(get_projects_dir(debug = 0), path)){
     path <- file.path(getwd(), path)
   }
   folders <- strsplit(path, split = .Platform$file.sep)[[1]]
