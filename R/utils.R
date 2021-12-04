@@ -350,7 +350,8 @@ debug_cli_sprintf <- function(debug,
 #' @export
 
 get_projects_dir <- function(scratch = TRUE,
-                             envir = sys.frame(-1)){
+                             envir = sys.frame(-1),
+                             debug = 1){
 
   user <- Sys.info()["user"]
 
@@ -372,11 +373,62 @@ get_projects_dir <- function(scratch = TRUE,
     debug_cli(TRUE, cli::cli_abort,
               "invalid user")
   }
-  debug_cli(TRUE, cli::cli_alert_info,
+  debug_cli(debug, cli::cli_alert_info,
             "user = {user}, projects_dir = {projects_dir}")
 
   list2env(x = list(projects_dir = projects_dir),
            envir = envir)
 
   return(projects_dir)
+}
+
+
+
+# Clear method
+#' @export
+
+clear_path <- function(path,
+                       method = "all",
+                       clear_type = c("incomplete", "all"),
+                       match_type = c("multiple", "single"),
+                       debug = 1){
+
+  clear_type <- match.arg(clear_type)
+  match_type <- match.arg(match_type)
+
+  ## TODO: remove; temporary for development
+  if (!dir.exists(path)){
+
+    path <- file.path(get_projects_dir(debug = 0),
+                      "current","simulations", path)
+  }
+  folders <- list.files(path)
+  folders <- folders[grepl(paste(bcb:::avail_methods,
+                                 collapse = "|"), folders)]
+  if (method != "all"){
+
+    folders <- switch(match_type,
+                      multiple = folders[grepl(method, folders)],
+                      single = match.arg(method, folders))
+  }
+  debug_cli(debug && length(folders), cli::cli_alert_info,
+            c("clearing {clear_type} files ",
+              "for method(s): {paste(folders, collapse = ', ')}"))
+
+  for (folder in folders){
+
+    progress_dir <- file.path(path, folder, "progress")
+    files <- list.files(progress_dir)
+
+    for (file in files){
+
+      progressi <- file.path(progress_dir, file)
+
+      if (clear_type == "all" ||
+          read.table(progressi) == 0){
+
+        file.remove(progressi)
+      }
+    }
+  }
 }
