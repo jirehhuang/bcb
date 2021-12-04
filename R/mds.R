@@ -152,7 +152,43 @@ compile_mds <- function(mds_dir = get_mds(dir = TRUE),
 
 
 
-## TODO: recompile_mds()
+# Recompile mds using make
+
+recompile_mds <- function(mds_dir = get_mds(dir = TRUE),
+                          mds0_dir = sprintf("%s0", mds_dir),
+                          debug = 0){
+
+  debug_cli(!dir.exists(mds0_dir), cli::cli_abort,
+            "invalid mds0 directory")
+
+  debug_cli(debug, cli::cli_alert_info,
+            "recompiling {.pkg mds} using make")
+
+  debug_cli(debug, cli::cli_alert,
+            "clearing compiled {.pkg mds} directory")
+
+  null <- sapply(file.path(mds_dir, "src",
+                           list.files(file.path(mds_dir, "src"))), file.remove)
+  null <- sapply(file.path(mds_dir, setdiff(list.files(mds_dir),
+                                            "src")), file.remove)
+
+  debug_cli(debug, cli::cli_alert,
+            "copying mds0 directory to {.pkg mds}")
+
+  null <- sapply(list.files(file.path(mds0_dir, "src")), function(file){
+
+    file.copy(file.path(mds0_dir, "src", file),
+              file.path(mds_dir, "src", file))
+  })
+  null <- sapply(list.files(mds0_dir), function(file){
+
+    file.copy(file.path(mds0_dir, file),
+              file.path(mds_dir, file))
+  })
+
+  compile_mds(mds_dir = mds_dir,
+              debug = debug)
+}
 
 
 
