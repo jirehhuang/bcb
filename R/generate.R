@@ -303,74 +303,14 @@ gen_data_grid <- function(data_grid = build_data_grid(),
   null <- mclapply(seq_len(nrow(data_grid)), mc.cores = n_cores,
                    mc.preschedule = FALSE, gen_fn)
 
-  ## TODO: execute simulate_method, with method = "cache"
-
-  ## function for caching observational rounds
-  obs_fn <- function(i){
-
-    error <- tryCatch(
-      {
-        ## prepare data row and directory
-        data_row <- dataset_grid[i, , drop = FALSE]
-        data_dir <- file.path(path,
-                              sprintf("%s%g_%s_%g",
-                                      data_row$index, data_row$id,
-                                      data_row$network, data_row$n_obs))
-        dir_check(data_dir)
-        dir_check(file.path(data_dir, "rds"))
-
-        if (data_row$n_obs <= 0 ||
-            data_row$n_dat <= 0)
-          return(NULL)
-
-        j <- data_row$dataset
-        if (!recache &
-            file.exists(file.path(data_dir, "rds",
-                                  sprintf("rounds%g.rds", j)))){
-
-          debug_cli(debug, cli::cli_alert_success,
-                    "{i} already cached rounds {j} of {data_row$n_dat} for network {data_row$network}",
-                    .envir = environment())
-
-          return(NULL)
-        }
-
-        debug_cli(debug, "",
-                  "{i} caching rounds {j} of {data_row$n_dat} for network {data_row$network}",
-                  .envir = environment())
-
-        ## read bn.fit object
-        bn.fit <- readRDS(file.path(data_dir, "bn.fit.rds"))
-
-        settings <- list(method = "cache", target = data_row$target,
-                         run = j, n_obs = data_row$n_obs, n_int = 0)
-        settings <- check_settings(bn.fit = bn.fit,
-                                   settings = settings, debug = debug)
-
-        ## execute bandit
-        roundsj <- bandit(bn.fit = bn.fit, settings = settings,
-                          seed0 = seed0, debug = debug)
-
-        ## write results in folder roundsj and as roundsj.rds
-        write_rounds(rounds = roundsj,
-                     where = file.path(data_dir, "txt",
-                                       sprintf("rounds%g", j)))
-        write_rounds(rounds = roundsj,
-                     where = file.path(data_dir, "rds",
-                                       sprintf("rounds%g.rds", j)))
-
-        return(NULL)
-      }
-      , error = function(err){
-
-        debug_cli(TRUE, cli::cli_alert_danger, "error in {i}: {err}",
-                  .envir = environment())
-        browser()
-      }
-    )
-  }
-  null <- mclapply(seq_len(nrow(dataset_grid)), mc.cores = n_cores,
-                   mc.preschedule = FALSE, obs_fn)
+  settings <- list(method = "cache",
+                   n_obs = max(data_grid$n_obs), n_int = 0)
+  simulate_method(method_num = "",
+                  settings = settings,
+                  path = path,
+                  n_cores = n_cores,
+                  resimulate = recache,
+                  debug = debug)
 }
 
 
