@@ -17,7 +17,7 @@ execute_mds <- function(ps,
   ## TODO: remove; temporary because mds not working for hoffman2
   if (Sys.info()["user"] == "jirehhua"){
 
-    debug_cli(TRUE, cli::cli_alert_warning,
+    debug_cli(debug >= 2, cli::cli_alert_warning,
               "{.pkg mds} not yet supported on hoffman2")
 
     ## return empty graph
@@ -144,7 +144,7 @@ compile_mds <- function(mds_dir = get_mds(dir = TRUE),
   ## TODO: remove; temporary because mds not working for hoffman2
   if (Sys.info()["user"] == "jirehhua"){
 
-    debug_cli(TRUE, cli::cli_alert_warning,
+    debug_cli(debug >= 2, cli::cli_alert_warning,
               "{.pkg mds} not yet supported on hoffman2")
 
     return(NULL)
