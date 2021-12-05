@@ -3,10 +3,29 @@
 
 simulate_method <- function(method_num,
                             settings,
-                            path,
+                            path = NULL,
                             n_cores = 1,
                             resimulate = FALSE,
                             debug = 0){
+
+  ## initialize output directory
+  if (is.null(path)){
+
+    ## default directory
+    ## TODO: revert; temporary for development
+    # path <- file.path(getwd(), "simulations", Sys.time())
+    path <- file.path(get_projects_dir(debug = 0),
+                      "current", "simulations", Sys.time())
+
+  } else if (!dir.exists(path) &&
+             ## TODO: revert; temporary for development
+             # ! grepl(path.expand("~"), path)){
+             ! grepl(get_projects_dir(debug = 0), path)){
+
+    ## append dir to getwd() if home directory not included
+    path <- file.path(getwd(), path)
+  }
+  dir_check(path)
 
   ## method
   method <- settings$method
@@ -64,7 +83,7 @@ simulate_method <- function(method_num,
         method_data_dir <- file.path(method_dir, nm)
 
         j <- data_row$dataset
-        if (!resimulate &  # to create rounds_dir
+        if (!resimulate &  # to create rounds_rds
             file.exists(rounds_rds <- file.path(method_data_dir, "rds",
                                                 sprintf("rounds%g.rds", j)))){
 
@@ -78,7 +97,7 @@ simulate_method <- function(method_num,
         ## keep track of whether in progress
         progressi <- file.path(method_dir, "progress",
                                sprintf("progress%g", i))
-        if (file.exists(progressi))
+        if (!resimulate && file.exists(progressi))
           return(NULL)  # skip if in progress or complete
         write.table(x = 0, file = progressi,  # mark as in progress
                     row.names = FALSE, col.names = FALSE)
@@ -252,18 +271,21 @@ get_progress <- function(path,
   ## format
   width <- 5
   progress <- apply(format(progress, digits = 2, nsmall = 2), 1,
-                    function(x) stringr::str_pad(x, width = width, side = "right"))
+                    function(x) stringr::str_pad(x, width = width,
+                                                 side = "right"))
   progress <- as.data.frame(progress)
 
   nc <- max(nchar(c(methods, "total")))
   rownames(progress) <- stringr::str_pad(c(methods, "total"),
                                          width = nc, side = "right")
-  colnames(progress) <- c(stringr::str_pad(stringr::str_pad("1", width = nc+2,
-                                                            side = "left"),
-                                           width = nc + width + 1, side = "right"),
-                          stringr::str_pad(seq_len(ncol(progress)-2)[-1],
-                                           width = width, side = "right"),
-                          "total", "incomplete")
+  colnames(progress) <- c(
+    stringr::str_pad(stringr::str_pad("1", width = nc+2,
+                                      side = "left"),
+                     width = nc + width + 1, side = "right"),
+    stringr::str_pad(seq_len(ncol(progress)-2)[-1],
+                     width = width, side = "right"),
+    "total", "incomplete"
+  )
   return(progress)
 }
 

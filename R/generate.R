@@ -14,12 +14,15 @@ gen_data_grid <- function(data_grid = build_data_grid(),
   if (is.null(path)){
 
     ## default directory
+    ## TODO: revert; temporary for development
     # path <- file.path(getwd(), "simulations", Sys.time())
-    path <- file.path(path.expand("~"),  # TODO: change this back
-                      "Documents/ucla/research/projects/current",
-                      "simulations", Sys.time())
+    path <- file.path(get_projects_dir(debug = 0),
+                      "current", "simulations", Sys.time())
 
-  } else if (! grepl(path.expand("~"), path)){
+  } else if (!dir.exists(path) &&
+             ## TODO: revert; temporary for development
+             # ! grepl(path.expand("~"), path)){
+             ! grepl(get_projects_dir(debug = 0), path)){
 
     ## append dir to getwd() if home directory not included
     path <- file.path(getwd(), path)
