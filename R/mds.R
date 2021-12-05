@@ -14,6 +14,16 @@ execute_mds <- function(ps,
   debug_cli(debug >= 2, cli::cli_alert_info,
             "sampling DAG with {.pkg mds}")
 
+  ## TODO: remove; temporary because mds not working for hoffman2
+  if (Sys.info()["user"] == "jirehhua"){
+
+    debug_cli(TRUE, cli::cli_alert_warning,
+              "{.pkg mds} not yet supported on hoffman2")
+
+    ## return empty graph
+    return(bnlearn::amat(bnlearn::empty.graph(nodes = settings$nodes)))
+  }
+
   temp_file <- file.path(settings$temp_dir, settings$id)
   gob <- ps2gobnilp(ps = ps, settings = settings, debug = debug)
 
@@ -29,11 +39,6 @@ execute_mds <- function(ps,
                                          seed))
   end_time <- Sys.time()
   sampler_time <- as.numeric(end_time - start_time, units = "secs")
-
-  # browser()  # TODO: temporary for debugging
-
-  # text <- sys::as_text(sampler$stdout)
-  # return(Reduce(`+`, lapply(text, sampler2amat)) / length(text))
 
   ## convert to amat
   text <- sys::as_text(sampler$stdout)
@@ -136,6 +141,15 @@ compile_mds <- function(mds_dir = get_mds(dir = TRUE),
   debug_cli(debug >= 2, cli::cli_alert_info,
             "compiling {.pkg mds} using make")
 
+  ## TODO: remove; temporary because mds not working for hoffman2
+  if (Sys.info()["user"] == "jirehhua"){
+
+    debug_cli(TRUE, cli::cli_alert_warning,
+              "{.pkg mds} not yet supported on hoffman2")
+
+    return(NULL)
+  }
+
   ## check operating system
   check_os()
 
@@ -157,6 +171,8 @@ compile_mds <- function(mds_dir = get_mds(dir = TRUE),
 recompile_mds <- function(mds_dir = get_mds(dir = TRUE),
                           mds0_dir = sprintf("%s0", mds_dir),
                           debug = 0){
+
+  ## TODO: mds0 should be modified, not the original
 
   debug_cli(!dir.exists(mds0_dir), cli::cli_abort,
             "invalid mds0 directory")
