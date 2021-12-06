@@ -87,15 +87,85 @@ apply_method <- function(t,
   } else{
 
     ## choose arm
-    if (method == "random"){
+    if (grepl("bcb", method)){
 
-      ## select random arm
-      a <- sample(seq_len(length(rounds$arms)), 1)
-      if (debug)
-        cat(sprintf("random: Intervention %s = %s with estimated = %s\n",
-                    rounds$arms[[a]]$node, rounds$arms[[a]]$value,
-                    rounds$arms[[a]]$estimate))
+      mu <- rounds$mu_est[t-1,]
+      se <- rounds$se_est[t-1,]
+      criteria <-
+        mu + se * settings$c * sqrt(log(t - settings$n_obs))
+
+    } else if (method == "random"){
+
+      criteria <- rep(0, length(rounds$arms))
+
+    } else if (method == "greedy"){
+
+      if (runif(1) < settings$epsilon){
+
+        criteria <- rep(0, length(rounds$arms))
+
+      } else{
+
+        criteria <- rounds$mu_int[t-1,]
+      }
+    } else if (method == "ucb"){
+
+      mu <- rounds$mu_int[t-1,]
+      N <- pmax(1, sapply(rounds$arms, `[[`, "N"))
+      criteria <-
+        mu + settings$c * sqrt(log(t - settings$n_obs) / N)
+
+    } else if (method == "ts"){
+
+      list2env(settings[c("mu0", "nu0", "b0", "a0")],
+               envir = environment())
+
+      if (settings$type == "bn.fit.gnet"){
+
+        params <- sapply(seq_len(length(rounds$arms)), function(a){
+
+          arm <- rounds$arms[[a]]
+          if (arm$N == 0){
+
+            return(c(mu = mu0, nu = nu0, b = b0, a = a0))
+
+          } else{
+
+            ## posterior update
+            nu <- nu0 + arm$N
+            mu <- (mu0 * nu0 + arm$N * arm$estimate) / nu
+            x <- rounds$data[rounds$selected$arm == a,
+                             settings$target]
+            a_ <- a0 + arm$N / 2
+            b <- b0 + 1/2 * sum((x - arm$estimate)^2) +
+              arm$N * nu0 / nu * (arm$estimate - mu0)^2 / 2
+
+            return(c(mu = mu, nu = nu, b = b, a = a_))
+          }
+        }, simplify = FALSE)
+
+        criteria <- sapply(params, function(x){
+
+          sigma2 <- 1 / stats::rgamma(n = 1, shape = x["a"], rate = x["b"])
+          mu <- rnorm(n = 1, mean = x["mu"], sd = sigma2 / x["nu"])
+
+          return(mu)
+        })
+      } else if (settings$type == "bn.fit.dnet"){
+
+        browser()
+
+        ## TODO: discrete implementation
+      }
     }
+    a <- random_which.max(criteria)
+    rounds$criteria[t,] <- criteria
+
+    debug_cli(debug >= 2, cli::cli_alert,
+              c("{method} selected {rounds$arm[[a]]$node} = ",
+                "{rounds$arm[[a]]$value} with estimate ",
+                "{rounds$arm[[a]]$estimate}"))
+
     ## generate data based on arm
     data_t <- ribn(x = bn.fit, debug = 0,
                    intervene = arm2intervene(rounds$arms[[a]]))
@@ -133,7 +203,8 @@ update_arms <- function(t,
 
     for (a in seq_len(length(rounds$arms))){
 
-      if (t <= settings$n_obs ||
+      if (t < settings$n_obs ||
+          settings$method == "cache" ||
           grepl("bcb", settings$method)){
 
         rounds$arms[[a]]$estimate <- rounds$mu_est[t, a]
@@ -142,8 +213,8 @@ update_arms <- function(t,
 
         rounds$arms[[a]]$estimate <- rounds$mu_int[t, a]
       }
-      rounds$arms[[a]]$N <-
-        sum(rounds$selected$arm == a)
+      rounds$arms[[a]]$criteria <- rounds$criteria[t, a]
+      rounds$arms[[a]]$N <- sum(rounds$selected$arm == a)
     }
   } else if (settings$type == "bn.fit.dnet"){
 
@@ -196,6 +267,7 @@ update_rounds <- function(t,
   interventions <- rounds$selected$interventions[seq_len(t)]
 
   if (a > 0){
+
     rounds$data[t,] <- data_t
     rounds$selected$arm[t] <- a
     rounds$selected$reward[t] <- mean(data_t[[target]])
@@ -236,13 +308,10 @@ update_rounds <- function(t,
     ## posterior mean
     for (post in avail_bda){
 
-      dag <- if (post == "star"){
-        bnlearn::amat(settings$bn.fit)
-      } else if (post == "bma"){
-        NULL
-      } else{
-        rounds[[post]][t,]
-      }
+      dag <- switch(post,
+                    star = bnlearn::amat(settings$bn.fit),
+                    bma = NULL,
+                    rounds[[post]][t,])
       ## betas
       rounds[[sprintf("beta_%s", post)]][t,] <-
         expect_post(rounds = rounds, metric = "beta_est", dag = dag)
@@ -255,7 +324,7 @@ update_rounds <- function(t,
     if (t <= n_obs ||
         settings$method %in% c("cache")){
 
-      ## default bma
+      ## default bma; bda = est for obs
       rounds$mu_est[t,] <- rounds$mu_bma[t,]
       rounds$se_est[t,] <- rounds$se_bma[t,]
 
@@ -268,13 +337,11 @@ update_rounds <- function(t,
                      `bcb-gies` = "gies",
                      "bma")  # default bma
 
-      dag <- if (post == "star"){
-        bnlearn::amat(settings$bn.fit)
-      } else if (post == "bma"){
-        NULL
-      } else{
-        rounds[[post]][t,]
-      }
+      dag <- switch(post,
+                    star = bnlearn::amat(settings$bn.fit),
+                    bma = NULL,
+                    rounds[[post]][t,])
+      ## mu and se
       rounds <- compute_mu_se(t = t, rounds = rounds, target = target,
                               dag = dag, type = "est", post = post, est = "est")
     }
@@ -380,7 +447,6 @@ summarize_rounds <- function(bn.fit, settings, rounds){
         mean((mat - rounds$beta_true)[not_diag]^2)
     }
   }
-
   ## fill columns for all data.frames
   rounds$bda <- convert_bda(bda = convert_bda(bda = rounds$bda, new_class = "data.frame"), "list")
 
@@ -450,7 +516,8 @@ read_rounds <- function(where){
              vec <- c("mu_true"),
              mat <- c(avail_bda[-1], sprintf("beta_%s", c(avail_bda)),
                       sprintf("mu_%s", c(avail_bda, "int", "est")),
-                      sprintf("se_%s", c(avail_bda, "int", "est"))),
+                      sprintf("se_%s", c(avail_bda, "int", "est")),
+                      "criteria"),
              unlist(lapply(avail_bda[-seq_len(2)],
                            function(x) sprintf("%s_%s", c("dag", "cpdag"), x))),
              "settings")
@@ -590,7 +657,8 @@ initialize_rounds <- function(settings,
              function(x) pxp,
              simplify = FALSE, USE.NAMES = TRUE),
       sapply(c(sprintf("mu_%s", c(avail_bda, "int", "est")),
-               sprintf("se_%s", c(avail_bda, "int", "est"))),
+               sprintf("se_%s", c(avail_bda, "int", "est")),
+               "criteria"),
              function(x) acal,
              simplify = FALSE, USE.NAMES = TRUE)
     )
@@ -621,7 +689,7 @@ initialize_rounds <- function(settings,
 
     nms <- c("data", avail_bda[-1], sprintf("beta_%s", avail_bda),
              sprintf("mu_%s", c(avail_bda, "int", "est")),
-             sprintf("se_%s", c(avail_bda, "int", "est")))
+             sprintf("se_%s", c(avail_bda, "int", "est")), "criteria")
 
     rounds[nms] <- lapply(rounds[nms], function(x){
 
@@ -794,11 +862,9 @@ check_settings <- function(settings,
     debug_cli(debug >= 3, "", "default eta = {settings$eta}")
   }
 
-  settings[c("epsilon", "c")] <- 0
   if (settings$method == "random"){
 
-    settings$epsilon <- 1
-    settings$n_ess <- 0
+
 
   } else if (settings$method == "greedy"){
 
@@ -806,10 +872,9 @@ check_settings <- function(settings,
     if (is.null(settings$epsilon) ||
         settings$epsilon > 1 ||
         settings$epsilon < 0){
-      settings$epsilon <- 0
+      settings$epsilon <- 0.1
       debug_cli(debug >= 3, "", "default epsilon = {settings$epsilon} for greedy")
     }
-    settings$n_ess <- 0
 
   } else if (settings$method %in% c("ucb")){
 
@@ -817,15 +882,34 @@ check_settings <- function(settings,
     if (is.null(settings$c) ||
         settings$c < 0){
       settings$c <- 1
-      debug_cli(debug >= 3, "", "default c = {settings$c} for UCB")
+      debug_cli(debug >= 3, "", "default c = {settings$c} for ucb")
     }
-    settings$n_ess <- 0
 
   } else if (settings$method == "ts"){
 
-    browser()
+    ## check mu0
+    if (is.null(settings$mu0)){
+      settings$mu0 <- 1
+      debug_cli(debug >= 3, "", "default mu0 = {settings$mu0} for ts")
+    }
 
-    ## TODO: implement thompson sampling
+    ## check nu0
+    if (is.null(settings$nu0)){
+      settings$nu0 <- 1
+      debug_cli(debug >= 3, "", "default nu0 = {settings$nu0} for ts")
+    }
+
+    ## check b0
+    if (is.null(settings$b0)){
+      settings$b0 <- 1
+      debug_cli(debug >= 3, "", "default b0 = {settings$b0} for ts")
+    }
+
+    ## check a0
+    if (is.null(settings$a0)){
+      settings$a0 <- 1
+      debug_cli(debug >= 3, "", "default a0 = {settings$a0} for ts")
+    }
 
   } else if (grepl("bcb", settings$method)){
 
@@ -835,15 +919,13 @@ check_settings <- function(settings,
     if (is.null(settings$c) ||
         settings$c < 0){
       settings$c <- 1
-      debug_cli(debug >= 3, "", "default c = {settings$c} for BCB")
+      debug_cli(debug >= 3, "", "default c = {settings$c} for bcb")
     }
-
-  } else{
-
-    ## TODO: further checks
   }
-
-  ## additional
+  for (i in c("epsilon", "c", "mu0", "nu0", "b0", "a0")){
+    if (is.null(settings[[i]]))
+      settings[[i]] <- NA
+  }
 
   ## check type
   if (is.null(settings$type)){
@@ -915,6 +997,9 @@ check_settings <- function(settings,
         settings$data_obs <- as.data.frame(lapply(settings$data_obs,
                                                   function(x) as.factor))
     }
+  } else if (is.null(settings$data_obs)){
+
+    settings["data_obs"] <- list(NULL)
   }
   debug_cli(!is.null(settings$data_obs) && !is.data.frame(settings$data_obs),
             cli::cli_abort, "data_obs is not a data.frame")
@@ -925,7 +1010,8 @@ check_settings <- function(settings,
   ## sort settings
   nms <- c("method", "target", "run", "n_obs", "n_int",
            "n_ess", "n_t", "int_parents", "epsilon",
-           "c", "score", "max_parents", "threshold", "eta",
+           "c", "mu0", "nu0", "b0", "a0", "score",
+           "max_parents", "threshold", "eta",
            "nodes", "nnodes", "type",
            "temp_dir", "aps_dir", "mds_dir",
            "id", "rounds0", "data_obs")
