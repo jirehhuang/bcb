@@ -515,12 +515,26 @@ zero_bn.fit <- function(bn.fit){
   if (class(bn.fit)[2] != "bn.fit.gnet")
     return(bn.fit)
 
+  ## already zeroed
+  if (!is.null(attr(bn.fit, "obs_means")))
+    return(bn.fit)
+
+  bn_list <- bn.fit[seq_len(length(bn.fit))]
+  for (node in names(bn.fit)){
+
+    bn_list[[node]]$sd <- 0
+  }
+  obs_means <- unlist(ribn(x = bn_list2bn.fit(bn_list), n = 1))
+
   bn_list <- bn.fit[seq_len(length(bn.fit))]
   for (node in names(bn.fit)){
 
     bn_list[[node]]$coefficients[1] <- 0
   }
-  return(bn_list2bn.fit(bn_list))
+  bn.fit <- bn_list2bn.fit(bn_list)
+  attr(bn.fit, "obs_means") <- obs_means
+
+  return(bn.fit)
 }
 
 

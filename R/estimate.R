@@ -69,6 +69,7 @@ compute_bda <- function(data,
       n <- sum(bool_data)
       i_values <- rounds$node_values[[i]]
       Xy <- as.matrix(data[bool_data, , drop=FALSE])
+      Xy <- apply(Xy, 2, function(x) x - mean(x))
 
       for (l in rounds$ps[[i]][, "ordering"]){
 
@@ -90,9 +91,6 @@ compute_bda <- function(data,
             ## compute bda effect
             if (is.na(temp[[j]][l, 1]) ||  # have not computed bda effect
                 any(bool_data[seq(temp[[j]][l, 1] + 1, t)])){  # have added bda-eligible data
-
-              beta <- matrix(numeric(length(ik)), ncol = 1)
-              beta_cpp(X = Xy[, ik, drop = FALSE], y = Xy[, j], beta = beta)
 
               values <- numeric(4)
               lm_cpp(X = Xy[, ik, drop = FALSE], y = Xy[, j], values = values)

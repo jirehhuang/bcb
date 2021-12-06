@@ -1001,6 +1001,20 @@ check_settings <- function(settings,
 
     settings["data_obs"] <- list(NULL)
   }
+  if (is.data.frame(settings$data_obs)){
+
+    obs_means <- attr(bn.fit, "obs_means")
+    if (!is.null(obs_means)){
+
+      cM <- colMeans(settings$data_obs)
+      settings$data_obs <- as.data.frame(
+        sapply(settings$nodes, function(node){
+
+          settings$data_obs[[node]] - obs_means[node]
+        })
+      )
+    }
+  }
   debug_cli(!is.null(settings$data_obs) && !is.data.frame(settings$data_obs),
             cli::cli_abort, "data_obs is not a data.frame")
 

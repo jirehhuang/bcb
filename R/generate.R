@@ -110,7 +110,8 @@ gen_data_grid <- function(data_grid = build_data_grid(),
                             seed = seed,
                             coefs = c(data_row$coef_lb, data_row$coef_ub),
                             vars = c(data_row$var_lb, data_row$var_ub),
-                            normalize = data_row$normalize)
+                            normalize = data_row$normalize,
+                            intercept = FALSE)
 
             ## check if invalid
             temp_row <- bn.fit2data_row(gnet, data_row)
