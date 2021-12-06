@@ -7,7 +7,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
                           n_cores = 1,
                           seed0 = 0,
                           regenerate = FALSE,
-                          recache = FALSE,
+                          cache = 0,
                           debug = 1){
 
   ## initialize output directory
@@ -306,14 +306,17 @@ gen_data_grid <- function(data_grid = build_data_grid(),
   null <- mclapply(seq_len(nrow(data_grid)), mc.cores = n_cores,
                    mc.preschedule = FALSE, gen_fn)
 
-  settings <- list(method = "cache",
-                   n_obs = max(data_grid$n_obs), n_int = 0)
-  simulate_method(method_num = "",
-                  settings = settings,
-                  path = path,
-                  n_cores = n_cores,
-                  resimulate = recache,
-                  debug = debug)
+  if (cache){
+
+    settings <- list(method = "cache",
+                     n_obs = max(data_grid$n_obs), n_int = 0)
+    simulate_method(method_num = "",
+                    settings = settings,
+                    path = path,
+                    n_cores = n_cores,
+                    resimulate = cache > 1,
+                    debug = debug)
+  }
 }
 
 
