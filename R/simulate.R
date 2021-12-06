@@ -82,23 +82,23 @@ simulate_method <- function(method_num,
                                             data_row$network, data_row$n_obs))
         method_data_dir <- file.path(method_dir, nm)
 
+        progressi <- file.path(method_dir, "progress",
+                               sprintf("progress%g", i))
         j <- data_row$dataset
-        if (!resimulate &  # to create rounds_rds
-            file.exists(rounds_rds <- file.path(method_data_dir, "rds",
-                                                sprintf("rounds%g.rds", j)))){
+        rounds_rds <- file.path(method_data_dir, "rds",
+                                sprintf("rounds%g.rds", j))
+        if (!resimulate &&
+            file.exists(progressi) &&
+            file.exists(rounds_rds)){
 
           debug_cli(debug, cli::cli_alert_success,
                     "{i} already executed {method}{method_num} on dataset {j} of {data_row$n_dat} for network {data_row$network}",
                     .envir = environment())
 
-          return(NULL)
+          return(NULL)  # skip if in progress or complete
         }
 
         ## keep track of whether in progress
-        progressi <- file.path(method_dir, "progress",
-                               sprintf("progress%g", i))
-        if (!resimulate && file.exists(progressi))
-          return(NULL)  # skip if in progress or complete
         write.table(x = 0, file = progressi,  # mark as in progress
                     row.names = FALSE, col.names = FALSE)
         ## TODO: delete doesn't always work when manually stop multi-core
@@ -373,7 +373,7 @@ check_method_grid <- function(method_grid){
   method_grid$index <- stringr::str_pad(string = seq_len(nrow(method_grid)),
                                         width = nchar(nrow(method_grid)),
                                         side = "left", pad = "0")
-  data_grid$index <- sprintf("%s_", data_grid$index)
+  method_grid$index <- sprintf("%s_", method_grid$index)
   if (is.null(method_grid$target))
     method_grid$target <- ""
   if (is.null(method_grid$c))
