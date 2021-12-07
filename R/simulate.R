@@ -154,13 +154,23 @@ simulate_method <- function(method_num,
         write.table(x = progress, file = file.path(path, "progress.txt"),
                     quote = FALSE, row.names = TRUE, col.names = TRUE)
 
+        ## print progress
         k <- trimws(rownames(progress)) == sprintf("%s%s", method,
                                                    method_num)
         last2 <- ncol(progress) - c(1, 0)
+        tot <- paste(progress[k, last2], collapse = " + ")
+        prog <- unlist(progress[k, -last2])
+        names(prog) <- seq_len(length(prog))
+        prog <- prog[prog != "1.000"]
+        prog <- paste(sapply(names(prog), function(x){
+
+          sprintf("%s. %s", x, prog[x])
+
+        }), collapse = " | ")
+        prog <- ifelse(nchar(prog) == 0, tot,
+                       sprintf("%s || %s", prog, tot))
         debug_cli(TRUE, cli::cli_alert,
-                  c("{sprintf('%s%s', method, method_num)} || ",
-                    "{paste(unlist(progress[k, -last2]), collapse = ' | ')} || ",
-                    "{paste(unlist(progress[k, last2]), collapse = ' | ')}"),
+                  "{sprintf('%s%s || %s', method, method_num, prog)}",
                   .envir = environment())
 
         return(NULL)
@@ -175,6 +185,7 @@ simulate_method <- function(method_num,
   }
   null <- mclapply(seq_len(nrow(dataset_grid)), mc.cores = n_cores,
                    mc.preschedule = FALSE, sim_fn)
+
   ## write progress
   progress <- get_progress(path = path, data_grid = data_grid)
   write.table(x = progress, file = file.path(path, "progress.txt"),
@@ -269,7 +280,7 @@ get_progress <- function(path,
 
   ## format
   width <- 5
-  progress <- apply(format(progress, digits = 2, nsmall = 2), 1,
+  progress <- apply(format(progress, digits = 3, nsmall = 3), 1,
                     function(x) stringr::str_pad(x, width = width,
                                                  side = "right"))
   progress <- as.data.frame(progress)
