@@ -9,22 +9,7 @@ simulate_method <- function(method_num,
                             debug = 0){
 
   ## initialize output directory
-  if (is.null(path)){
-
-    ## default directory
-    ## TODO: revert; temporary for development
-    # path <- file.path(getwd(), "simulations", Sys.time())
-    path <- file.path(get_projects_dir(debug = 0),
-                      "current", "simulations", Sys.time())
-
-  } else if (!dir.exists(path) &&
-             ## TODO: revert; temporary for development
-             # ! grepl(path.expand("~"), path)){
-             ! grepl(get_projects_dir(debug = 0), path)){
-
-    ## append dir to getwd() if home directory not included
-    path <- file.path(getwd(), path)
-  }
+  path <- check_path(path)
   dir_check(path)
 
   ## method
@@ -105,7 +90,8 @@ simulate_method <- function(method_num,
 
           if (!file.exists(rounds_rds)){
 
-            file.remove(progressi)
+            if (file.exists(progressi))
+              file.remove(progressi)
 
           } else{
 
@@ -233,11 +219,12 @@ get_progress <- function(path,
                          data_grid){
 
   ## TODO: remove; temporary for development
-  if (!dir.exists(path)){
-
-    path <- file.path(get_projects_dir(debug = 0),
-                      "current","simulations", path)
-  }
+  # if (!dir.exists(path)){
+  #
+  #   path <- file.path(get_projects_dir(debug = 0),
+  #                     "current","simulations", path)
+  # }
+  path <- check_path(path)
   methods <- list.files(path)
   methods <- methods[grepl(paste(avail_methods,
                                  collapse = "|"), methods)]
@@ -314,11 +301,12 @@ clear_path <- function(path,
   match_type <- match.arg(match_type)
 
   ## TODO: remove; temporary for development
-  if (!dir.exists(path)){
-
-    path <- file.path(get_projects_dir(debug = 0),
-                      "current","simulations", path)
-  }
+  # if (!dir.exists(path)){
+  #
+  #   path <- file.path(get_projects_dir(debug = 0),
+  #                     "current","simulations", path)
+  # }
+  path <- check_path(path)
   methods <- list.files(path)
   methods <- methods[grepl(paste(avail_methods,
                                  collapse = "|"), methods)]

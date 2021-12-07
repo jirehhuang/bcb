@@ -107,6 +107,7 @@ dir_check <- function(path,
   ## TODO: revert; temporary for development
   # if (! grepl(path.expand("~"), path)){
   if (! grepl(get_projects_dir(debug = 0), path)){
+
     path <- file.path(getwd(), path)
   }
   folders <- strsplit(path, split = .Platform$file.sep)[[1]]
@@ -267,6 +268,34 @@ load_example <- function(eg = c("gnet"),
   compile_mds()
 
   list2env(objs, envir = envir)
+}
+
+
+
+# Check path
+
+check_path <- function(path){
+
+  if (is.null(path)){
+
+    ## default directory
+    ## TODO: revert; temporary for development
+    # path <- file.path(getwd(), "simulations", Sys.time())
+    path <- file.path(get_projects_dir(debug = 0),
+                      "current", "simulations", Sys.time())
+
+  } else if (!dir.exists(path) &&
+             ## TODO: revert; temporary for development
+             # ! grepl(path.expand("~"), path)){
+             ! grepl(get_projects_dir(debug = 0), path)){
+
+    ## append dir to getwd() if home directory not included
+    ## TODO: revert; temporary for development
+    # path <- file.path(getwd(), path)
+    path <- file.path(get_projects_dir(debug = 0),
+                      "current","simulations", path)
+  }
+  return(path)
 }
 
 

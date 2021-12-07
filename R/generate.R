@@ -11,22 +11,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
                           debug = 1){
 
   ## initialize output directory
-  if (is.null(path)){
-
-    ## default directory
-    ## TODO: revert; temporary for development
-    # path <- file.path(getwd(), "simulations", Sys.time())
-    path <- file.path(get_projects_dir(debug = 0),
-                      "current", "simulations", Sys.time())
-
-  } else if (!dir.exists(path) &&
-             ## TODO: revert; temporary for development
-             # ! grepl(path.expand("~"), path)){
-             ! grepl(get_projects_dir(debug = 0), path)){
-
-    ## append dir to getwd() if home directory not included
-    path <- file.path(getwd(), path)
-  }
+  path <- check_path(path)
   dir_check(path)
 
   ## data_grid
