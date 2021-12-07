@@ -144,8 +144,8 @@ simulate_method <- function(method_num,
                           seed0 = seed0, debug = debug)
 
         ## write results in folder roundsj and as roundsj.rds
-        write_rounds(rounds = roundsj, where = file.path(method_data_dir, "txt",
-                                                         sprintf("rounds%g", j)))
+        # write_rounds(rounds = roundsj, where = file.path(method_data_dir, "txt",
+        #                                                  sprintf("rounds%g", j)))
         dir_check(file.path(method_data_dir, "rds"))
         write_rounds(rounds = roundsj, where = rounds_rds)
 
