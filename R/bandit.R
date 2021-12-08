@@ -457,6 +457,16 @@ summarize_rounds <- function(bn.fit, settings, rounds){
 
   rounds <- rounds[setdiff(names(rounds),
                            "node_values")]
+  if (settings$method != "cache"){
+
+    nms <- setdiff(names(rounds),
+                   c("arms", "ps", "bda", "arp",
+                     "beta_true", "mu_true", "settings"))
+    for (nm in nms){
+
+      rounds[[nm]] <- rounds[[nm]][-seq_len(settings$n_obs),]
+    }
+  }
   return(rounds)
 }
 
