@@ -111,7 +111,8 @@ compile_path <- function(path,
 #' @export
 
 average_compiled <- function(compiled,
-                             across_networks = FALSE){
+                             across_networks = FALSE,
+                             normalize = TRUE){
 
   # concise <- attr(compiled, "concise")
   # average <- attr(compiled, "average")
@@ -120,6 +121,7 @@ average_compiled <- function(compiled,
   #           "compiled must not already be averaged or formatted")
 
   nms <- names(compiled[[1]][[1]])
+  max_mu <- max(abs(compiled[[1]][[1]]$mu_true))
   averaged <- sapply(compiled, function(net_rounds){
 
     net_rounds <- net_rounds[!sapply(net_rounds, is.null)]
@@ -137,6 +139,14 @@ average_compiled <- function(compiled,
 
         dim(reduced) <- dim(net_rounds[[1]][[nm]])
         dimnames(reduced) <- dimnames(net_rounds[[1]][[nm]])
+      }
+      if (normalize &&
+          nm %in% c("arms", "selected", "mu_est", "criteria")){
+
+        exclude <- c("n", "value", "N",
+                     "arm", "correct", "mu_est")
+        reduced[, setdiff(names(reduced), exclude)] <-
+          reduced[, setdiff(names(reduced), exclude)] / max_mu
       }
       return(reduced)
 
@@ -162,6 +172,14 @@ average_compiled <- function(compiled,
         dim(reduced) <- dim(averaged[[1]][[nm]])
         dimnames(reduced) <- dimnames(averaged[[1]][[nm]])
       }
+      if (!normalize &&  # haven't been normalized already
+          nm %in% c("arms", "selected", "mu_est", "criteria")){
+
+        exclude <- c("n", "value", "N",
+                     "arm", "correct", "mu_est")
+        reduced[, setdiff(names(reduced), exclude)] <-
+          reduced[, setdiff(names(reduced), exclude)] / max_mu
+      }
       return(reduced)
 
     }, simplify = FALSE)
@@ -185,8 +203,13 @@ rounds2df <- function(rounds){
   colnames(rounds$criteria) <- sprintf("criteria%s", seq_len(ncol(rounds$criteria)))
 
   df <- cbind(
+    t = 0,  # placeholder
     rounds$selected[, setdiff(names(rounds$selected), "interventions")],
     rounds$mu_est, rounds$criteria, rounds$ji
   )
+  df <- df[df$arm > 0,, drop = FALSE]
+  df$t <- seq_len(nrow(df))
+  rownames(df) <- NULL
+
   return(df)
 }
