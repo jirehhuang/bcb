@@ -608,10 +608,15 @@ lookup_score <- function(target,
 clear_temp <- function(settings, every = FALSE){
 
   temp_file <- file.path(settings$temp_dir, settings$id)
+  ext <- c("aps", "mds", "score", "support", "arp", "gobnilp")
 
-  sapply(c("score", "support", "arp", "gobnilp"), function(x){
+  sapply(ext, function(x){
 
-    if (file.exists(file <- sprintf("%s_%s", temp_file, x))){
+    if (dir.exists(file <- sprintf("%s_%s", temp_file, x))){
+
+      unlink(file, recursive = TRUE)
+    }
+    if (file.exists(file)){
 
       file.remove(file)
     }
@@ -622,7 +627,7 @@ clear_temp <- function(settings, every = FALSE){
 
     sapply(files, function(x){
 
-      if (any(sapply(c("_score", "_support", "_arp", "_gobnilp"),
+      if (any(sapply(sprintf("_%s", ext),
                      function(y) grepl(y, x)))){
 
         file <- file.path(settings$temp_dir, x)

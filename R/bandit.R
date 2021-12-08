@@ -963,6 +963,38 @@ check_settings <- function(settings,
   }
   dir_check(settings$temp_dir)
 
+  ## check id
+  if (is.null(settings$id)){
+    settings$id <- random_id(n = 12)
+    debug_cli(debug >= 3, "", "generated id = {settings$id}")
+  }
+
+  ## check unique_make
+  if (is.null(settings$unique_make) ||
+      is.na(as.logical(settings$unique_make))){
+
+    settings$unique_make <- FALSE
+    debug_cli(debug >= 3, "", "default unique_make = {settings$unique_make}")
+  }
+  if (settings$unique_make){
+
+    ## copy and recompile bida aps
+    settings$aps_dir <- file.path(settings$temp_dir,
+                                  sprintf("%s_aps", settings$id))
+    dir_check(settings$aps_dir)
+    recompile_bida(aps_dir = settings$aps_dir,
+                   aps0_dir = get_bida(dir = TRUE),
+                   debug = debug)
+
+    ## copy and recompile mds
+    settings$mds_dir <- file.path(settings$temp_dir,
+                                  sprintf("%s_mds", settings$id))
+    dir_check(settings$mds_dir)
+    recompile_mds(mds_dir = settings$mds_dir,
+                  mds0_dir = get_mds(dir = TRUE),
+                  debug = debug)
+  }
+
   ## check aps_dir
   if (is.null(settings$aps_dir)){
     settings$aps_dir <- get_bida(dir = TRUE)
@@ -976,12 +1008,6 @@ check_settings <- function(settings,
     debug_cli(debug >= 3, "", "detected mds_dir = {settings$mds_dir}")
   }
   compile_mds(mds_dir = settings$mds_dir, debug = debug)
-
-  ## check id
-  if (is.null(settings$id)){
-    settings$id <- random_id(n = 12)
-    debug_cli(debug >= 3, "", "generated id = {settings$id}")
-  }
 
   ## check rounds0
   if (length(settings$rounds0)){
