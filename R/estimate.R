@@ -132,9 +132,11 @@ compute_bda <- function(data,
               ## est
               beta_est <- (beta_bda * n_bda + beta_int * n_int) / (n_bda +
                                                                      n_int)
-              se_est <- sqrt((se_bda^2 * n_bda + se_int^2 * n_int) /
-                               (n_bda + n_int))
+              se_est <- sqrt((se_bda^2 * n_bda^2 + se_int^2 * n_int^2) /
+                               (n_bda + n_int)^2)
 
+              temp[[j]]$beta_est[l] <- beta_est
+              temp[[j]]$se_est[l] <- se_est
             }
             ## purely observational; no intervention yet
             if (is.na(temp[[j]]$t_int[l])){
@@ -246,7 +248,7 @@ expect_post <- function(rounds,
     ## concentrate posterior around pdag or skel structure
     ## does nothing if dag = NULL
     rounds$ps <- concentrate_ps(ps = rounds$ps,
-                                pdag = dag)
+                                amat = dag)
 
     ## expectation over posterior distribution
     for (i in if (is.null(from)) seq_p else from){
