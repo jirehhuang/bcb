@@ -15,8 +15,9 @@ simulate_method <- function(method_num,
   ## method
   method <- settings$method
   method_dir <- file.path(path, sprintf("%s%s", method, method_num))
-  settings$temp_dir <- file.path(method_dir, "progress")
   dir_check(file.path(method_dir, "progress"))  # create method_dir and add progress
+  settings$temp_dir <- file.path(method_dir, "temp")
+  dir_check(settings$temp_dir)
 
   ## data_grid
   data_grid <- read.table(file.path(path, "data_grid.txt"))
