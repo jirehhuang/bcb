@@ -271,8 +271,8 @@ update_rounds <- function(t,
     rounds$data[t,] <- data_t
     rounds$selected$arm[t] <- a
     rounds$selected$reward[t] <- mean(data_t[[target]])
-    rounds$selected$estimate <- rounds$arms[[a]]$estimate
-    rounds$selected$criteria <- rounds$arms[[a]]$criteria
+    rounds$selected$estimate[t] <- rounds$arms[[a]]$estimate
+    rounds$selected$criteria[t] <- rounds$arms[[a]]$criteria
     rounds$selected$interventions[t] <- rounds$arms[[a]]$node
   }
   compute_scores(data = data, settings = settings,
@@ -627,7 +627,7 @@ initialize_rounds <- function(settings,
   list2env(settings[c("n_obs", "n_int")], envir = environment())
 
   ## borrow data from previous rounds
-  if (!length(settings$rounds0)){
+  if (length(settings$rounds0) == 0){
 
     rounds <- list(
       arms = build_arms(bn.fit = bn.fit, settings = settings, debug = debug),
