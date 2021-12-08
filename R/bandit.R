@@ -237,10 +237,11 @@ simple_reward <- function(settings,
     ests <- sapply(rounds$arms, function(arm) arm$estimate)
     chosen_arms <- which(ests == max(ests))
 
-    mean(sapply(chosen_arms, function(a){
+    sr <- mean(sapply(chosen_arms, function(a){
 
       rounds$mu_true[a]
     }))
+    return(sr)
 
   } else if (settings$type == "bn.fit.dnet"){
 
@@ -672,6 +673,8 @@ initialize_rounds <- function(settings,
              function(x) acal,
              simplify = FALSE, USE.NAMES = TRUE)
     )
+    rounds$node_values <- bn.fit2values(bn.fit =
+                                          bn.fit)  # used in estimate.R
   } else{
 
     debug_cli(!identical(bn.fit, settings$rounds0$settings$bn.fit), cli::cli_abort,
@@ -711,9 +714,15 @@ initialize_rounds <- function(settings,
       rounds$ps <- list()
       rounds$bda <- list()
     }
+    rounds$node_values <- bn.fit2values(bn.fit =
+                                          bn.fit)  # used in estimate.R
+    rounds <- update_rounds(t = n_obs,
+                            a = 0,
+                            data_t = rounds$data[n_obs,],
+                            settings = settings,
+                            rounds = rounds,
+                            debug = debug)
   }
-  rounds$node_values <- bn.fit2values(bn.fit =
-                                        bn.fit)  # used in estimate.R
   return(rounds)
 }
 
