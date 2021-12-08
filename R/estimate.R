@@ -73,6 +73,7 @@ compute_bda <- function(data,
 
       for (l in rounds$ps[[i]][, "ordering"]){
 
+        ## TODO: can be problematic when concentrating around a dag
         if (rounds$ps[[i]][l, "prob"] == 0) break
 
         k <- pars[l, !is.na(pars[l, ])]  # indices of parents
@@ -239,7 +240,13 @@ expect_post <- function(rounds,
   metrics <- trimws(strsplit(metric, "\\+")[[1]])
   nms <- names(rounds$bda[[1]][[2]])
 
-  if (is.null(dag)){
+  if (is.null(dag) ||
+      any(dag * t(dag) > 0)){  # is a pdag or skel
+
+    ## concentrate posterior around pdag or skel structure
+    ## does nothing if dag = NULL
+    rounds$ps <- concentrate_ps(ps = rounds$ps,
+                                pdag = dag)
 
     ## expectation over posterior distribution
     for (i in if (is.null(from)) seq_p else from){
@@ -268,7 +275,7 @@ expect_post <- function(rounds,
     }
   } else{
 
-    ## concentrate posterior around a dag structure
+    ## concentrate posterior around dag structure
     if (is.null(dim(dag)))
       dag <- row2mat(row = dag, nodes = names(rounds$bda))
     edge_list <- as.list(sparsebnUtils::as.edgeList(dag))
@@ -449,6 +456,41 @@ dag_bda <- function(dag,
 ######################################################################
 ## General relevant functions
 ######################################################################
+
+
+
+# Concentrate ps around a dag, pdag, or skel
+
+concentrate_ps <- function(ps,
+                           amat = NULL){
+
+  if (is.null(amat))
+    return(ps)
+
+  nodes <- names(ps)
+  if (is.null(dim(amat)))
+    amat <- row2mat(row = amat, nodes = nodes)
+
+  ps <- lapply(seq_len(length(ps)), function(i){
+
+    max_parents <- ncol(ps[[i]]) - 3
+    for (l in ps[[i]][, "ordering"]){
+
+      if (ps[[i]][l, "prob"] == 0) break
+
+      ps[[i]][l, seq_len(max_parents)]
+      if (any(amat[ps[[i]][l, seq_len(max_parents)],
+                   i] == 0, na.rm = TRUE)){
+
+        ps[[i]][l, "prob"] <- 0
+      }
+    }
+    ps[[i]][, "prob"] <- ps[[i]][,
+                                 "prob"] / sum(ps[[i]][, "prob"])
+    return(ps[[i]])
+  })
+  return(ps)
+}
 
 
 

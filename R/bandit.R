@@ -302,7 +302,7 @@ update_rounds <- function(t,
                                 seed = sample(t, size = 1), debug = debug)
   rounds$gies[t,] <- estimate_gies(ps = rounds$ps, settings = settings,
                                    interventions = interventions,
-                                   dag = TRUE, debug = debug)
+                                   dag = FALSE, debug = debug)
 
   if (settings$type == "bn.fit.gnet"){
 
