@@ -183,6 +183,7 @@ recompile_mds <- function(mds_dir = get_mds(dir = TRUE),
   debug_cli(debug, cli::cli_alert,
             "clearing compiled {.pkg mds} directory")
 
+  dir_check(file.path(mds_dir, "src"))
   null <- sapply(file.path(mds_dir, "src",
                            list.files(file.path(mds_dir, "src"))), file.remove)
   null <- sapply(file.path(mds_dir, setdiff(list.files(mds_dir),
