@@ -11,10 +11,6 @@ compute_bda <- function(data,
                         settings,
                         rounds,
                         target = NULL,
-                        a_0 = 1,
-                        b_0 = 1,
-                        m_0 = 0,
-                        Lambda_0 = 1,
                         debug = 0){
 
   t <- nrow(data)
@@ -23,7 +19,7 @@ compute_bda <- function(data,
   nodes <- settings$nodes
   parents <- seq_len(settings$max_parents)
 
-  debug_cli(debug >= 3, cli::cli_alert_info,
+  debug_cli(debug >= 2, cli::cli_alert_info,
             c("computing back-door adjustments with ",
               ifelse(settings$type == "bn.fit.gnet",
                      "Gaussian linear model",
@@ -242,6 +238,9 @@ expect_post <- function(rounds,
   metrics <- trimws(strsplit(metric, "\\+")[[1]])
   nms <- names(rounds$bda[[1]][[2]])
 
+  if (!is.null(dag) && is.null(dim(dag)))
+    dag <- row2mat(row = dag, nodes = names(rounds$bda))
+
   if (is.null(dag) ||
       any(dag * t(dag) > 0)){  # is a pdag or skel
 
@@ -278,8 +277,6 @@ expect_post <- function(rounds,
   } else{
 
     ## concentrate posterior around dag structure
-    if (is.null(dim(dag)))
-      dag <- row2mat(row = dag, nodes = names(rounds$bda))
     edge_list <- as.list(sparsebnUtils::as.edgeList(dag))
 
     for (i in if (is.null(from)) seq_p else from){
