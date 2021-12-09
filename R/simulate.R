@@ -106,7 +106,7 @@ simulate_method <- function(method_num,
 
         ## settings
         bn.fit <- readRDS(file.path(data_dir, "bn.fit.rds"))
-        seed0 <- data_row$seed
+        seed0 <- data_row$seed * data_row$n_dat
         if (method == "cache"){
 
           settings$n_obs <- min(settings$n_obs, data_row$n_obs)
@@ -125,6 +125,10 @@ simulate_method <- function(method_num,
         settings$run <- j
         settings$data_obs <- file.path(data_dir,
                                        sprintf("data%g.txt", j))
+        ## ensure unique id; reset in bandit()
+        set.seed(round(as.numeric(Sys.time()) * 1e6) %%
+                   .Machine$integer.max)
+        settings$id <- random_id(n = 12)
 
         ## execute bandit
         roundsj <- bandit(bn.fit = bn.fit, settings = settings,
