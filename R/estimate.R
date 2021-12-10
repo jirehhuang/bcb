@@ -441,6 +441,8 @@ concentrate_ps <- function(ps,
                                  "prob"] / sum(ps[[i]][, "prob"])
     return(ps[[i]])
   })
+  names(ps) <- nodes
+
   return(ps)
 }
 
