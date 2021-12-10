@@ -139,7 +139,6 @@ apply_method <- function(t,
             n_int <- length(x_int)
             beta_int <- ifelse(n_int, mean(x_int), 0)
 
-            beta_0 <- mu_0
             nu <- nu_0 + n_int
             beta <- (nu_0 * beta_0 + n_int * beta_int) / nu
 
@@ -206,9 +205,9 @@ apply_method <- function(t,
     rounds$criteria[t,] <- criteria
 
     debug_cli(debug >= 2, cli::cli_alert,
-              c("{method} selected {rounds$arm[[a]]$node} = ",
-                "{rounds$arm[[a]]$value} with estimate ",
-                "{format(rounds$arm[[a]]$estimate, digits = 4, nsmall = 4)} ",
+              c("{method} selected {rounds$arms[[a]]$node} = ",
+                "{rounds$arms[[a]]$value} with estimate ",
+                "{format(rounds$arms[[a]]$estimate, digits = 4, nsmall = 4)} ",
                 "({format(criteria[a], digits = 4, nsmall = 4)})"))
 
     ## generate data based on arm
@@ -965,19 +964,19 @@ check_settings <- function(settings,
     }
 
     ## check nu_0
-    if (is.null(settings$nu_0)){
+    if (is.null(settings$nu_0) || settings$nu_0 <= 0){
       settings$nu_0 <- 1
       debug_cli(debug >= 3, "", "default nu_0 = {settings$nu_0} for ts")
     }
 
     ## check b_0
-    if (is.null(settings$b_0)){
+    if (is.null(settings$b_0) || settings$b_0 <= 0){
       settings$b_0 <- 1
       debug_cli(debug >= 3, "", "default b_0 = {settings$b_0} for ts")
     }
 
     ## check a_0
-    if (is.null(settings$a_0)){
+    if (is.null(settings$a_0) || settings$a_0 <= 0){
       settings$a_0 <- 1
       debug_cli(debug >= 3, "", "default a_0 = {settings$a_0} for ts")
     }
