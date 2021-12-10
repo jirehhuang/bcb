@@ -122,35 +122,79 @@ apply_method <- function(t,
 
       if (settings$type == "bn.fit.gnet"){
 
-        params <- sapply(seq_len(length(rounds$arms)), function(a){
+        if (mu_0 == 0){
 
-          arm <- rounds$arms[[a]]
-          if (arm$N == 0){
-
-            return(c(mu = mu_0, nu = nu_0, b = b_0, a = a_0))
-
-          } else{
+          beta_0 <- mu_0
+          int_nodes <- unique(sapply(rounds$arms, `[[`, "node"))
+          params <- sapply(int_nodes, function(node){
 
             ## posterior update
-            nu <- nu_0 + arm$N
-            mu <- (mu_0 * nu_0 + arm$N * arm$estimate) / nu
-            x <- rounds$data[rounds$selected$arm == a,
-                             settings$target]
-            a_ <- a_0 + arm$N / 2
-            b <- b_0 + 1/2 * sum((x - arm$estimate)^2) +
-              arm$N * nu_0 / nu * (arm$estimate - mu_0)^2 / 2
+            bool_int <- rounds$selected$interventions == node
+            x_int <- as.numeric(
+              sapply(rounds$selected$arm[bool_int], function(x){
 
-            return(c(mu = mu, nu = nu, b = b, a = a_))
-          }
-        }, simplify = FALSE)
+                rounds$arms[[x]]$value
+              })
+            ) * rounds$data[bool_int, settings$target]
+            n_int <- length(x_int)
+            beta_int <- ifelse(n_int, mean(x_int), 0)
 
-        criteria <- sapply(params, function(x){
+            beta_0 <- mu_0
+            nu <- nu_0 + n_int
+            beta <- (nu_0 * beta_0 + n_int * beta_int) / nu
 
-          sigma2 <- 1 / stats::rgamma(n = 1, shape = x["a"], rate = x["b"])
-          mu <- rnorm(n = 1, mean = x["mu"], sd = sigma2 / x["nu"])
+            a_ <- a_0 + n_int / 2
+            b <- b_0 + 1/2 * sum((x_int - beta_int)^2) +
+              n_int * nu_0 / nu * (beta_int - beta_0)^2 / 2
 
-          return(mu)
-        })
+            return(c(beta = beta, nu = nu, b = b, a = a_))
+
+          }, simplify = FALSE)
+
+          criteria <- sapply(params, function(x){
+
+            sigma2 <- 1 / stats::rgamma(n = 1, shape = x["a"], rate = x["b"])
+            mu <- rnorm(n = 1, mean = x["beta"], sd = sigma2 / x["nu"])
+
+            return(mu)
+          })
+          criteria <- sapply(seq_len(length(rounds$arms)), function(a){
+
+            criteria[rounds$arms[[a]]$node] * rounds$arms[[a]]$value
+          })
+          criteria <- unname(criteria)
+
+        } else{
+
+          params <- lapply(seq_len(length(rounds$arms)), function(a){
+
+            arm <- rounds$arms[[a]]
+            if (arm$N == 0){
+
+              return(c(mu = mu_0, nu = nu_0, b = b_0, a = a_0))
+
+            } else{
+
+              ## posterior update
+              nu <- nu_0 + arm$N
+              mu <- (mu_0 * nu_0 + arm$N * arm$estimate) / nu
+              x <- rounds$data[rounds$selected$arm == a,
+                               settings$target]
+              a_ <- a_0 + arm$N / 2
+              b <- b_0 + 1/2 * sum((x - arm$estimate)^2) +
+                arm$N * nu_0 / nu * (arm$estimate - mu_0)^2 / 2
+
+              return(c(mu = mu, nu = nu, b = b, a = a_))
+            }
+          })
+          criteria <- sapply(params, function(x){
+
+            sigma2 <- 1 / stats::rgamma(n = 1, shape = x["a"], rate = x["b"])
+            mu <- rnorm(n = 1, mean = x["mu"], sd = sigma2 / x["nu"])
+
+            return(mu)
+          })
+        }
       } else if (settings$type == "bn.fit.dnet"){
 
         browser()
