@@ -172,10 +172,22 @@ bn2gnet <- function(bn,
     return(params)
   })
 
-  ## normalize variances
   if (normalize){
 
+    ## normalize coefficients
     beta <- wamat(bnlearn::custom.fit(gnet, dist = dist))  # coefficient matrix
+    if (normalize == 1){
+
+      max_beta <- max(abs(beta))
+      dist <- lapply(dist, function(x){
+
+        x$coef <- x$coef / max_beta
+        return(x)
+      })
+      beta <- beta / max_beta
+    }
+
+    ## normalize variances
     I <- diag(length(dist))  # identity matrix
     Omega <- diag(sapply(dist, `[[`, "sd")^2)  # error variances
 
@@ -198,17 +210,26 @@ bn2gnet <- function(bn,
 
         ## TODO: other normalizing strategies
 
-        ## estimate covariance matrix
+        ## covariance matrix
         Sigma <- solve(t(I - beta)) %*% Omega %*% solve(I - beta)
 
-        ## scale coefficients
-        beta[, node] <- beta[, node] / sqrt(Sigma[node, node])
-        dist[[node]]$coef[-1] <-
-          dist[[node]]$coef[-1] / sqrt(Sigma[node, node])
+        if (normalize == 1){
 
-        ## scale error variance
-        Omega[node, node] <- Omega[node, node] / Sigma[node, node]
-        dist[[node]]$sd <- dist[[node]]$sd / sqrt(Sigma[node, node])
+          ## adjust error variance
+          Omega[node, node] <- 1 - sum(beta[, node]^2 * diag(Sigma))
+          dist[[node]]$sd <- sqrt(Omega[node, node])
+
+        } else if (normalize == 2){
+
+          ## scale coefficients
+          beta[, node] <- beta[, node] / sqrt(Sigma[node, node])
+          dist[[node]]$coef[-1] <-
+            dist[[node]]$coef[-1] / sqrt(Sigma[node, node])
+
+          ## scale error variance
+          Omega[node, node] <- Omega[node, node] / Sigma[node, node]
+          dist[[node]]$sd <- dist[[node]]$sd / sqrt(Sigma[node, node])
+        }
       }
     }
   }
