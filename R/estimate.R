@@ -87,7 +87,8 @@ compute_bda <- function(data,
 
             ## compute bda effect
             if (is.na(temp[[j]][l, 1]) ||  # have not computed bda effect
-                any(bool_data[seq(temp[[j]][l, 1] + 1, t)])){  # have added bda-eligible data
+                any(bool_data[seq(temp[[j]][l, 1] + 1, t)]) ||  # have added bda-eligible data
+                sum(bool_data) < temp[[j]]$n_bda[l]){  ## have removed bda-eligible data
 
               values <- numeric(4)
               lm_cpp(X = Xy[, ik, drop = FALSE], y = Xy[, j], values = values)
