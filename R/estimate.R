@@ -140,14 +140,18 @@ compute_bda <- function(data,
               # a_0 <- n_bda / 2
               #
               # ## posterior update
+              # bool_int <- rounds$selected$interventions == nodes[i]
+              # x_int <- as.numeric(
+              #   sapply(rounds$selected$arm[bool_int], function(x){
+              #
+              #     rounds$arms[[x]]$value
+              #   })
+              # ) * rounds$data[bool_int, settings$target]
+              # n_int <- length(x_int)
+              #
               # nu <- nu_0 + n_int
               # beta <- (nu_0 * beta_0 + n_int * beta_int) / nu
-              # bool_int <- rounds$selected$interventions == rounds$arms[[a]]$node
-              # x_int <- sapply(rounds$selected$arm[bool_int], function(x){
               #
-              #   rounds$arms[[x]]$value
-              #
-              # }) * rounds$data[bool_int, settings$target]
               # a_ <- a_0 + n_int / 2
               # b <- b_0 + 1/2 * sum((x_int - beta_int)^2) +
               #   n_int * nu_0 / nu * (beta_int - beta_0)^2 / 2
