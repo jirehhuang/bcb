@@ -110,7 +110,6 @@ compute_bda <- function(data,
 
               a <- rounds$selected$arm[t]
               value <- rounds$arms[[a]]$value
-              temp[[j]]$t_int[l] <- t
 
               ## bda
               beta_bda <- temp[[j]]$beta_bda[l]
@@ -122,9 +121,7 @@ compute_bda <- function(data,
               se_int <- rounds$se_int[t, a]
               se_int <- ifelse(!is.na(se_int), se_int,
                                2 * (beta_int - beta_bda)^2)  # or x_int^2?
-              n_int <- sum(unlist(sapply(rounds$arms, function(arm){
-                if (arm$node == rounds$arms[[a]]$node) arm$N
-              })))
+              n_int <- sum(rounds$selected$interventions == nodes[i])
 
               ## est
               beta_est <- (beta_bda * n_bda + beta_int * n_int) / (n_bda +
@@ -132,8 +129,38 @@ compute_bda <- function(data,
               se_est <- sqrt((se_bda^2 * n_bda^2 + se_int^2 * n_int^2) /
                                (n_bda + n_int)^2)
 
+              # ## priors
+              # beta_0 <- beta_bda
+              # nu_0 <- n_bda
+              # b_0 <- temp[[j]]$rss[l]  # sum of squared residuals
+              # a_0 <- n_bda / 2
+              #
+              # ## posterior update
+              # nu <- nu_0 + n_int
+              # beta <- (nu_0 * beta_0 + n_int * beta_int) / nu
+              # bool_int <- rounds$selected$interventions == rounds$arms[[a]]$node
+              # x_int <- sapply(rounds$selected$arm[bool_int], function(x){
+              #
+              #   rounds$arms[[x]]$value
+              #
+              # }) * rounds$data[bool_int, settings$target]
+              # a_ <- a_0 + n_int / 2
+              # b <- b_0 + 1/2 * sum((x_int - beta_int)^2) +
+              #   n_int * nu_0 / nu * (beta_int - beta_0)^2 / 2
+              #
+              # if (all.equal(mean(x_int), beta_int) != TRUE){
+              #
+              #   browser()
+              # }
+
               temp[[j]]$beta_est[l] <- beta_est
               temp[[j]]$se_est[l] <- se_est
+              for (b in seq_len(length(i_values))){
+
+                temp[[j]][[sprintf("mu%g_est", b)]][l] <-
+                  i_values[b] * temp[[j]]$beta_est[l]
+              }
+              temp[[j]]$t_int[l] <- t
             }
             ## purely observational; no intervention yet
             if (is.na(temp[[j]]$t_int[l])){
@@ -195,17 +222,20 @@ compute_int <- function(t,
 
     }) * rounds$data[bool_int, target]
 
+    ## update se
     beta_int <- mean(x_int)
+    se_int <- sd(x_int) / sqrt(length(x_int))  # s / sqrt(n)
+    se_int <- ifelse(is.na(se_int),
+                     abs(beta_int),  # sqrt((beta_int - 0)^2)
+                     se_int)
+    ## update mu
     for (aa in seq_len(length(rounds$arms))){
 
       if (rounds$arms[[aa]]$node != rounds$arms[[a]]$node) next
 
       rounds$mu_int[t, aa] <- beta_int * rounds$arms[[aa]]$value
+      rounds$se_int[t, aa] <- se_int
     }
-    rounds$se_int[t, a] <- sd(x_int) / sqrt(length(x_int))  # s / sqrt(n)
-    rounds$se_int[t, a] <- ifelse(is.na(rounds$se_int[t, a]),
-                                  abs(beta_int),  # sqrt((beta_int - 0)^2)
-                                  rounds$se_int[t, a])
 
     ## TODO: optimistic
 
