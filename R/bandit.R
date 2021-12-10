@@ -881,7 +881,8 @@ check_settings <- function(settings,
 
   ## check n_ess
   if (is.null(settings$n_ess) ||
-      settings$n_ess < 1){
+      is.na(settings$n_ess) ||
+      !is.numeric(settings$n_ess)){
     settings$n_ess <- settings$n_obs + settings$n_int
     debug_cli(debug >= 3, "",
               c("automatically selected n_ess = n_obs + n_int = ",
