@@ -208,7 +208,8 @@ apply_method <- function(t,
     debug_cli(debug >= 2, cli::cli_alert,
               c("{method} selected {rounds$arm[[a]]$node} = ",
                 "{rounds$arm[[a]]$value} with estimate ",
-                "{rounds$arm[[a]]$estimate}"))
+                "{format(rounds$arm[[a]]$estimate, digits = 4, nsmall = 4)} ",
+                "({format(criteria[a], digits = 4, nsmall = 4)})"))
 
     ## generate data based on arm
     data_t <- ribn(x = bn.fit, debug = 0,
@@ -882,8 +883,10 @@ check_settings <- function(settings,
   ## check n_ess
   if (is.null(settings$n_ess) ||
       settings$n_ess < 1){
-    settings$n_ess <- 0
-    debug_cli(debug >= 3, "", "default n_ess = {settings$n_ess}")
+    settings$n_ess <- settings$n_obs + settings$n_int
+    debug_cli(debug >= 3, "",
+              c("automatically selected n_ess = n_obs + n_int = ",
+                "{settings$n_ess}"))
   }
 
   ## check n_t
