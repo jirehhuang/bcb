@@ -123,6 +123,10 @@ compute_bda <- function(data,
                                2 * (beta_int - beta_bda)^2)  # or x_int^2?
               n_int <- sum(rounds$selected$interventions == nodes[i])
 
+              ## ess
+              n_bda <- ifelse(settings$n_ess <= 0,
+                              max(min(n_bda, n_int), 1),
+                              min(n_bda, settings$n_ess))
               ## est
               beta_est <- (beta_bda * n_bda + beta_int * n_int) / (n_bda +
                                                                      n_int)
