@@ -511,8 +511,9 @@ bool_bda <- function(t,
     ## block a directed path from i to target
     bool_arms <- sapply(rounds$arms, function(arm){
 
-      max(rounds$arp[i, arm$node],
-          rounds$arp[arm$node, settings$target]) < settings$eta
+      ## Pr(i -> j -> target) <= min(Pr(i -> j), Pr(j -> target))
+      min(rounds$arp[i, arm$node],
+          rounds$arp[arm$node, settings$target]) <= settings$eta
     })
     bool_data[rounds$selected$arm[seq_len(t)] > 0] <-
       bool_arms[rounds$selected$arm[seq_len(t)]]
