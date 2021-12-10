@@ -323,6 +323,11 @@ expect_post <- function(rounds,
       row_index <- lookup(parents = edge_list[[i]],
                           ps_i = rounds$ps[[i]])
 
+      debug_cli(row_index <= 0, cli::cli_abort,
+                "no row corresponding to parents
+                {paste(names(rounds$bda)[edge_list[[i]]], collapse = ',')}
+                for node {names(rounds$bda)[i]}")
+
       for (j in if (is.null(to)) seq_p[-i] else to){
 
         if (metric %in% names(rounds$bda[[i]][[j]])){
