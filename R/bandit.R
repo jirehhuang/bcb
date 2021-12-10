@@ -117,7 +117,7 @@ apply_method <- function(t,
 
     } else if (method == "ts"){
 
-      list2env(settings[c("mu0", "nu0", "b0", "a0")],
+      list2env(settings[c("mu_0", "nu_0", "b_0", "a_0")],
                envir = environment())
 
       if (settings$type == "bn.fit.gnet"){
@@ -127,18 +127,18 @@ apply_method <- function(t,
           arm <- rounds$arms[[a]]
           if (arm$N == 0){
 
-            return(c(mu = mu0, nu = nu0, b = b0, a = a0))
+            return(c(mu = mu_0, nu = nu_0, b = b_0, a = a_0))
 
           } else{
 
             ## posterior update
-            nu <- nu0 + arm$N
-            mu <- (mu0 * nu0 + arm$N * arm$estimate) / nu
+            nu <- nu_0 + arm$N
+            mu <- (mu_0 * nu_0 + arm$N * arm$estimate) / nu
             x <- rounds$data[rounds$selected$arm == a,
                              settings$target]
-            a_ <- a0 + arm$N / 2
-            b <- b0 + 1/2 * sum((x - arm$estimate)^2) +
-              arm$N * nu0 / nu * (arm$estimate - mu0)^2 / 2
+            a_ <- a_0 + arm$N / 2
+            b <- b_0 + 1/2 * sum((x - arm$estimate)^2) +
+              arm$N * nu_0 / nu * (arm$estimate - mu_0)^2 / 2
 
             return(c(mu = mu, nu = nu, b = b, a = a_))
           }
@@ -193,7 +193,11 @@ apply_method <- function(t,
 
 update_arms <- function(t,
                         settings,
-                        rounds){
+                        rounds,
+                        debug = 0){
+
+  debug_cli(debug >= 2, cli::cli_alert_info,
+            "updating {length(rounds$arms)} arms")
 
   # if (t <= settings$n_obs) return(rounds$arms)
 
@@ -352,7 +356,8 @@ update_rounds <- function(t,
 
     ## TODO: discrete implementation; should be similar
   }
-  rounds$arms <- update_arms(t = t, settings = settings, rounds = rounds)
+  rounds$arms <- update_arms(t = t, settings = settings,
+                             rounds = rounds, debug = debug)
   rounds$selected$simple_reward[t] <- simple_reward(settings, rounds)
   return(rounds)
 }
@@ -689,8 +694,8 @@ initialize_rounds <- function(settings,
 
     rounds$arms <- build_arms(bn.fit = bn.fit,
                               settings = settings, debug = debug)
-    rounds$arms <- update_arms(t = n_obs,
-                               settings = settings, rounds = rounds)
+    rounds$arms <- update_arms(t = n_obs, settings = settings,
+                               rounds = rounds, debug = debug)
     rounds$selected <-
       rbind(rounds$selected[seq_len(n_cache),
                             seq_len(7), drop = FALSE],
@@ -906,28 +911,28 @@ check_settings <- function(settings,
 
   } else if (settings$method == "ts"){
 
-    ## check mu0
-    if (is.null(settings$mu0)){
-      settings$mu0 <- 1
-      debug_cli(debug >= 3, "", "default mu0 = {settings$mu0} for ts")
+    ## check mu_0
+    if (is.null(settings$mu_0)){
+      settings$mu_0 <- 1
+      debug_cli(debug >= 3, "", "default mu_0 = {settings$mu_0} for ts")
     }
 
-    ## check nu0
-    if (is.null(settings$nu0)){
-      settings$nu0 <- 1
-      debug_cli(debug >= 3, "", "default nu0 = {settings$nu0} for ts")
+    ## check nu_0
+    if (is.null(settings$nu_0)){
+      settings$nu_0 <- 1
+      debug_cli(debug >= 3, "", "default nu_0 = {settings$nu_0} for ts")
     }
 
-    ## check b0
-    if (is.null(settings$b0)){
-      settings$b0 <- 1
-      debug_cli(debug >= 3, "", "default b0 = {settings$b0} for ts")
+    ## check b_0
+    if (is.null(settings$b_0)){
+      settings$b_0 <- 1
+      debug_cli(debug >= 3, "", "default b_0 = {settings$b_0} for ts")
     }
 
-    ## check a0
-    if (is.null(settings$a0)){
-      settings$a0 <- 1
-      debug_cli(debug >= 3, "", "default a0 = {settings$a0} for ts")
+    ## check a_0
+    if (is.null(settings$a_0)){
+      settings$a_0 <- 1
+      debug_cli(debug >= 3, "", "default a_0 = {settings$a_0} for ts")
     }
 
   } else if (grepl("bcb", settings$method)){
@@ -941,7 +946,7 @@ check_settings <- function(settings,
       debug_cli(debug >= 3, "", "default c = {settings$c} for bcb")
     }
   }
-  for (i in c("epsilon", "c", "mu0", "nu0", "b0", "a0")){
+  for (i in c("epsilon", "c", "mu_0", "nu_0", "b_0", "a_0")){
     if (is.null(settings[[i]]))
       settings[[i]] <- NA
   }
@@ -1069,7 +1074,7 @@ check_settings <- function(settings,
   ## sort settings
   nms <- c("method", "target", "run", "n_obs", "n_int",
            "n_ess", "n_t", "int_parents", "epsilon",
-           "c", "mu0", "nu0", "b0", "a0", "score",
+           "c", "mu_0", "nu_0", "b_0", "a_0", "score",
            "max_parents", "threshold", "eta",
            "nodes", "nnodes", "type",
            "temp_dir", "aps_dir", "mds_dir",
