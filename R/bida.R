@@ -12,6 +12,7 @@
 
 compute_scores <- function(data,
                            settings,
+                           blmat = NULL,
                            interventions = rep("", nrow(data)),
                            output = FALSE,
                            debug = 0){
@@ -19,12 +20,9 @@ compute_scores <- function(data,
   ## TODO: read temp_file and update only nodes that were not most recently intervened on
 
   ## load relevant settings
-  list2env(settings[c("score", "max_parents", "blmat")],
+  list2env(settings[c("score", "max_parents")],
            envir = environment())
   temp_file <- file.path(settings$temp_dir, settings$id)
-
-  ## TODO: check and support blmat
-  blmat <- NULL
 
   n <- nrow(data)
   p <- d <- ncol(data)
@@ -50,6 +48,7 @@ compute_scores <- function(data,
   lns <- c(character(0), toString(d))
 
   ## fml score from bida
+  ## TODO: test; blmat
   if (score == "fml"){
     n0 <- 1
     a <- d-1
@@ -75,6 +74,7 @@ compute_scores <- function(data,
       lns <- c(lns, sprintf("%g %g", node, length(lines)), unlist(lines))
     }
     ## bge score from bida, renamed to bge0
+    ## TODO: test; blmat
   } else if (score == "bge0"){
     const1 <- -log(pi)*n*0.5
     for (node in nodes){
@@ -118,10 +118,11 @@ compute_scores <- function(data,
         par_sets <- combn(seq_p[-i], k)
 
         ## remove parent sets that violate blmat
-        if (!is.null(blmat))
-          par_sets <- par_sets[, !apply(par_sets, 2,
-                                        function(par) any(blmat[par, i]))]
+        if (!is.null(blmat) && length(par_sets)){
 
+          par_sets <- par_sets[, !apply(par_sets, 2, function(par)
+            any(blmat[par, i] == 1)), drop = FALSE]
+        }
         len <- length(lines)
         lines <- c(lines, vector(mode = "list", ncol(par_sets)))
 
@@ -402,7 +403,7 @@ read_ps <- function(settings){
     n_parents <- ps_raw[pos, 2]  # number of parent configurations
     pos <- pos + 1
 
-    ps_raw_i <- ps_raw[seq(pos, pos + n_parents - 1), ]
+    ps_raw_i <- ps_raw[seq(pos, pos + n_parents - 1), , drop = FALSE]
 
     map <- map_parent_sets(sorted = ps[[i]][, seq_len(max_parents),
                                             drop = FALSE],
@@ -482,11 +483,11 @@ ps2es <- function(ps,
     for (j in seq(i + 1, nnodes)){
 
       # j -> i
-      es[j, i] <- sum(ps[[i]][apply(ps[[i]][, parents],
+      es[j, i] <- sum(ps[[i]][apply(ps[[i]][, parents, drop = FALSE],
                                     1, function(x) j %in% x), "prob"])
 
       # i -> j
-      es[i, j] <- sum(ps[[j]][apply(ps[[j]][, parents],
+      es[i, j] <- sum(ps[[j]][apply(ps[[j]][, parents, drop = FALSE],
                                     1, function(x) i %in% x), "prob"])
     }
   }

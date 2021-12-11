@@ -324,7 +324,7 @@ update_rounds <- function(t,
     rounds$selected$criteria[t] <- rounds$arms[[a]]$criteria
     rounds$selected$interventions[t] <- rounds$arms[[a]]$node
   }
-  compute_scores(data = data, settings = settings,
+  compute_scores(data = data, settings = settings, blmat = rounds$blmat,
                  interventions = interventions, debug = debug)
   rounds$ps <- compute_ps(data = data,
                           settings = settings,
@@ -348,7 +348,7 @@ update_rounds <- function(t,
 
   rounds$mds[t,] <- execute_mds(ps = rounds$ps, settings = settings,
                                 seed = sample(t, size = 1), debug = debug)
-  rounds$gies[t,] <- estimate_gies(ps = rounds$ps, settings = settings,
+  rounds$gies[t,] <- estimate_gies(rounds = rounds, settings = settings,
                                    interventions = interventions,
                                    dag = FALSE, debug = debug)
 
@@ -513,7 +513,7 @@ summarize_rounds <- function(bn.fit, settings, rounds){
 
     nms <- setdiff(names(rounds),
                    c("arms", "ps", "bda", "arp",
-                     "beta_true", "mu_true", "settings"))
+                     "beta_true", "mu_true", "blmat", "settings"))
     for (nm in nms){
 
       rounds[[nm]] <- rounds[[nm]][-seq_len(settings$n_obs),]
@@ -579,7 +579,7 @@ read_rounds <- function(where){
              mat <- c(avail_bda[-1], sprintf("beta_%s", c(avail_bda)),
                       sprintf("mu_%s", c(avail_bda, "int", "est")),
                       sprintf("se_%s", c(avail_bda, "int", "est")),
-                      "criteria"),
+                      "criteria", "blmat"),
              unlist(lapply(avail_bda[-seq_len(2)],
                            function(x) sprintf("%s_%s", c("dag", "cpdag"), x))),
              "settings")
@@ -774,6 +774,23 @@ initialize_rounds <- function(settings,
                             rounds = rounds,
                             debug = debug)
   }
+  ## blacklist
+  if (settings$restrict %in% c("ppc",
+                               bnlearn:::constraint.based.algorithms)){
+
+    result <- phsl::bnsl(x = rounds$data[seq_len(n_obs),],
+                         restrict = settings$restrict, maximize = "",
+                         restrict.args = list(alpha = settings$alpha,
+                                              max.sx = settings$max.sx),
+                         undirected = TRUE, debug = debug >= 3)
+    rounds$blmat <- 1L - bnlearn::amat(result)
+
+    if (grepl("bcb-star", settings$method)){
+
+      rounds$blmat[bnlearn::amat(settings$bn.fit) |
+                     t(bnlearn::amat(settings$bn.fit))] <- 0
+    }
+  }
   return(rounds)
 }
 
@@ -914,6 +931,28 @@ check_settings <- function(settings,
     debug_cli(debug >= 3, "", "selected score = {settings$score}")
   }
 
+  ## check restrict
+  if (is.null(settings$restrict) ||
+      !settings$restrict %in% c("ppc",
+                                bnlearn:::constraint.based.algorithms)){
+    settings$restrict <- "none"
+    debug_cli(debug >= 3, "", "default restrict = {settings$restrict}")
+  }
+
+  ## check alpha
+  if (is.null(settings$alpha) ||
+      !is.numeric(settings$alpha)){
+    settings$alpha <- bnlearn:::check.alpha(settings$alpha, bn.fit)
+    debug_cli(debug >= 3, "", "default alpha = {settings$alpha}")
+  }
+
+  ## check max.sx
+  if (is.null(settings$max.sx) ||
+      !is.numeric(settings$max.sx)){
+    settings$max.sx <- settings$nnodes - 2
+    debug_cli(debug >= 3, "", "default max.sx = {settings$max.sx}")
+  }
+
   ## check max_parents
   if (is.null(settings$max_parents) || settings$max_parents < 0){
     settings$max_parents <- min(5, settings$nnodes - 1)
@@ -936,8 +975,6 @@ check_settings <- function(settings,
   }
 
   if (settings$method == "random"){
-
-
 
   } else if (settings$method == "greedy"){
 
@@ -1124,6 +1161,7 @@ check_settings <- function(settings,
   nms <- c("method", "target", "run", "n_obs", "n_int",
            "n_ess", "n_t", "int_parents", "epsilon",
            "c", "mu_0", "nu_0", "b_0", "a_0", "score",
+           "restrict", "alpha", "max.sx",
            "max_parents", "threshold", "eta",
            "nodes", "nnodes", "type",
            "temp_dir", "aps_dir", "mds_dir",

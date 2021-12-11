@@ -365,7 +365,8 @@ check_method_grid <- function(method_grid){
   ## column names
   nms <- c("target", "n_run", "n_obs", "n_int", "n_ess", "n_t", "int_parents",
            "epsilon", "c", "mu_0", "nu_0", "b_0", "a_0",
-           "score", "max_parents", "eta", "unique_make")
+           "score", "restrict", "alpha", "max.sx",
+           "max_parents", "eta", "unique_make")
 
   ## remove extra columns
   method_grid <- method_grid[, intersect(names(method_grid), nms)]

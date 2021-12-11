@@ -39,12 +39,15 @@ compute_bda <- function(data,
           ## last t where bda updated, effect estimate, residual sum of squared
           ## deviations, and mean estimates for each intervention value
           i_values <- rounds$node_values[[i]]
-          as.data.frame(sapply(c("t_bda", "t_int", "n_bda", "xtx", "rss",
+          as.data.frame(
+            sapply(c("t_bda", "t_int", "n_bda", "xtx", "rss",
                                  "beta_bda", "se_bda",
                                  sprintf("mu%g_bda", seq_len(length(i_values))),
                                  "beta_est", "se_est",
                                  sprintf("mu%g_est", seq_len(length(i_values)))),
-                               function(x) rep(NA, nrow(rounds$ps[[i]]))))
+                               function(x) rep(NA, nrow(rounds$ps[[i]])),
+                   simplify = FALSE)
+          )
         } else NULL)
         names(temp) <- nodes
         return(temp)
@@ -323,10 +326,15 @@ expect_post <- function(rounds,
       row_index <- lookup(parents = edge_list[[i]],
                           ps_i = rounds$ps[[i]])
 
-      debug_cli(row_index <= 0, cli::cli_abort,
-                "no row corresponding to parents
-                {paste(names(rounds$bda)[edge_list[[i]]], collapse = ',')}
-                for node {names(rounds$bda)[i]}")
+      if (row_index <= 0){
+
+        debug_cli(TRUE, cli::cli_warn,
+                  "no row corresponding to parents
+                  {paste(names(rounds$bda)[edge_list[[i]]], collapse = ',')}
+                  for node {ifelse(is.character(i), i, names(rounds$bda)[i])}")
+
+        next  # mat[i, j] = mat[j, i] = 0
+      }
 
       for (j in if (is.null(to)) seq_p[-i] else to){
 
