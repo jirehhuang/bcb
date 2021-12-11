@@ -360,6 +360,7 @@ update_rounds <- function(t,
       dag <- switch(post,
                     star = bnlearn::amat(settings$bn.fit),
                     bma = NULL,
+                    eg = bnlearn::amat(bnlearn::empty.graph(settings$nodes)),
                     rounds[[post]][t,])
       ## betas
       rounds[[sprintf("beta_%s", post)]][t,] <-
@@ -389,6 +390,7 @@ update_rounds <- function(t,
       dag <- switch(post,
                     star = bnlearn::amat(settings$bn.fit),
                     bma = NULL,
+                    eg = bnlearn::amat(bnlearn::empty.graph(settings$nodes)),
                     rounds[[post]][t,])
       ## mu and se
       rounds <- compute_mu_se(t = t, rounds = rounds, target = target,

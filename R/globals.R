@@ -28,7 +28,8 @@ avail_methods <- c("cache",     # cache observational rounds
                    "bcb-bma",   # bayesian model averaging
                    "bcb-mpg",   # median probability graph
                    "bcb-mds",   # thompson sampling via modular dag sampling
-                   "bcb-gies")  # greedy interventional equivalence search
+                   "bcb-gies",  # greedy interventional equivalence search
+                   "bcb-eg")    # empty graph
 
 
 
@@ -38,7 +39,8 @@ avail_bda <- c("star",  # true underlying dag
                "bma",   # bayesian model averaging
                "mpg",   # median probability graph
                "mds",   # thompson sampling via modular dag sampling
-               "gies")  # greedy interventional equivalence search
+               "gies",  # greedy interventional equivalence search
+               "eg")    # empty graph
 
 
 
