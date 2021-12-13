@@ -24,6 +24,15 @@ compute_scores <- function(data,
            envir = environment())
   temp_file <- file.path(settings$temp_dir, settings$id)
 
+  if (length(blmat)){
+
+    if (is.null(dim(blmat))){
+
+      blmat <- row2mat(row = blmat, nodes = settings$nodes)
+    }
+    max_parents <- min(max_parents,
+                       max(colSums(1 - blmat)))
+  }
   n <- nrow(data)
   p <- d <- ncol(data)
   seq_p <- nodes <- seq_len(p)
@@ -37,7 +46,6 @@ compute_scores <- function(data,
     }
     S <- t(data) %*% data
   }
-
   nps <- sum(sapply(0:max_parents, function(x) choose(d-1,x)))
   debug_cli(nps > 1e6, cli::cli_abort,
             "stopping because {nps} > 1e6 parent sets")
@@ -204,14 +212,21 @@ compute_ps <- function(data,
   }
 
   ## calculate parent support using the APS solver
+  start_time <- Sys.time()
   aps_type <- "modular"
   sys::exec_internal(cmd = sprintf("%s/aps", aps_dir),
                      args = c(aps_type,
                               sprintf("%s_%s", temp_file,
                                       c("score", "support"))))
+  end_time <- Sys.time()
+  aps_time <- as.numeric(end_time - start_time, units = "secs")
 
-  debug_cli(!file.exists(sprintf("%s_support", temp_file)), cli::abort(),
+  debug_cli(!file.exists(sprintf("%s_support", temp_file)), cli::abort,
             "support file missing")
+
+  debug_cli(debug >= 3, cli::cli_alert,
+            c("executed {.pkg bida} aps for ps in ",
+              "{prettyunits::pretty_sec(aps_time)}"))
 
   ## read in calculated parent support from file
   ps <- read_ps(settings = settings)
@@ -258,14 +273,21 @@ compute_arp <- function(data,
   }
 
   ## calculate parent support using the APS solver
+  start_time <- Sys.time()
   aps_type <- "ar_modular"
   sys::exec_internal(cmd = sprintf("%s/aps", aps_dir),
                      args = c(aps_type,
                               sprintf("%s_%s", temp_file,
                                       c("score", "arp"))))
+  end_time <- Sys.time()
+  aps_time <- as.numeric(end_time - start_time, units = "secs")
 
   debug_cli(!file.exists(sprintf("%s_arp", temp_file)), cli::abort(),
             "arp file missing")
+
+  debug_cli(debug >= 3, cli::cli_alert,
+            c("executed {.pkg bida} aps for arp in ",
+              "{prettyunits::pretty_sec(aps_time)}"))
 
   ## read in calculated ancestor support from file
   arp <- as.matrix(read.delim(sprintf("%s_arp", temp_file),
