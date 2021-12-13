@@ -29,7 +29,15 @@ compute_bda <- function(data,
   if (settings$type == "bn.fit.gnet"){
 
     ## initialize storage structure
-    if (length(rounds[["bda"]]) == 0){
+    if (length(rounds$bda) == 0 ||
+        !identical(sapply(rounds$ps, nrow),
+                   sapply(rounds$bda, function(x)
+                     unlist(sapply(x, nrow)))[1,])){
+
+      debug_cli(debug >= 2, cli::cli_alert,
+                c("initializing bda",
+                  ifelse(length(rounds$bda) == 0, "",
+                         " because dimensions changed")))
 
       bda <- lapply(seq_p, function(i){
 
@@ -41,11 +49,11 @@ compute_bda <- function(data,
           i_values <- rounds$node_values[[i]]
           as.data.frame(
             sapply(c("t_bda", "t_int", "n_bda", "xtx", "rss",
-                                 "beta_bda", "se_bda",
-                                 sprintf("mu%g_bda", seq_len(length(i_values))),
-                                 "beta_est", "se_est",
-                                 sprintf("mu%g_est", seq_len(length(i_values)))),
-                               function(x) rep(NA, nrow(rounds$ps[[i]])),
+                     "beta_bda", "se_bda",
+                     sprintf("mu%g_bda", seq_len(length(i_values))),
+                     "beta_est", "se_est",
+                     sprintf("mu%g_est", seq_len(length(i_values)))),
+                   function(x) rep(NA, nrow(rounds$ps[[i]])),
                    simplify = FALSE)
           )
         } else NULL)
