@@ -857,7 +857,6 @@ initialize_rounds <- function(settings,
       }
       rounds$blmat[t,] <- 1L - skel
     }
-    browser()
   }
   return(rounds)
 }
