@@ -767,6 +767,46 @@ initialize_rounds <- function(settings,
              function(x) acal,
              simplify = FALSE, USE.NAMES = TRUE)
     )
+    ## build blacklist
+    if (settings$restrict == "none"){
+
+      rounds$blmat <- matrix(diag(settings$nnodes), ncol = ncol(rounds$beta_bma),
+                             nrow = nrow(rounds$beta_bma), byrow = TRUE)
+
+    } else if (settings$restrict == "star"){
+
+      skel <- bnlearn::amat(settings$bn.fit) | t(bnlearn::amat(settings$bn.fit))
+      rounds$blmat <- matrix(1 - skel, ncol = ncol(pxp),
+                             nrow = nrow(pxp), byrow = TRUE)
+
+    } else{
+
+      tt <- seq_len(n_obs)
+      tt <- tt[tt > settings$max_parents + 2 | tt > n_obs]
+      for (t in tt){
+
+        restrict <- ifelse(settings$restrict == "pc",
+                           "ppc", settings$restrict)
+        max_groups <- ifelse(settings$restrict == "pc", 1, 20)
+        max.sx <- min(settings$max.sx,
+                      max(t - 5, 1))  # TODO: design better
+        result <- phsl::bnsl(x = rounds$data[seq_len(t),, drop = FALSE],
+                             restrict = restrict, maximize = "",
+                             restrict.args = list(alpha = settings$alpha,
+                                                  max.sx = max.sx,
+                                                  max_groups = max_groups),
+                             undirected = TRUE, debug = debug >= 3)
+        skel <- bnlearn::amat(result)
+
+        if (grepl("bcb-star", settings$method)){
+
+          ## activate true edges
+          skel[bnlearn::amat(settings$bn.fit) |
+                 t(bnlearn::amat(settings$bn.fit))] <- 1
+        }
+        rounds$blmat[t,] <- 1L - skel
+      }
+    }
     rounds$node_values <- bn.fit2values(bn.fit =
                                           bn.fit)  # used in estimate.R
   } else{
@@ -794,7 +834,8 @@ initialize_rounds <- function(settings,
                        simple_reward = 0, time = 0))
     rounds$selected$reward[n_cache + 1] <- -1  # indicate where to begin
 
-    nms <- c("data", avail_bda[-1], sprintf("beta_%s", avail_bda),
+    nms <- c("data", avail_bda[-1],
+             sprintf("beta_%s", avail_bda), "blmat",
              sprintf("mu_%s", c(avail_bda, "int", "est")),
              sprintf("se_%s", c(avail_bda, "int", "est")), "criteria")
 
@@ -808,6 +849,8 @@ initialize_rounds <- function(settings,
       rounds$ps <- list()
       rounds$bda <- list()
     }
+    rounds$blmat[n_cache + seq_len(n_blank),] <- rounds$blmat[rep(n_cache,
+                                                                  n_blank),]
     rounds$node_values <- bn.fit2values(bn.fit =
                                           bn.fit)  # used in estimate.R
     rounds <- update_rounds(t = n_obs,
@@ -816,47 +859,6 @@ initialize_rounds <- function(settings,
                             settings = settings,
                             rounds = rounds,
                             debug = debug)
-  }
-  ## build blacklist
-  if (settings$restrict == "none"){
-
-    rounds$blmat <- matrix(diag(settings$nnodes), ncol = ncol(rounds$beta_bma),
-                           nrow = nrow(rounds$beta_bma), byrow = TRUE)
-
-  } else if (settings$restrict == "star"){
-
-    skel <- bnlearn::amat(settings$bn.fit) | t(bnlearn::amat(settings$bn.fit))
-    rounds$blmat <- matrix(1 - skel, ncol = ncol(pxp),
-                           nrow = nrow(pxp), byrow = TRUE)
-
-  } else{
-
-    tt <- seq_len(n_obs)
-    tt <- tt[tt > settings$max_parents + 2 | tt > n_obs]
-    for (t in tt){
-
-      restrict <- ifelse(settings$restrict == "pc",
-                         "ppc", settings$restrict)
-      max_groups <- ifelse(settings$restrict == "pc", 1, 20)
-      max.sx <- min(settings$max.sx,
-                    max(t - 5, 1))  # TODO: design better
-
-      result <- phsl::bnsl(x = rounds$data[seq_len(t),, drop = FALSE],
-                           restrict = restrict, maximize = "",
-                           restrict.args = list(alpha = settings$alpha,
-                                                max.sx = max.sx,
-                                                max_groups = max_groups),
-                           undirected = TRUE, debug = debug >= 3)
-      skel <- bnlearn::amat(result)
-
-      if (grepl("bcb-star", settings$method)){
-
-        ## activate true edges
-        skel[bnlearn::amat(settings$bn.fit) |
-               t(bnlearn::amat(settings$bn.fit))] <- 1
-      }
-      rounds$blmat[t,] <- 1L - skel
-    }
   }
   return(rounds)
 }
