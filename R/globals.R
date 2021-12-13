@@ -44,6 +44,16 @@ avail_bda <- c("star",  # true underlying dag
 
 
 
+# Available restrict methods
+
+avail_restrict <- c("none",  # no restriction
+                    "star",  # skeleton of true underlying skeleton
+                    "pc",    # phsl::ppc(max_groups = 1)
+                    "ppc",   # phsl::ppc()
+                    bnlearn:::constraint.based.algorithms)
+
+
+
 # Width of function portion of debugging output
 
 DEBUG_WIDTH <- 20
