@@ -324,7 +324,7 @@ update_rounds <- function(t,
     rounds$selected$criteria[t] <- rounds$arms[[a]]$criteria
     rounds$selected$interventions[t] <- rounds$arms[[a]]$node
   }
-  compute_scores(data = data, settings = settings, blmat = rounds$blmat,
+  compute_scores(data = data, settings = settings, blmat = rounds$blmat[t,],
                  interventions = interventions, debug = debug)
   rounds$ps <- compute_ps(data = data,
                           settings = settings,
@@ -430,13 +430,18 @@ summarize_rounds <- function(bn.fit, settings, rounds){
   ## simple and cumulative regret
   rounds$selected$simple_regret <- max_reward - rounds$selected$simple_reward
   ind_obs <- rounds$selected$interventions == ""
-  rounds$selected$cumulative <- 0
   if (rounds$selected$reward[1] == -1)
     rounds$selected$reward[1] <- rounds$data[1, settings$target]  # reset indicator
+  rounds$selected$cumulative <- 0
   rounds$selected$cumulative[ind_obs] <-
     cumsum((max_reward - rounds$selected$reward)[ind_obs])
   rounds$selected$cumulative[!ind_obs] <-
     cumsum((max_reward - rounds$selected$reward)[!ind_obs])
+  rounds$selected$expected_cumulative <- 0
+  rounds$selected$expected_cumulative[ind_obs] <-
+    cumsum((max_reward - rounds$selected$expected)[ind_obs])
+  rounds$selected$expected_cumulative[!ind_obs] <-
+    cumsum((max_reward - rounds$selected$expected)[!ind_obs])
 
   ## clear rownames
   rownames(rounds$arms) <- rownames(rounds$data) <-
@@ -455,9 +460,21 @@ summarize_rounds <- function(bn.fit, settings, rounds){
                                                                 `[[`, "dag"))
     rounds[[sprintf("cpdag_%s", graph)]] <- do.call(rbind, lapply(cp_dag,
                                                                   `[[`, "cpdag"))
+    # rounds[[sprintf("dag_%s", graph)]] <- as.data.frame(
+    #   data.table::rbindlist(lapply(cp_dag, `[[`, "dag")))
+    # rounds[[sprintf("cpdag_%s", graph)]] <- as.data.frame(
+    #   data.table::rbindlist(lapply(cp_dag, `[[`, "cpdag")))
     rownames(rounds[[sprintf("dag_%s", graph)]]) <-
       rownames(rounds[[sprintf("cpdag_%s", graph)]]) <- NULL
   }
+  skel <- apply(1 - rounds$blmat, 1, function(row){
+    est <- row2mat(row = row, nodes = settings$nodes)
+    if (all(est == 1))
+      est[] <- 0
+    eval_graph(est = est, true = true | t(true), cp = FALSE)
+  })
+  rounds[["skel"]] <- do.call(rbind, skel)
+  rownames(rounds[["skel"]]) <- NULL
 
   ## mse of edge support (bma)
   not_diag <- diag(settings$nnodes) == 0
@@ -502,6 +519,30 @@ summarize_rounds <- function(bn.fit, settings, rounds){
   ## fill columns for all data.frames
   rounds$bda <- convert_bda(bda = convert_bda(bda = rounds$bda, new_class = "data.frame"), "list")
 
+  ## summarize each arm in decreasing order of mu_true
+  arms_ordering <- order(rounds$mu_true, decreasing = TRUE)
+  for (i in seq_len(length(arms_ordering))){
+
+    rounds[[sprintf("arm%g", i)]] <- cbind(
+      data.frame(arm = (a <- arms_ordering[i]),
+                 mu_true = rounds$mu_true[a],
+                 criteria = rounds$criteria[, a]),
+      do.call(cbind, sapply(
+        sprintf("mu_%s", c(avail_bda, "int", "est")), function(x){
+
+          rounds[[x]][, a]
+
+        }, simplify = FALSE
+      )),
+      do.call(cbind, sapply(
+        sprintf("se_%s", c(avail_bda, "int", "est")), function(x){
+
+          rounds[[x]][, a]
+
+        }, simplify = FALSE
+      ))
+    )
+  }
   ## delete ps and bda and add settings
   # rounds <- rounds[setdiff(names(rounds), c("ps", "bda", "arp"))]
   settings <- settings[setdiff(names(settings), c("rounds"))]
@@ -577,9 +618,10 @@ read_rounds <- function(where){
     nms <- c("arms", "data", "selected", "ps", "bda", "arp", "beta_true",
              vec <- c("mu_true"),
              mat <- c(avail_bda[-1], sprintf("beta_%s", c(avail_bda)),
+                      "blmat",
                       sprintf("mu_%s", c(avail_bda, "int", "est")),
                       sprintf("se_%s", c(avail_bda, "int", "est")),
-                      "criteria", "blmat"),
+                      "criteria"),
              unlist(lapply(avail_bda[-seq_len(2)],
                            function(x) sprintf("%s_%s", c("dag", "cpdag"), x))),
              "settings")
@@ -715,7 +757,8 @@ initialize_rounds <- function(settings,
     rounds <- c(
       rounds,
       sapply(c(avail_bda[-1],
-               sprintf("beta_%s", avail_bda)),
+               sprintf("beta_%s", avail_bda),
+               "blmat"),
              function(x) pxp,
              simplify = FALSE, USE.NAMES = TRUE),
       sapply(c(sprintf("mu_%s", c(avail_bda, "int", "est")),
@@ -774,22 +817,47 @@ initialize_rounds <- function(settings,
                             rounds = rounds,
                             debug = debug)
   }
-  ## blacklist
-  if (settings$restrict %in% c("ppc",
-                               bnlearn:::constraint.based.algorithms)){
+  ## build blacklist
+  if (settings$restrict == "none"){
 
-    result <- phsl::bnsl(x = rounds$data[seq_len(n_obs),],
-                         restrict = settings$restrict, maximize = "",
-                         restrict.args = list(alpha = settings$alpha,
-                                              max.sx = settings$max.sx),
-                         undirected = TRUE, debug = debug >= 3)
-    rounds$blmat <- 1L - bnlearn::amat(result)
+    rounds$blmat <- matrix(diag(settings$nnodes), ncol = ncol(rounds$beta_bma),
+                           nrow = nrow(rounds$beta_bma), byrow = TRUE)
 
-    if (grepl("bcb-star", settings$method)){
+  } else if (settings$restrict == "star"){
 
-      rounds$blmat[bnlearn::amat(settings$bn.fit) |
-                     t(bnlearn::amat(settings$bn.fit))] <- 0
+    skel <- bnlearn::amat(settings$bn.fit) | t(bnlearn::amat(settings$bn.fit))
+    rounds$blmat <- matrix(1 - skel, ncol = ncol(pxp),
+                           nrow = nrow(pxp), byrow = TRUE)
+
+  } else{
+
+    tt <- seq_len(n_obs)
+    tt <- tt[tt > settings$max_parents + 2 | tt > n_obs]
+    for (t in tt){
+
+      restrict <- ifelse(settings$restrict == "pc",
+                         "ppc", settings$restrict)
+      max_groups <- ifelse(settings$restrict == "pc", 1, 20)
+      max.sx <- min(settings$max.sx,
+                    max(t - 5, 1))  # TODO: design better
+
+      result <- phsl::bnsl(x = rounds$data[seq_len(t),, drop = FALSE],
+                           restrict = restrict, maximize = "",
+                           restrict.args = list(alpha = settings$alpha,
+                                                max.sx = max.sx,
+                                                max_groups = max_groups),
+                           undirected = TRUE, debug = debug >= 3)
+      skel <- bnlearn::amat(result)
+
+      if (grepl("bcb-star", settings$method)){
+
+        ## activate true edges
+        skel[bnlearn::amat(settings$bn.fit) |
+               t(bnlearn::amat(settings$bn.fit))] <- 1
+      }
+      rounds$blmat[t,] <- 1L - skel
     }
+    browser()
   }
   return(rounds)
 }
@@ -892,7 +960,9 @@ check_settings <- function(settings,
   }
 
   ## check n_int
-  if (is.null(settings$n_int) ||
+  if (settings$method == "cache"){
+    settings$n_int <- 0
+  } else if (is.null(settings$n_int) ||
       settings$n_int < 0){
     settings$n_int <- 100
     debug_cli(debug >= 3, "", "default n_int = {settings$n_int}")
@@ -933,8 +1003,7 @@ check_settings <- function(settings,
 
   ## check restrict
   if (is.null(settings$restrict) ||
-      !settings$restrict %in% c("ppc",
-                                bnlearn:::constraint.based.algorithms)){
+      !settings$restrict %in% avail_restrict){
     settings$restrict <- "none"
     debug_cli(debug >= 3, "", "default restrict = {settings$restrict}")
   }
