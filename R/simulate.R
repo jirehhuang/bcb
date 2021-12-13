@@ -203,7 +203,8 @@ sim_method_grid <- function(method,
   ## execute
   null <- lapply(method_nums, function(method_num){
 
-    settings <- as.list(method_grid[method_num,])
+    settings <- as.list(method_grid[ifelse(method_num == "",
+                                           1, method_num),])
     settings$method <- method
 
     simulate_method(method_num = method_num,
