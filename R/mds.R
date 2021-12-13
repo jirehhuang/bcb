@@ -15,10 +15,10 @@ execute_mds <- function(ps,
             "sampling DAG with {.pkg mds}")
 
   ## TODO: remove; temporary because mds not working for hoffman2
-  if (Sys.info()["user"] == "jirehhua"){
+  if (Sys.info()["user"] == "jirehhua" || length(ps) > 12){
 
     debug_cli(debug >= 2, cli::cli_alert_warning,
-              "{.pkg mds} not yet supported on hoffman2")
+              "{.pkg mds} not yet supported on hoffman2 or large graphs")
 
     ## return empty graph
     return(bnlearn::amat(bnlearn::empty.graph(nodes = settings$nodes)))
@@ -39,6 +39,10 @@ execute_mds <- function(ps,
                                          seed))
   end_time <- Sys.time()
   sampler_time <- as.numeric(end_time - start_time, units = "secs")
+
+  debug_cli(debug >= 3, cli::cli_alert,
+            c("executed {.pkg mds} in ",
+              "{prettyunits::pretty_sec(sampler_time)}"))
 
   ## convert to amat
   text <- sys::as_text(sampler$stdout)
