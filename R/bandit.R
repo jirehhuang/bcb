@@ -348,7 +348,8 @@ update_rounds <- function(t,
 
   rounds$mds[t,] <- execute_mds(ps = rounds$ps, settings = settings,
                                 seed = sample(t, size = 1), debug = debug)
-  rounds$gies[t,] <- estimate_gies(rounds = rounds, settings = settings,
+  rounds$gies[t,] <- estimate_gies(rounds = rounds, blmat = rounds$blmat[t,],
+                                   settings = settings,
                                    interventions = interventions,
                                    dag = FALSE, debug = debug)
 

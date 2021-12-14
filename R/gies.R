@@ -7,16 +7,25 @@
 # Estimate adjacency matrix using gies
 
 estimate_gies <- function(rounds,
+                          blmat,
                           settings,
                           interventions,
-                          dag = TRUE,
+                          dag = FALSE,
                           debug = 0){
 
   debug_cli(debug >= 2, cli::cli_alert_info,
             "estimating graph with gies")
 
   nodes <- settings$nodes
-  if (any(rounds$blmat == 1)){
+  if (is.null(blmat)){
+
+    blmat <- 1 - diag(settings$nnodes)
+
+  } else if (is.null(dim(blmat))){
+
+    blmat <- row2mat(row = blmat, nodes = nodes)
+  }
+  if (any(blmat[!diag(settings$nnodes)] == 1)){
 
     data <- rounds$data[seq_len(settings$n_obs),]
     score <- new("bnlearn_score", data = data, interventions = interventions,
@@ -33,8 +42,8 @@ estimate_gies <- function(rounds,
   ## TODO: score that tries to lookup and uses bnlearn if failed
 
   gies <- pcalg::gies(score = score, maxDegree = settings$max_parents,
-                      fixedGaps = rounds$blmat, iterate = TRUE,
-                      adaptive = ifelse(any(rounds$blmat == 1),
+                      fixedGaps = blmat, iterate = TRUE,
+                      adaptive = ifelse(any(blmat == 1),
                                         "vstructures", "none"),
                       phase = c("forward", "backward", "turning"),
                       verbose = max(0, debug - 2))
