@@ -78,12 +78,18 @@ compile_path <- function(path,
 
           roundsj$selected <-
             roundsj$selected[intersect(names(roundsj$selected),
-                                       c("arm", "interventions", "reward", "estimate", "criteria",
-                                         "simple_reward", "expected", "correct", "simple_regret",
-                                         "cumulative", "expected_cumulative", "mu_est"))]
+                                       c("arm", "interventions", "reward", "estimate",
+                                         "criteria", "simple_reward", "expected", "correct",
+                                         "simple_regret", "cumulative", "expected_cumulative",
+                                         "mu_est"))]
+          ## TODO: only save a few arms
+          which_arms <- which(sapply(seq_len(nrow(roundsj$arms)), function(i){
+            roundsj$arms$N[roundsj[[sprintf("arm%g", i)]]$arm[1]]
+          }) > 0)
+          which_arms <- union(which_arms, seq_len(nrow(roundsj$arms)))
           roundsj <- roundsj[c("arms", "selected", "beta_true",
                                "mu_true", "mu_est", "criteria", "ji",
-                               sprintf("arm%g", seq_len(nrow(roundsj$arms))))]
+                               sprintf("arm%g", which_arms))]
 
         }
         return(roundsj)
@@ -128,6 +134,9 @@ average_compiled <- function(compiled,
   # debug_cli(average > 0 || format > 0, cli::cli_abort,
   #           "compiled must not already be averaged or formatted")
 
+  if (across_networks)
+    normalize <- TRUE
+
   nms <- names(compiled[[1]][[1]])
   averaged <- sapply(compiled, function(net_rounds){
 
@@ -150,7 +159,8 @@ average_compiled <- function(compiled,
       }
       if (normalize){
 
-        if (nm %in% c("arms", "selected", "mu_est", "criteria")){
+        if (nm %in% c("arms", "selected", "mu_est", "criteria",
+                      sprintf("arm%g", seq_len(nrow(net_rounds[[1]]$arms))))){
 
           exclude <- c("n", "value", "N",
                        "arm", "correct", "mu_est")
@@ -185,21 +195,6 @@ average_compiled <- function(compiled,
 
         dim(reduced) <- dim(averaged[[1]][[nm]])
         dimnames(reduced) <- dimnames(averaged[[1]][[nm]])
-      }
-      if (!normalize){  # haven't been normalized already
-
-        max_mu <- max(abs(averaged[[1]]$mu_true))
-        if (nm %in% c("arms", "selected", "mu_est", "criteria")){
-
-          exclude <- c("n", "value", "N",
-                       "arm", "correct", "mu_est")
-          reduced[, setdiff(names(reduced), exclude)] <-
-            reduced[, setdiff(names(reduced), exclude)] / max_mu
-
-        } else if (nm %in% c("beta_true", "mu_true")){
-
-          reduced <- reduced / max_mu
-        }
       }
       return(reduced)
 
