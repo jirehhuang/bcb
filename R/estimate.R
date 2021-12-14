@@ -122,56 +122,63 @@ compute_bda <- function(data,
               a <- rounds$selected$arm[t]
               value <- rounds$arms[[a]]$value
 
-              ## bda
-              beta_bda <- temp[[j]]$beta_bda[l]
-              se_bda <- temp[[j]]$se_bda[l]
-              n_bda <- temp[[j]]$n_bda[l]
+              if (FALSE){
 
-              ## int
-              beta_int <- rounds$mu_int[t, a] * value
-              se_int <- rounds$se_int[t, a]
-              se_int <- ifelse(!is.na(se_int), se_int,
-                               2 * (beta_int - beta_bda)^2)  # or x_int^2?
-              n_int <- sum(rounds$selected$interventions == nodes[i])
+                ## bda
+                beta_bda <- temp[[j]]$beta_bda[l]
+                se_bda <- temp[[j]]$se_bda[l]
+                n_bda <- temp[[j]]$n_bda[l]
 
-              ## ess
-              n_bda <- ifelse(settings$n_ess <= 0,
-                              max(min(n_bda, n_int), 1),
-                              min(n_bda, settings$n_ess))
-              ## est
-              beta_est <- (beta_bda * n_bda + beta_int * n_int) / (n_bda +
-                                                                     n_int)
-              se_est <- sqrt((se_bda^2 * n_bda^2 + se_int^2 * n_int^2) /
-                               (n_bda + n_int)^2)
+                ## int
+                beta_int <- rounds$mu_int[t, a] * value
+                se_int <- rounds$se_int[t, a]
+                se_int <- ifelse(!is.na(se_int), se_int,
+                                 2 * (beta_int - beta_bda)^2)  # or x_int^2?
+                n_int <- sum(rounds$selected$interventions == nodes[i])
 
-              # ## priors
-              # beta_0 <- beta_bda
-              # nu_0 <- n_bda
-              # b_0 <- temp[[j]]$rss[l]  # sum of squared residuals
-              # a_0 <- n_bda / 2
-              #
-              # ## posterior update
-              # bool_int <- rounds$selected$interventions == nodes[i]
-              # x_int <- as.numeric(
-              #   sapply(rounds$selected$arm[bool_int], function(x){
-              #
-              #     rounds$arms[[x]]$value
-              #   })
-              # ) * rounds$data[bool_int, settings$target]
-              # n_int <- length(x_int)
-              #
-              # nu <- nu_0 + n_int
-              # beta <- (nu_0 * beta_0 + n_int * beta_int) / nu
-              #
-              # a_ <- a_0 + n_int / 2
-              # b <- b_0 + 1/2 * sum((x_int - beta_int)^2) +
-              #   n_int * nu_0 / nu * (beta_int - beta_0)^2 / 2
-              #
-              # if (all.equal(mean(x_int), beta_int) != TRUE){
-              #
-              #   browser()
-              # }
+                ## ess
+                n_bda <- ifelse(settings$n_ess <= 0,
+                                max(min(n_bda, n_int), 1),
+                                min(n_bda, settings$n_ess))
+                ## est
+                beta_est <- (beta_bda * n_bda + beta_int * n_int) / (n_bda +
+                                                                       n_int)
+                se_est <- sqrt((se_bda^2 * n_bda^2 + se_int^2 * n_int^2) /
+                                 (n_bda + n_int)^2)
+              } else{
 
+                ## priors
+                n_bda <- temp[[j]]$n_bda[l]
+                n_bda <- ifelse(settings$n_ess <= 0,
+                                max(min(n_bda, n_int), 1),
+                                min(n_bda, settings$n_ess))
+
+                beta_0 <- temp[[j]]$beta_bda[l]
+                nu_0 <- n_bda
+                b_0 <- temp[[j]]$rss[l]  # sum of squared residuals
+                a_0 <- n_bda / 2
+
+                ## posterior update
+                beta_int <- rounds$mu_int[t, a] * value
+                bool_int <- rounds$selected$interventions == nodes[i]
+                x_int <- as.numeric(
+                  sapply(rounds$selected$arm[bool_int], function(x){
+
+                    rounds$arms[[x]]$value
+                  })
+                ) * rounds$data[bool_int, settings$target]
+                n_int <- length(x_int)
+
+                nu <- nu_0 + n_int
+                beta <- (nu_0 * beta_0 + n_int * beta_int) / nu
+
+                a_ <- a_0 + n_int / 2
+                b <- b_0 + 1/2 * sum((x_int - beta_int)^2) +
+                  n_int * nu_0 / nu * (beta_int - beta_0)^2 / 2
+
+                beta_est <- nu
+                se_est <- b / a_ / nu
+              }
               temp[[j]]$beta_est[l] <- beta_est
               temp[[j]]$se_est[l] <- se_est
               for (b in seq_len(length(i_values))){
