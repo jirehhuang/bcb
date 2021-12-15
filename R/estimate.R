@@ -147,7 +147,18 @@ compute_bda <- function(data,
                                  (n_bda + n_int)^2)
               } else{
 
-                ## priors
+                ## int
+                beta_int <- rounds$mu_int[t, a] * value
+                bool_int <- rounds$selected$interventions == nodes[i]
+                x_int <- as.numeric(
+                  sapply(rounds$selected$arm[bool_int], function(x){
+
+                    rounds$arms[[x]]$value
+                  })
+                ) * rounds$data[bool_int, settings$target]
+                n_int <- length(x_int)
+
+                ## priors with bda
                 ## TODO: use n_bda <- temp[[j]]$xtx[l] ?
                 n_bda <- temp[[j]]$n_bda[l]
                 a_0 <- n_bda / 2
@@ -160,16 +171,6 @@ compute_bda <- function(data,
                 b_0 <- temp[[j]]$rss[l]  # sum of squared residuals
 
                 ## posterior update
-                beta_int <- rounds$mu_int[t, a] * value
-                bool_int <- rounds$selected$interventions == nodes[i]
-                x_int <- as.numeric(
-                  sapply(rounds$selected$arm[bool_int], function(x){
-
-                    rounds$arms[[x]]$value
-                  })
-                ) * rounds$data[bool_int, settings$target]
-                n_int <- length(x_int)
-
                 nu <- nu_0 + n_int
                 beta <- (nu_0 * beta_0 + n_int * beta_int) / nu
 
