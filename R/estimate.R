@@ -148,7 +148,9 @@ compute_bda <- function(data,
               } else{
 
                 ## priors
+                ## TODO: use n_bda <- temp[[j]]$xtx[l] ?
                 n_bda <- temp[[j]]$n_bda[l]
+                a_0 <- n_bda / 2
                 n_bda <- ifelse(settings$n_ess <= 0,
                                 max(min(n_bda, n_int), 1),
                                 min(n_bda, settings$n_ess))
@@ -156,7 +158,6 @@ compute_bda <- function(data,
                 beta_0 <- temp[[j]]$beta_bda[l]
                 nu_0 <- n_bda
                 b_0 <- temp[[j]]$rss[l]  # sum of squared residuals
-                a_0 <- n_bda / 2
 
                 ## posterior update
                 beta_int <- rounds$mu_int[t, a] * value
@@ -173,11 +174,11 @@ compute_bda <- function(data,
                 beta <- (nu_0 * beta_0 + n_int * beta_int) / nu
 
                 a_ <- a_0 + n_int / 2
-                b <- b_0 + 1/2 * sum((x_int - beta_int)^2) +
+                b_ <- b_0 + 1/2 * sum((x_int - beta_int)^2) +
                   n_int * nu_0 / nu * (beta_int - beta_0)^2 / 2
 
-                beta_est <- nu
-                se_est <- b / a_ / nu
+                beta_est <- beta
+                se_est <- sqrt(b_ / a_ / nu)
               }
               temp[[j]]$beta_est[l] <- beta_est
               temp[[j]]$se_est[l] <- se_est
