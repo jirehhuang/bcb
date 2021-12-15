@@ -76,7 +76,7 @@ compute_bda <- function(data,
       n <- sum(bool_data)
       i_values <- rounds$node_values[[i]]
       Xy <- as.matrix(data[bool_data, , drop=FALSE])
-      Xy <- apply(Xy, 2, function(x) x - mean(x))
+      # Xy <- apply(Xy, 2, function(x) x - mean(x))
 
       for (l in rounds$ps[[i]][, "ordering"]){
 
