@@ -543,6 +543,7 @@ summarize_rounds <- function(bn.fit, settings, rounds){
         }, simplify = FALSE
       ))
     )
+    rownames(rounds[[sprintf("arm%g", i)]]) <- NULL
   }
   ## delete ps and bda and add settings
   # rounds <- rounds[setdiff(names(rounds), c("ps", "bda", "arp"))]
@@ -973,6 +974,7 @@ check_settings <- function(settings,
   ## check n_ess
   if (is.null(settings$n_ess) ||
       is.na(settings$n_ess) ||
+      is.infinite(settings$n_ess) ||
       !is.numeric(settings$n_ess)){
     settings$n_ess <- settings$n_obs + settings$n_int
     debug_cli(debug >= 3, "",
