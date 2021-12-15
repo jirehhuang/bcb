@@ -122,7 +122,7 @@ compute_bda <- function(data,
               a <- rounds$selected$arm[t]
               value <- rounds$arms[[a]]$value
 
-              if (FALSE){
+              if (TRUE){
 
                 ## bda
                 beta_bda <- temp[[j]]$beta_bda[l]
