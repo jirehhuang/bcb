@@ -31,8 +31,9 @@ void lm_cpp(arma::mat& X,
 
   // standard errors
   arma::vec resid = y - X * betas;
+  arma::mat inv_XtX = arma::inv(X.t() * X);
   values(2) = arma::dot(resid, resid);  // sum of squared residuals
-  values(3) = arma::dot(X.col(0), X.col(0));  // XtX
+  values(3) = 1 / inv_XtX(0, 0);  // XtX
   values(1) = std::sqrt(values(2) / (X.n_rows - X.n_cols) / values(3));
 
   // update to estimate sd of intervention distr
