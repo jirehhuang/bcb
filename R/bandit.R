@@ -275,10 +275,10 @@ update_arms <- function(t,
 
 
 
-# Average true effect of chosen estimate(s)
+# Average true effect of arm(s) with highest estimate(s)
 
-simple_reward <- function(settings,
-                          rounds){
+get_greedy_expected <- function(settings,
+                                rounds){
 
   if (settings$type == "bn.fit.gnet"){
 
@@ -405,7 +405,7 @@ update_rounds <- function(t,
   }
   rounds$arms <- update_arms(t = t, settings = settings,
                              rounds = rounds, debug = debug)
-  rounds$selected$simple_reward[t] <- simple_reward(settings, rounds)
+  rounds$selected$greedy_expected[t] <- get_greedy_expected(settings, rounds)
   return(rounds)
 }
 
@@ -420,16 +420,14 @@ summarize_rounds <- function(bn.fit, settings, rounds){
   rounds$arms$mu_true <- rounds$mu_true
 
   ## expected reward from pulled arms
-  max_reward <- max(rounds$arms$mu_true)
-  rounds$selected$expected <- 0
-  rounds$selected$expected[rounds$selected$arm != 0] <-
+  rounds$selected$expected_reward <- 0
+  rounds$selected$expected_reward[rounds$selected$arm != 0] <-
     rounds$arms$mu_true[rounds$selected$arm]
 
-  ## whether or not correct arm would be simple_reward
-  rounds$selected$correct <- 1 * (rounds$selected$simple_reward == max_reward)
-
   ## simple and cumulative regret
-  rounds$selected$simple_regret <- max_reward - rounds$selected$simple_reward
+  max_reward <- max(rounds$arms$mu_true)
+  rounds$selected$expected_regret <- max_reward - rounds$selected$expected_reward
+  rounds$selected$greedy_regret <- max_reward - rounds$selected$greedy_expected
   ind_obs <- rounds$selected$interventions == ""
   if (rounds$selected$reward[1] == -1)
     rounds$selected$reward[1] <- rounds$data[1, settings$target]  # reset indicator
@@ -735,7 +733,7 @@ initialize_rounds <- function(settings,
       selected = data.frame(arm = integer(n_obs + n_int),
                             interventions = "", reward = 0,
                             estimate = 0, criteria = 0,
-                            simple_reward = 0, time = 0),
+                            greedy_expected = 0, time = 0),
       ps = list(),
       bda = list(),
       arp = matrix(NA, nrow = settings$nnodes, ncol = settings$nnodes),
@@ -833,7 +831,7 @@ initialize_rounds <- function(settings,
             data.frame(arm = integer(n_blank),
                        interventions = "", reward = 0,
                        estimate = 0, criteria = 0,
-                       simple_reward = 0, time = 0))
+                       greedy_expected = 0, time = 0))
     rounds$selected$reward[n_cache + 1] <- -1  # indicate where to begin
 
     nms <- c("data", avail_bda[-1],
@@ -966,7 +964,7 @@ check_settings <- function(settings,
   if (settings$method == "cache"){
     settings$n_int <- 0
   } else if (is.null(settings$n_int) ||
-      settings$n_int < 0){
+             settings$n_int < 0){
     settings$n_int <- 100
     debug_cli(debug >= 3, "", "default n_int = {settings$n_int}")
   }
