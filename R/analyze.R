@@ -79,9 +79,9 @@ compile_path <- function(path,
           roundsj$selected <-
             roundsj$selected[intersect(names(roundsj$selected),
                                        c("arm", "interventions", "reward", "estimate",
-                                         "criteria", "simple_reward", "expected", "correct",
-                                         "simple_regret", "cumulative", "expected_cumulative",
-                                         "mu_est"))]
+                                         "criteria", "expected_reward", "expected_regret",
+                                         "greedy_expected", "greedy_regret", "cumulative",
+                                         "expected_cumulative", "mu_est"))]
           ## TODO: only save a few arms
           which_arms <- which(sapply(seq_len(nrow(roundsj$arms)), function(i){
             roundsj$arms$N[roundsj[[sprintf("arm%g", i)]]$arm[1]]
@@ -163,7 +163,7 @@ average_compiled <- function(compiled,
                       sprintf("arm%g", seq_len(nrow(net_rounds[[1]]$arms))))){
 
           exclude <- c("n", "value", "N",
-                       "arm", "correct", "mu_est")
+                       "arm", "mu_est")
           reduced[, setdiff(names(reduced), exclude)] <-
             reduced[, setdiff(names(reduced), exclude)] / max_mu
 
