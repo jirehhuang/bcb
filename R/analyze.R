@@ -235,3 +235,53 @@ rounds2df <- function(rounds){
 
   return(df)
 }
+
+
+
+# Fixed theme for plots
+#' @export
+
+theme_fixed <- function(base_size = 10,
+                        axis_size = 8,
+                        bool_axis_text = TRUE,
+                        bool_legend_title = FALSE,
+                        bool_legend = TRUE,
+                        legend.position = "bottom") {
+  require(grid)
+  require(ggthemes)
+  (theme_foundation(base_size = base_size, base_family = "") +
+      theme(plot.title = element_text(face = "bold",
+                                      size = rel(1.2), hjust = 0.5),
+            text = element_text(),
+            panel.background = element_rect(colour = NA),
+            plot.background = element_rect(colour = NA),
+            panel.border = element_rect(colour = NA),
+            axis.title = element_text(face = "bold",size = rel(1)),
+            axis.title.y = element_text(angle=90,vjust =2),
+            axis.title.x = element_text(vjust = -0.2),
+            axis.text = element_text(size = axis_size),
+            axis.line.x = element_line(colour="black"),
+            axis.line.y = element_line(colour="black"),
+            axis.ticks = element_line(),
+            panel.grid.major = element_line(colour="#f0f0f0"),
+            panel.grid.minor = element_blank(),
+            legend.key = element_rect(colour = NA),
+            legend.key.size= unit(0.5, "cm"),
+            legend.spacing = unit(0, "cm"),
+            legend.direction = "horizontal",
+            plot.margin=unit(c(1,2,1,2),"mm"),
+            strip.background=element_rect(colour="#f0f0f0",fill="#f0f0f0"),
+            strip.text = element_text(face="bold"),
+            axis.text.x = if (bool_axis_text){
+              element_text()
+            } else element_blank(),  # remove x-axis text
+            legend.position = legend.position,
+            legend.title = if (bool_legend_title){
+              element_text()
+            } else element_blank(),
+            legend.text = if(bool_legend){
+              element_text()
+            } else element_text(color = "white")
+      )
+  )
+}
