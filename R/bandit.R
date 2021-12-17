@@ -386,6 +386,7 @@ update_rounds <- function(t,
                      `bcb-mpg` = "mpg",
                      `bcb-mds` = "mds",
                      `bcb-gies` = "gies",
+                     `bcb-eg` = "eg",
                      "bma")  # default bma
 
       dag <- switch(post,
