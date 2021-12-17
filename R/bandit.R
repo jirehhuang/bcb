@@ -339,19 +339,18 @@ update_rounds <- function(t,
   }
   rounds$bma[t,] <- ps2es(ps = rounds$ps, settings = settings)
   rounds$mpg[t,] <- es2mpg(es = rounds$bma[t,], prob = 0.5)
-
-  rounds <- compute_int(t = t, settings = settings,
-                        rounds = rounds, debug = debug)
-  rounds$bda <- compute_bda(data = data,
-                            settings = settings, rounds = rounds,
-                            target = NULL, debug = debug)
-
   rounds$mds[t,] <- execute_mds(ps = rounds$ps, settings = settings,
                                 seed = sample(t, size = 1), debug = debug)
   rounds$gies[t,] <- estimate_gies(rounds = rounds, blmat = rounds$blmat[t,],
                                    settings = settings,
                                    interventions = interventions,
                                    dag = FALSE, debug = debug)
+
+  rounds <- compute_int(t = t, settings = settings,
+                        rounds = rounds, debug = debug)
+  rounds$bda <- compute_bda(data = data,
+                            settings = settings, rounds = rounds,
+                            target = NULL, debug = debug)
 
   if (settings$type == "bn.fit.gnet"){
 
@@ -378,6 +377,7 @@ update_rounds <- function(t,
       ## default bma; bda = est for obs
       rounds$mu_est[t,] <- rounds$mu_bma[t,]
       rounds$se_est[t,] <- rounds$se_bma[t,]
+      rounds$n_bda[t,] <- t
 
     } else{  # t > n_obs
 
@@ -397,6 +397,9 @@ update_rounds <- function(t,
       ## mu and se
       rounds <- compute_mu_se(t = t, rounds = rounds, target = target,
                               dag = dag, type = "est", post = post, est = "est")
+      rounds$n_bda[t,] <-
+        sapply(rounds$bda[sapply(rounds$arms, `[[`, "node")],
+               function(x) max(x[[target]]$n_bda, na.rm = TRUE))
     }
   } else if (settings$type == "bn.fit.dnet"){
 
@@ -414,7 +417,9 @@ update_rounds <- function(t,
 
 ## Summarize rounds
 
-summarize_rounds <- function(bn.fit, settings, rounds){
+summarize_rounds <- function(bn.fit,
+                             settings,
+                             rounds){
 
   ## arms
   rounds$arms <- do.call(rbind, lapply(rounds$arms, as.data.frame))
@@ -526,6 +531,7 @@ summarize_rounds <- function(bn.fit, settings, rounds){
     rounds[[sprintf("arm%g", i)]] <- cbind(
       data.frame(arm = (a <- arms_ordering[i]),
                  mu_true = rounds$mu_true[a],
+                 n_bda = rounds$n_bda[, a],
                  criteria = rounds$criteria[, a]),
       do.call(cbind, sapply(
         sprintf("mu_%s", c(avail_bda, "int", "est")), function(x){
@@ -764,7 +770,7 @@ initialize_rounds <- function(settings,
              simplify = FALSE, USE.NAMES = TRUE),
       sapply(c(sprintf("mu_%s", c(avail_bda, "int", "est")),
                sprintf("se_%s", c(avail_bda, "int", "est")),
-               "criteria"),
+               "n_bda", "criteria"),
              function(x) acal,
              simplify = FALSE, USE.NAMES = TRUE)
     )
@@ -838,7 +844,8 @@ initialize_rounds <- function(settings,
     nms <- c("data", avail_bda[-1],
              sprintf("beta_%s", avail_bda), "blmat",
              sprintf("mu_%s", c(avail_bda, "int", "est")),
-             sprintf("se_%s", c(avail_bda, "int", "est")), "criteria")
+             sprintf("se_%s", c(avail_bda, "int", "est")),
+             "n_bda", "criteria")
 
     rounds[nms] <- lapply(rounds[nms], function(x){
 
