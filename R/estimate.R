@@ -66,7 +66,7 @@ compute_bda <- function(data,
 
       bda <- rounds$bda
     }
-    for (i in seq_p){
+    for (i in if (is.null(target)) seq_p else seq_p[-match(target, nodes)]){
 
       pars <- as.matrix(rounds$ps[[i]][, parents, drop = FALSE])
       temp <- bda[[i]]
@@ -82,7 +82,7 @@ compute_bda <- function(data,
         ik <- c(i, k)  # predictor and parent
 
         ## i -> j
-        for (j in if (is.null(target)) seq_p[-i] else target){
+        for (j in if (is.null(target)) seq_p[-i] else match(target, nodes)){
 
           ## all observational data, and interventional data
           ## on nodes a that do not block a path i -> a -> j

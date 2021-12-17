@@ -348,9 +348,10 @@ update_rounds <- function(t,
 
   rounds <- compute_int(t = t, settings = settings,
                         rounds = rounds, debug = debug)
-  rounds$bda <- compute_bda(data = data,
-                            settings = settings, rounds = rounds,
-                            target = NULL, debug = debug)
+  rounds$bda <- compute_bda(data = data, settings = settings, rounds = rounds,
+                            # target = NULL,  # to estimate pairwise effects
+                            target = target,  # focus on target
+                            debug = debug)
 
   if (settings$type == "bn.fit.gnet"){
 
