@@ -69,6 +69,12 @@ compile_path <- function(path,
           return(NULL)
 
         roundsj <- readRDS(file.path(method_data_dir, "rds", x))
+
+        ## TODO: remove this quick patch fix because of a previous typo
+        if (any(is.na(roundsj$selected$expected_cumulative))){
+
+          roundsj$selected$expected_cumulative <- cumsum(roundsj$selected$expected_regret)
+        }
         if (concise){
 
           cp_dag <- unlist(lapply(avail_bda[-seq_len(2)],

@@ -438,9 +438,9 @@ summarize_rounds <- function(bn.fit, settings, rounds){
     cumsum((max_reward - rounds$selected$reward)[!ind_obs])
   rounds$selected$expected_cumulative <- 0
   rounds$selected$expected_cumulative[ind_obs] <-
-    cumsum((max_reward - rounds$selected$expected)[ind_obs])
+    cumsum((max_reward - rounds$selected$expected_reward)[ind_obs])
   rounds$selected$expected_cumulative[!ind_obs] <-
-    cumsum((max_reward - rounds$selected$expected)[!ind_obs])
+    cumsum((max_reward - rounds$selected$expected_reward)[!ind_obs])
 
   ## clear rownames
   rownames(rounds$arms) <- rownames(rounds$data) <-
