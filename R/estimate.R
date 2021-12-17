@@ -68,15 +68,9 @@ compute_bda <- function(data,
     }
     for (i in seq_p){
 
-      bool_data <- bool_bda(t = t, i = i,
-                            settings = settings, rounds = rounds)
-
       pars <- as.matrix(rounds$ps[[i]][, parents, drop = FALSE])
       temp <- bda[[i]]
-      n <- sum(bool_data)
       i_values <- rounds$node_values[[i]]
-      Xy <- as.matrix(data[bool_data, , drop=FALSE])
-      # Xy <- apply(Xy, 2, function(x) x - mean(x))
 
       for (l in rounds$ps[[i]][, "ordering"]){
 
@@ -89,6 +83,13 @@ compute_bda <- function(data,
 
         ## i -> j
         for (j in if (is.null(target)) seq_p[-i] else target){
+
+          ## all observational data, and interventional data
+          ## on nodes a that do not block a path i -> a -> j
+          bool_data <- bool_bda(t = t, from = i, to = j,
+                                settings = settings, rounds = rounds)
+          n <- sum(bool_data)
+          Xy <- as.matrix(data[bool_data, , drop=FALSE])
 
           if (j %in% k){  # j -> i, so i -/-> j
 
@@ -457,6 +458,8 @@ concentrate_ps <- function(ps,
   if (is.null(amat))
     return(ps)
 
+  ## TODO: this is approximate
+
   nodes <- names(ps)
   if (is.null(dim(amat)))
     amat <- row2mat(row = amat, nodes = nodes)
@@ -489,7 +492,8 @@ concentrate_ps <- function(ps,
 # Indicate data rows that can be used for bda
 
 bool_bda <- function(t,
-                     i,
+                     from,
+                     to = settings$target,
                      settings,
                      rounds,
                      debug = 0){
@@ -504,8 +508,8 @@ bool_bda <- function(t,
     bool_arms <- sapply(rounds$arms, function(arm){
 
       ## Pr(i -> j -> target) <= min(Pr(i -> j), Pr(j -> target))
-      min(rounds$arp[i, arm$node],
-          rounds$arp[arm$node, settings$target]) < settings$eta
+      min(rounds$arp[from, arm$node],
+          rounds$arp[arm$node, to]) < settings$eta
     })
     bool_data[rounds$selected$arm[seq_len(t)] > 0] <-
       bool_arms[rounds$selected$arm[seq_len(t)]]
