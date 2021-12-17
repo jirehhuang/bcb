@@ -566,6 +566,7 @@ summarize_rounds <- function(bn.fit,
     for (nm in nms){
 
       rounds[[nm]] <- rounds[[nm]][-seq_len(settings$n_obs),]
+      rownames(rounds[[nm]]) <- NULL
     }
   }
   return(rounds)
