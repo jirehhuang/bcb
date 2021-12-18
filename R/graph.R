@@ -107,7 +107,7 @@ amat2cpdag <- function(amat,
 
       debug_cli(TRUE, cli::cli_alert_danger,
                 "CPDAG still contains cycles")
-      browser()
+      # browser()
     }
   } else{
 
