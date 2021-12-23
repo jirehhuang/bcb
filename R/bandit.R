@@ -330,13 +330,6 @@ update_rounds <- function(t,
                           settings = settings,
                           interventions = interventions,
                           debug = debug)
-  if (t > n_obs){
-
-    rounds$arp <- compute_arp(data = data,
-                              settings = settings,
-                              interventions = interventions,
-                              debug = debug)
-  }
   rounds$bma[t,] <- ps2es(ps = rounds$ps, settings = settings)
   rounds$mpg[t,] <- es2mpg(es = rounds$bma[t,], prob = 0.5)
   rounds$mds[t,] <- execute_mds(ps = rounds$ps, settings = settings,
@@ -345,7 +338,43 @@ update_rounds <- function(t,
                                    settings = settings,
                                    interventions = interventions,
                                    dag = FALSE, debug = debug)
+  if (t > n_obs){
 
+    post <- method2post(method = settings$method)
+    dag <- switch(post,
+                  star = bnlearn::amat(settings$bn.fit),
+                  bma = NULL,
+                  eg = NULL,
+                  # eg = bnlearn::amat(bnlearn::empty.graph(settings$nodes)),
+                  rounds[[post]][t,])
+
+    ## if dag, determine arp deterministically
+    if (all(dag %in% c(0, 1)) &&
+        !any(dag * t(dag) > 0)){
+
+      arp <- diag(settings$nnodes)
+      for (i in seq_len(settings$nnodes)){
+
+        for (j in seq_len(settings$nnodes)[-i]){
+
+          if (phsl:::has_path(i = i, j = j, amat = dag,
+                              nodes = settings$nodes)){
+            arp[i, j] <- 1
+          }
+        }
+      }
+      rownames(arp) <- colnames(arp) <- settings$nodes
+      rounds$arp <- arp
+
+    } else{
+
+      ## compute arp probabilities
+      rounds$arp <- compute_arp(data = data,
+                                settings = settings,
+                                interventions = interventions,
+                                debug = debug)
+    }
+  }
   rounds <- compute_int(t = t, settings = settings,
                         rounds = rounds, debug = debug)
   rounds$bda <- compute_bda(data = data, settings = settings, rounds = rounds,
@@ -382,14 +411,7 @@ update_rounds <- function(t,
 
     } else{  # t > n_obs
 
-      post <- switch(settings$method,
-                     `bcb-star` = "star",
-                     `bcb-mpg` = "mpg",
-                     `bcb-mds` = "mds",
-                     `bcb-gies` = "gies",
-                     `bcb-eg` = "eg",
-                     "bma")  # default bma
-
+      post <- method2post(method = settings$method)
       dag <- switch(post,
                     star = bnlearn::amat(settings$bn.fit),
                     bma = NULL,
@@ -455,7 +477,7 @@ summarize_rounds <- function(bn.fit,
 
   ## graph metrics
   true <- bnlearn::amat(bn.fit)
-  for (graph in c(avail_bda[-seq_len(2)])){
+  for (graph in setdiff(avail_bda, c("star", "bma", "eg"))){
 
     cp_dag <- apply(rounds[[graph]], 1, function(row){
       est <- row2mat(row = row, nodes = settings$nodes)
@@ -631,7 +653,7 @@ read_rounds <- function(where){
                       sprintf("mu_%s", c(avail_bda, "int", "est")),
                       sprintf("se_%s", c(avail_bda, "int", "est")),
                       "criteria"),
-             unlist(lapply(avail_bda[-seq_len(2)],
+             unlist(lapply(setdiff(avail_bda, c("star", "bma", "eg")),
                            function(x) sprintf("%s_%s", c("dag", "cpdag"), x))),
              "settings")
 
@@ -1250,4 +1272,20 @@ check_settings <- function(settings,
   settings <- settings[union(nms, c("bn.fit"))]
 
   return(settings)
+}
+
+
+
+# Convert policy method to posterior method
+
+method2post <- function(method){
+
+  post <- switch(method,
+                 `bcb-star` = "star",
+                 `bcb-mpg` = "mpg",
+                 `bcb-mds` = "mds",
+                 `bcb-gies` = "gies",
+                 `bcb-eg` = "eg",
+                 "bma")  # default bma
+  return(post)
 }
