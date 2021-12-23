@@ -62,7 +62,6 @@ compile_path <- function(path,
                                                  data_row$network, data_row$n_obs))
 
       method_data_rds <- list.files(file.path(method_data_dir, "rds"))
-      # method_data_rds <- sprintf("rounds%g.rds", seq_len(data_row$n_dat))
       net_rounds <- sapply(method_data_rds, function(x){
 
         if (!file.exists(file.path(method_data_dir, "rds", x)))
@@ -109,9 +108,6 @@ compile_path <- function(path,
 
       return(net_rounds)
     }))
-    # attr(compiled, "concise") <- concise
-    # attr(compiled, "average") <- 0
-    # attr(compiled, "format") <- 0
     if (all(sapply(compiled, function(x)
       any(sapply(x, length) > 0)))){
 
@@ -133,12 +129,6 @@ compile_path <- function(path,
 average_compiled <- function(compiled,
                              across_networks = FALSE,
                              normalize = TRUE){
-
-  # concise <- attr(compiled, "concise")
-  # average <- attr(compiled, "average")
-  # format <- attr(compiled, "format")
-  # debug_cli(average > 0 || format > 0, cli::cli_abort,
-  #           "compiled must not already be averaged or formatted")
 
   if (across_networks)
     normalize <- TRUE
@@ -182,8 +172,6 @@ average_compiled <- function(compiled,
 
     }, simplify = FALSE)
   }, simplify = FALSE)
-  # attr(averaged, "average") <- 1
-  # attr(averaged, "format") <- 1
 
   if (across_networks){
 
@@ -205,8 +193,21 @@ average_compiled <- function(compiled,
       return(reduced)
 
     }, simplify = FALSE)
-    # attr(averaged, "average") <- 2
-    # attr(averaged, "format") <- 2
+  }
+  ## adjust format
+  if (across_networks){
+
+    averaged <- list(
+      averaged = list(
+        averaged = averaged
+      )
+    )
+  } else{
+
+    averaged <- lapply(averaged, function(x){
+
+      list(averaged = x)
+    })
   }
   return(averaged)
 }
@@ -234,6 +235,87 @@ rounds2df <- function(rounds){
   rownames(df) <- NULL
 
   return(df)
+}
+
+
+
+#' @export
+
+compiled2results <- function(path,
+                             concise = TRUE,
+                             format = 2,
+                             as_df = TRUE,
+                             debug = 1){
+
+  debug_cli(debug, cli::cli_alert_info,
+            c("arranging results from files in {path}/{ifelse(concise, 'concise', 'complete')} ",
+              "with format = {format} and as_df = {as_df}"))
+
+  path <- bcb:::check_path(path)
+
+  files <- list.files(compiled_path <- file.path(path, ifelse(concise, "concise",
+                                                              "complete")))
+  files <- files[grepl(".rds", files)]
+  files <- files[grepl(paste(bcb:::avail_methods[-1],
+                             collapse = "|"), files) &
+                   !grepl("results|df", files)]
+
+  results <- list()
+  for (file in files){
+
+    debug_cli(debug, cli::cli_alert,
+              "reading {file}")
+
+    nm <- gsub(".rds", "", file)
+    results[[nm]] <- readRDS(file.path(compiled_path, file))
+
+    if (format == 1){
+
+      results[[nm]] <- average_compiled(compiled = results[[nm]],
+                                        across_networks = FALSE, normalize = TRUE)
+      # results[[nm]] <- lapply(results[[nm]], function(x){
+      #
+      #   list(averaged = x)
+      # })
+    } else if (format == 2){
+
+      results[[nm]] <- average_compiled(compiled = results[[nm]],
+                                        across_networks = TRUE, normalize = TRUE)
+      # results[[nm]] <- list(
+      #   averaged = list(
+      #     averaged = average_compiled(compiled = results[[nm]],
+      #                                 across_networks = TRUE, normalize = TRUE)
+      #   )
+      # )
+    }
+    if (as_df){
+
+      results[[nm]] <- lapply(results[[nm]], function(x){
+
+        lapply(x, rounds2df)
+      })
+      results[[nm]] <- do.call(rbind, lapply(names(results[[nm]]), function(network){
+
+        cbind(data.frame(network = network),
+              do.call(rbind, lapply(names(results[[nm]][[network]]), function(rounds){
+
+                cbind(data.frame(rounds = rounds),
+                      results[[nm]][[network]][[rounds]])
+              })))
+      }))
+    }
+  }
+  if (as_df){
+
+    results <- do.call(rbind, lapply(names(results), function(method){
+
+      cbind(data.frame(method = method),
+            results[[method]])
+    }))
+    write.table(results, file = file.path(compiled_path, sprintf("df_%s.txt", format)))
+  }
+  saveRDS(results, file = file.path(compiled_path,
+                                    sprintf("%s_%s.rds", ifelse(as_df, "df", "results"), format)))
 }
 
 
