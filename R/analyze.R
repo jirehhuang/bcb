@@ -323,8 +323,8 @@ compiled2results <- function(path,
 # Fixed theme for plots
 #' @export
 
-theme_fixed <- function(base_size = 10,
-                        axis_size = 8,
+theme_fixed <- function(base_size = 11,
+                        axis_size = 9,
                         bool_axis_text = TRUE,
                         bool_legend_title = FALSE,
                         bool_legend = TRUE,
@@ -366,4 +366,47 @@ theme_fixed <- function(base_size = 10,
             } else element_text(color = "white")
       )
   )
+}
+
+
+
+#' @export
+
+df2line <- function(df,
+                    metrics = c("expected_cumulative", "expected_regret"),
+                    ...){
+
+  metrics <- metrics[metrics %in% names(df)]
+  ylabs <- sapply(metrics, function(x){
+
+    switch(x,
+           reward = "Reward",
+           estimate = "Estimate of Selected Arm",
+           criteria = "Criteria of Selected Arm",
+           greedy_expected = "Expected Reward of Arm with Highest Estimate",
+           expected_reward = "Expected Reward of Selected Arm",
+           expected_regret = "Simple Regret",
+           greedy_regret = "Expected Regret of Arm with Highest Estimate",
+           cumulative = "Cumulative Regret",
+           expected_cumulative = "Expected Cumulative Regret",
+           mu_est = "MSE of Estimated Rewards",
+           dag_mpg = "JI of MPG Estimate",
+           cpdag_mpg = "JI of CPDAG of MPG Estimate",
+           dag_mds = "JI of MDS Estimate",
+           cpdag_mds = "JI of CPDAG of MDS Estimate",
+           dag_gies = "JI of GIES Estimate",
+           cpdag_gies = "JI of CPDAG of GIES Estimate",
+           x)
+  })
+  plotlist <- lapply(seq_len(length(metrics)), function(i){
+
+    ggplot(data = df,
+           aes(x = t, y = get(metrics[i]), group = method,
+               color = method, lty = method)) +
+      geom_line(size = 1) +
+      theme_fixed(...) +
+      ylab(ylabs[i])
+  })
+  ggarrange(plotlist = plotlist,
+            common.legend = TRUE)
 }
