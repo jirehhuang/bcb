@@ -76,7 +76,7 @@ compile_path <- function(path,
         }
         if (concise){
 
-          cp_dag <- unlist(lapply(avail_bda[-seq_len(2)],
+          cp_dag <- unlist(lapply(setdiff(avail_bda, c("star", "bma", "eg")),
                                   function(x) sprintf("%s_%s", c("dag", "cpdag"), x)))
           roundsj$ji <- as.data.frame(sapply(cp_dag,
                                              function(x) roundsj[[x]]$JI, simplify = FALSE))
