@@ -3,7 +3,7 @@
 
 compile_path <- function(path,
                          concise = TRUE,
-                         n_cores = 1,
+                         n_cores = -1,
                          debug = 1){
 
   path <- check_path(path)
