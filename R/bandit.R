@@ -152,9 +152,11 @@ apply_method <- function(t,
 
           criteria <- sapply(params, function(x){
 
-            sigma2 <- 1 / stats::rgamma(n = 1, shape = x["a"], rate = x["b"])
-            mu <- rnorm(n = 1, mean = x["beta"], sd = sqrt(sigma2 / x["nu"]))
+            # sigma2 <- 1 / stats::rgamma(n = 1, shape = x["a"], rate = x["b"])
+            # mu <- rnorm(n = 1, mean = x["beta"], sd = sqrt(sigma2 / x["nu"]))
 
+            mu <- rt_nig(n = 1, mu = x["beta"], nu = x["nu"],
+                         b = x["b"], a = x["a"])
             return(mu)
           })
           criteria <- sapply(seq_len(length(rounds$arms)), function(a){
@@ -188,9 +190,11 @@ apply_method <- function(t,
           })
           criteria <- sapply(params, function(x){
 
-            sigma2 <- 1 / stats::rgamma(n = 1, shape = x["a"], rate = x["b"])
-            mu <- rnorm(n = 1, mean = x["mu"], sd = sqrt(sigma2 / x["nu"]))
+            # sigma2 <- 1 / stats::rgamma(n = 1, shape = x["a"], rate = x["b"])
+            # mu <- rnorm(n = 1, mean = x["mu"], sd = sqrt(sigma2 / x["nu"]))
 
+            mu <- rt_nig(n = 1, mu = x["mu"], nu = x["nu"],
+                         b = x["b"], a = x["a"])
             return(mu)
           })
         }
@@ -1288,4 +1292,14 @@ method2post <- function(method){
                  `bcb-eg` = "eg",
                  "bma")  # default bma
   return(post)
+}
+
+
+
+# Generate mu marginal with t-distribution using nig parameters
+
+rt_nig <- function(n, mu, nu, b, a){
+
+  rt(n = n, df = 2 * a) *
+    sqrt(b / a / nu) + mu
 }
