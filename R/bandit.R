@@ -153,7 +153,7 @@ apply_method <- function(t,
           criteria <- sapply(params, function(x){
 
             sigma2 <- 1 / stats::rgamma(n = 1, shape = x["a"], rate = x["b"])
-            mu <- rnorm(n = 1, mean = x["beta"], sd = sigma2 / x["nu"])
+            mu <- rnorm(n = 1, mean = x["beta"], sd = sqrt(sigma2 / x["nu"]))
 
             return(mu)
           })
@@ -189,7 +189,7 @@ apply_method <- function(t,
           criteria <- sapply(params, function(x){
 
             sigma2 <- 1 / stats::rgamma(n = 1, shape = x["a"], rate = x["b"])
-            mu <- rnorm(n = 1, mean = x["mu"], sd = sigma2 / x["nu"])
+            mu <- rnorm(n = 1, mean = x["mu"], sd = sqrt(sigma2 / x["nu"]))
 
             return(mu)
           })
