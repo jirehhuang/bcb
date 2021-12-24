@@ -353,7 +353,8 @@ update_rounds <- function(t,
                   rounds[[post]][t,])
 
     ## if dag, determine arp deterministically
-    if (all(dag %in% c(0, 1)) &&
+    if (!is.null(dag) &&
+        all(dag %in% c(0, 1)) &&
         !any(dag * t(dag) > 0)){
 
       arp <- diag(settings$nnodes)
@@ -1300,6 +1301,9 @@ method2post <- function(method){
 
 rt_nig <- function(n, mu, nu, b, a){
 
-  rt(n = n, df = 2 * a) *
-    sqrt(b / a / nu) + mu
+  value <- mu +
+    rt(n = n, df = 2 * a) *
+    sqrt(b / a / nu)
+
+  return(unname(value))
 }
