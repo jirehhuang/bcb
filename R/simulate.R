@@ -36,7 +36,7 @@ simulate_method <- function(method_num,
 
   ## set up parallel execution
   if (n_cores < 1)
-    n_cores <- min(parallel::detectCores(), nrow(data_grid))
+    n_cores <- min(parallel::detectCores(), nrow(dataset_grid))
   n_cores <- round(n_cores)
 
   debug_cli(debug, cli::cli_alert_info,
@@ -365,9 +365,8 @@ check_method_grid <- function(method_grid){
 
   ## column names
   nms <- c("target", "n_run", "n_obs", "n_int", "n_ess", "n_t", "int_parents",
-           "epsilon", "c", "mu_0", "nu_0", "b_0", "a_0",
-           "score", "restrict", "alpha", "max.sx",
-           "max_parents", "eta", "unique_make")
+           "epsilon", "c", "mu_0", "nu_0", "b_0", "a_0", "bcb_combine", "bcb_criteria",
+           "score", "restrict", "alpha", "max.sx", "max_parents", "eta", "unique_make")
 
   ## remove extra columns
   method_grid <- method_grid[, intersect(names(method_grid), nms)]

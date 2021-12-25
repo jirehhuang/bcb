@@ -54,6 +54,21 @@ avail_restrict <- c("none",  # no restriction
 
 
 
+# Available bcb methods for combining obs and int estimates
+
+avail_bcb_combine <- c("average",    # weighted average
+                       "conjugate")  # conjugate
+
+
+
+# Available bcb methods for determining criteria
+
+avail_bcb_criteria <- c("ucb",  # upper confidence bound
+                        "ts",   # thompson sampling
+                        "uq")   # upper quantile; ucb with no log(t)
+
+
+
 # Width of function portion of debugging output
 
 DEBUG_WIDTH <- 20

@@ -560,6 +560,7 @@ summarize_rounds <- function(bn.fit,
       data.frame(arm = (a <- arms_ordering[i]),
                  mu_true = rounds$mu_true[a],
                  n_bda = rounds$n_bda[, a],
+                 n_nig = rounds$n_nig[, a],
                  criteria = rounds$criteria[, a]),
       do.call(cbind, sapply(
         sprintf("mu_%s", c(avail_bda, "int", "est")), function(x){
@@ -799,7 +800,7 @@ initialize_rounds <- function(settings,
              simplify = FALSE, USE.NAMES = TRUE),
       sapply(c(sprintf("mu_%s", c(avail_bda, "int", "est")),
                sprintf("se_%s", c(avail_bda, "int", "est")),
-               "n_bda", "criteria"),
+               "n_bda", "n_nig", "criteria"),
              function(x) acal,
              simplify = FALSE, USE.NAMES = TRUE)
     )
@@ -874,7 +875,7 @@ initialize_rounds <- function(settings,
              sprintf("beta_%s", avail_bda), "blmat",
              sprintf("mu_%s", c(avail_bda, "int", "est")),
              sprintf("se_%s", c(avail_bda, "int", "est")),
-             "n_bda", "criteria")
+             "n_bda", "n_nig", "criteria")
 
     rounds[nms] <- lapply(rounds[nms], function(x){
 
@@ -1139,8 +1140,25 @@ check_settings <- function(settings,
       settings$c <- 1
       debug_cli(debug >= 3, "", "default c = {settings$c} for bcb")
     }
+
+    ## check bcb_combine
+    if (is.null(settings$bcb_combine) ||
+        !is.character(settings$bcb_combine) ||
+        !settings$bcb_combine %in% avail_bcb_combine){
+      settings$bcb_combine <- "average"
+      debug_cli(debug >= 3, "", "default bcb_combine = {settings$bcb_combine} for bcb")
+    }
+
+    ## check bcb_criteria
+    if (is.null(settings$bcb_criteria) ||
+        !is.character(settings$bcb_criteria) ||
+        !settings$bcb_criteria %in% avail_bcb_criteria){
+      settings$bcb_criteria <- "ucb"
+      debug_cli(debug >= 3, "", "default bcb_criteria = {settings$bcb_criteria} for bcb")
+    }
   }
-  for (i in c("epsilon", "c", "mu_0", "nu_0", "b_0", "a_0")){
+  for (i in c("epsilon", "c", "mu_0", "nu_0", "b_0", "a_0",
+              "bcb_combine", "bcb_criteria")){
     if (is.null(settings[[i]]))
       settings[[i]] <- NA
   }
@@ -1268,8 +1286,9 @@ check_settings <- function(settings,
   ## sort settings
   nms <- c("method", "target", "run", "n_obs", "n_int",
            "n_ess", "n_t", "int_parents", "epsilon",
-           "c", "mu_0", "nu_0", "b_0", "a_0", "score",
-           "restrict", "alpha", "max.sx",
+           "c", "mu_0", "nu_0", "b_0", "a_0",
+           "bcb_combine", "bcb_criteria",
+           "score", "restrict", "alpha", "max.sx",
            "max_parents", "threshold", "eta",
            "nodes", "nnodes", "type",
            "temp_dir", "aps_dir", "mds_dir",
