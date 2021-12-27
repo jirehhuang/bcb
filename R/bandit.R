@@ -428,6 +428,9 @@ update_rounds <- function(t,
       rounds$n_bda[t,] <-
         sapply(rounds$bda[sapply(rounds$arms, `[[`, "node")],
                function(x) max(x[[target]]$n_bda, na.rm = TRUE))
+      rounds$n_nig[t,] <-
+        sapply(rounds$bda[sapply(rounds$arms, `[[`, "node")],
+               function(x) max(x[[target]]$n_nig, na.rm = TRUE))
     }
   } else if (settings$type == "bn.fit.dnet"){
 

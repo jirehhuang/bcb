@@ -36,10 +36,14 @@ void lm_cpp(arma::mat& X,
   values(3) = 1 / inv_XtX(0, 0);  // XtX
   values(1) = std::sqrt(values(2) / (X.n_rows - X.n_cols) / values(3));
 
-  // update to estimate sd of intervention distr
+  // solve for SE_bda = SE_nig
   resid = y - X.col(0) * betas(0);
   resid = resid - arma::mean(resid);
-  values(2) = arma::dot(resid, resid);  // sum of squared residuals
+  double values_2 = arma::dot(resid, resid);  // update to estimate interventional sd
+  values(4) = (values_2 / values(2)) *
+    (values(3) / arma::dot(X.col(0), X.col(0))) *
+    (X.n_rows - X.n_cols);
+  values(2) = values_2;
 }
 
 
