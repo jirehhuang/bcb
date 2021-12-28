@@ -1109,15 +1109,15 @@ check_settings <- function(settings,
     debug_cli(debug >= 3, "", "default n_int = {settings$n_int}")
   }
 
-  ## check n_ess
-  if (is.null(settings$n_ess) ||
-      is.na(settings$n_ess) ||
-      is.infinite(settings$n_ess) ||
-      !is.numeric(settings$n_ess)){
-    settings$n_ess <- settings$n_obs + settings$n_int
+  ## check initial_n_ess
+  if (is.null(settings$initial_n_ess) ||
+      is.na(settings$initial_n_ess) ||
+      is.infinite(settings$initial_n_ess) ||
+      !is.numeric(settings$initial_n_ess)){
+    settings$initial_n_ess <- settings$n_obs + settings$n_int
     debug_cli(debug >= 3, "",
-              c("automatically selected n_ess = n_obs + n_int = ",
-                "{settings$n_ess}"))
+              c("automatically selected initial_n_ess = n_obs + n_int = ",
+                "{settings$initial_n_ess}"))
   }
 
   ## check n_t
@@ -1387,7 +1387,7 @@ check_settings <- function(settings,
 
   ## sort settings
   nms <- c("method", "target", "run", "n_obs", "n_int",
-           "n_ess", "n_t", "int_parents", "epsilon",
+           "initial_n_ess", "n_t", "int_parents", "epsilon",
            "c", "mu_0", "nu_0", "b_0", "a_0",
            "bcb_combine", "bcb_criteria",
            "score", "restrict", "alpha", "max.sx",

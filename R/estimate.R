@@ -140,9 +140,9 @@ compute_bda <- function(data,
                 n_int <- sum(rounds$selected$interventions == nodes[i])
 
                 ## ess
-                n_bda <- ifelse(settings$n_ess <= 0,
+                n_bda <- ifelse(settings$initial_n_ess <= 0,
                                 max(min(n_bda, n_int), 1),
-                                min(n_bda, settings$n_ess))
+                                min(n_bda, settings$initial_n_ess))
                 ## est
                 beta_est <- (beta_bda * n_bda + beta_int * n_int) / (n_bda +
                                                                        n_int)
@@ -165,9 +165,9 @@ compute_bda <- function(data,
                 ## priors with bda
                 n_bda <- temp[[j]]$n_bda[l]
                 n_nig <- temp[[j]]$n_nig[l]
-                n_nig <- ifelse(settings$n_ess <= 0,
+                n_nig <- ifelse(settings$initial_n_ess <= 0,
                                 max(min(n_nig, n_int), 1),
-                                min(n_nig, settings$n_ess))
+                                min(n_nig, settings$initial_n_ess))
                 nu_0 <- n_nig
                 a_0 <- max(1, n_nig / 2)
 
@@ -248,11 +248,12 @@ compute_int <- function(t,
 
     a <- rounds$selected$arm[t]
     bool_int <- rounds$selected$interventions == rounds$arms[[a]]$node
-    x_int <- sapply(rounds$selected$arm[bool_int], function(x){
+    x_int <- as.numeric(
+      sapply(rounds$selected$arm[bool_int], function(x){
 
-      rounds$arms[[x]]$value
-
-    }) * rounds$data[bool_int, target]
+        rounds$arms[[x]]$value
+      })
+    ) * rounds$data[bool_int, target]
 
     ## update se
     beta_int <- mean(x_int)
