@@ -91,8 +91,44 @@ apply_method <- function(t,
 
       mu <- rounds$mu_est[t-1,]
       se <- rounds$se_est[t-1,]
-      criteria <-
-        mu + se * settings$c * sqrt(log(t - settings$n_obs))
+
+      if (settings$bcb_criteria == "ucb"){
+
+        criteria <-
+          mu + se * settings$c * sqrt(log(t - settings$n_obs))
+
+      } else if (settings$bcb_criteria == "ts"){
+
+        mu <- rounds$mu_est[t-1,]
+        se <- rounds$se_est[t-1,]
+        n_nig <- rounds$n_nig[t-1,]
+        n_int <- sapply(rounds$arms, function(arm){
+
+          sum(rounds$selected$interventions == arm$node)
+        })
+        t_ <- sapply(unique(sapply(rounds$arms, `[[`, "node")), function(node){
+
+          a <- match(node, sapply(rounds$arms, `[[`, "node"))
+          rt(n = 1, df = n_nig[a] + n_int[a])
+        })
+        criteria <- sapply(seq_len(length(rounds$arms)), function(a){
+
+          mu[a] + t_[rounds$arms[[a]]$node] * se[a] * rounds$arms[[a]]$value
+        })
+        ## TODO: check whether symmetric (above) or indep (below) criteria
+        # t_ <- sapply(seq_len(length(rounds$arms)), function(a){
+        #
+        #   rt(n = 1, df = n_nig[a] + n_int[a])
+        # })
+        # criteria <- sapply(seq_len(length(rounds$arms)), function(a){
+        #
+        #   mu[a] + t_[a] * se[a]
+        # })
+      } else if (settings$bcb_criteria == "uq"){
+
+        criteria <-
+          mu + se * settings$c
+      }
 
     } else if (method == "random"){
 
@@ -117,85 +153,45 @@ apply_method <- function(t,
 
     } else if (method == "ts"){
 
-      list2env(settings[c("mu_0", "nu_0", "b_0", "a_0")],
-               envir = environment())
-
       if (settings$type == "bn.fit.gnet"){
+
+        list2env(settings[c("mu_0", "nu_0", "b_0", "a_0")],
+                 envir = environment())
+
+        mu <- rounds$mu_est[t-1,]
+        se <- rounds$se_est[t-1,]
+        n_nig <- rounds$n_nig[t-1,]
 
         if (mu_0 == 0){
 
-          beta_0 <- mu_0
-          int_nodes <- unique(sapply(rounds$arms, `[[`, "node"))
-          params <- sapply(int_nodes, function(node){
+          ## symmetric criteria
+          n_int <- sapply(rounds$arms, function(arm){
 
-            ## posterior update
-            bool_int <- rounds$selected$interventions == node
-            x_int <- as.numeric(
-              sapply(rounds$selected$arm[bool_int], function(x){
+            sum(rounds$selected$interventions == arm$node)
+          })
+          t_ <- sapply(unique(sapply(rounds$arms, `[[`, "node")), function(node){
 
-                rounds$arms[[x]]$value
-              })
-            ) * rounds$data[bool_int, settings$target]
-            n_int <- length(x_int)
-            beta_int <- ifelse(n_int, mean(x_int), 0)
-
-            nu <- nu_0 + n_int
-            beta <- (nu_0 * beta_0 + n_int * beta_int) / nu
-
-            a_ <- a_0 + n_int / 2
-            b <- b_0 + 1/2 * sum((x_int - beta_int)^2) +
-              n_int * nu_0 / nu * (beta_int - beta_0)^2 / 2
-
-            return(c(beta = beta, nu = nu, b = b, a = a_))
-
-          }, simplify = FALSE)
-
-          criteria <- sapply(params, function(x){
-
-            # sigma2 <- 1 / stats::rgamma(n = 1, shape = x["a"], rate = x["b"])
-            # mu <- rnorm(n = 1, mean = x["beta"], sd = sqrt(sigma2 / x["nu"]))
-
-            mu <- rt_nig(n = 1, mu = x["beta"], nu = x["nu"],
-                         b = x["b"], a = x["a"])
-            return(mu)
+            a <- match(node, sapply(rounds$arms, `[[`, "node"))
+            rt(n = 1, df = n_nig[a] + n_int[a])
           })
           criteria <- sapply(seq_len(length(rounds$arms)), function(a){
 
-            criteria[rounds$arms[[a]]$node] * rounds$arms[[a]]$value
+            mu[a] + t_[rounds$arms[[a]]$node] * se[a] * rounds$arms[[a]]$value
           })
-          criteria <- unname(criteria)
-
         } else{
 
-          params <- lapply(seq_len(length(rounds$arms)), function(a){
+          ## independent criteria
+          n_int <- sapply(seq_len(length(rounds$arms)), function(a){
 
-            arm <- rounds$arms[[a]]
-            if (arm$N == 0){
-
-              return(c(mu = mu_0, nu = nu_0, b = b_0, a = a_0))
-
-            } else{
-
-              ## posterior update
-              nu <- nu_0 + arm$N
-              mu <- (mu_0 * nu_0 + arm$N * arm$estimate) / nu
-              x <- rounds$data[rounds$selected$arm == a,
-                               settings$target]
-              a_ <- a_0 + arm$N / 2
-              b <- b_0 + 1/2 * sum((x - arm$estimate)^2) +
-                arm$N * nu_0 / nu * (arm$estimate - mu_0)^2 / 2
-
-              return(c(mu = mu, nu = nu, b = b, a = a_))
-            }
+            sum(rounds$selected$arm == a)
           })
-          criteria <- sapply(params, function(x){
+          t_ <- sapply(seq_len(length(rounds$arms)), function(a){
 
-            # sigma2 <- 1 / stats::rgamma(n = 1, shape = x["a"], rate = x["b"])
-            # mu <- rnorm(n = 1, mean = x["mu"], sd = sqrt(sigma2 / x["nu"]))
+            rt(n = 1, df = n_nig[a] + n_int[a])
+          })
+          criteria <- sapply(seq_len(length(rounds$arms)), function(a){
 
-            mu <- rt_nig(n = 1, mu = x["mu"], nu = x["nu"],
-                         b = x["b"], a = x["a"])
-            return(mu)
+            mu[a] + t_[a] * se[a]
           })
         }
       } else if (settings$type == "bn.fit.dnet"){
@@ -406,31 +402,132 @@ update_rounds <- function(t,
                               dag = dag, type = "bda", post = post, est = post)
     }
     ## est
-    if (t <= n_obs ||
-        settings$method %in% c("cache")){
+    post <- method2post(method = settings$method)
+    dag <- switch(post,
+                  star = bnlearn::amat(settings$bn.fit),
+                  bma = NULL,
+                  eg = bnlearn::amat(bnlearn::empty.graph(settings$nodes)),
+                  rounds[[post]][t,])
+    if (settings$method == "ts"){
 
-      ## default bma; bda = est for obs
-      rounds$mu_est[t,] <- rounds$mu_bma[t,]
-      rounds$se_est[t,] <- rounds$se_bma[t,]
+      list2env(settings[c("mu_0", "nu_0", "b_0", "a_0")],
+               envir = environment())
+
+      if (mu_0 == 0){
+
+        beta_0 <- mu_0
+        int_nodes <- unique(sapply(rounds$arms, `[[`, "node"))
+        params <- sapply(int_nodes, function(node){
+
+          ## posterior update
+          bool_int <- rounds$selected$interventions == node
+          x_int <- as.numeric(
+            sapply(rounds$selected$arm[bool_int], function(x){
+
+              rounds$arms[[x]]$value
+            })
+          ) * rounds$data[bool_int, settings$target]
+          n_int <- length(x_int)
+          beta_int <- ifelse(n_int, mean(x_int), 0)
+
+          nu <- nu_0 + n_int
+          beta <- (nu_0 * beta_0 + n_int * beta_int) / nu
+
+          a_ <- a_0 + n_int / 2
+          b <- b_0 + 1/2 * sum((x_int - beta_int)^2) +
+            n_int * nu_0 / nu * (beta_int - beta_0)^2 / 2
+
+          return(c(beta = beta, nu = nu, b = b, a = a_))
+
+        }, simplify = FALSE)
+
+      } else{
+
+        mu_int <- rounds$mu_int[t,]
+        params <- lapply(seq_len(length(rounds$arms)), function(a){
+
+          bool_int <- rounds$selected$interventions == rounds$arms[[a]]$node
+          x_int <- as.numeric(
+            sapply(rounds$selected$arm[bool_int], function(x){
+
+              rounds$arms[[x]]$value
+            })
+          ) * rounds$data[bool_int, settings$target]
+          x_int <- x_int * rounds$arms[[a]]$value
+          n_int <- length(x_int)
+
+          if (n_int == 0){
+
+            return(c(mu = mu_0, nu = nu_0, b = b_0, a = a_0))
+
+          } else{
+
+            ## posterior update
+            nu <- nu_0 + n_int
+            mu <- (mu_0 * nu_0 + n_int * rounds$mu_int[t, a]) / nu
+
+            a_ <- a_0 + n_int / 2
+            b <- b_0 + 1/2 * sum((x_int - rounds$mu_int[t, a])^2) +
+              n_int * nu_0 / nu * (rounds$mu_int[t, a] - mu_0)^2 / 2
+
+            return(c(mu = mu, nu = nu, b = b, a = a_))
+          }
+        })
+      }
+      rounds$mu_est[t,] <- sapply(seq_len(length(rounds$arms)), function(a){
+
+        if (mu_0 == 0){
+
+          params[[rounds$arms[[a]]$node]][["beta"]] * rounds$arms[[a]]$value
+
+        } else{
+
+          params[[a]][["mu"]]
+        }
+      })
+      rounds$se_est[t,] <- sapply(seq_len(length(rounds$arms)), function(a){
+
+        par <- params[[ifelse(mu_0 == 0, rounds$arms[[a]]$node, a)]]
+
+        sqrt(par[["b"]] / par[["a"]] / par[["nu"]])
+      })
+      rounds$n_nig[t,] <- sapply(seq_len(length(rounds$arms)), function(a){
+
+        par <- params[[ifelse(mu_0 == 0, rounds$arms[[a]]$node, a)]]
+
+        2 * par[["a"]]
+      })
+    } else{  # else if (settings$method != "ts")
+
+      if (t <= n_obs ||
+               settings$method %in% c("cache")){
+
+        ## default bma; bda = est for obs
+        rounds$mu_est[t,] <- rounds$mu_bma[t,]
+        rounds$se_est[t,] <- rounds$se_bma[t,]
+
+      } else{  # t > n_obs
+
+        ## mu and se
+        rounds <- compute_mu_se(t = t, rounds = rounds, target = target,
+                                dag = dag, type = "est", post = post, est = "est")
+      }
+      rounds$n_nig[t,] <- sapply(rounds$arms, function(arm){
+
+        expect_post(rounds = rounds, dag = dag,
+                    from = arm$node, to = target,
+                    metric = "n_nig")
+      })
+    }
+    if (t <= n_obs){
+
       rounds$n_bda[t,] <- t
 
-    } else{  # t > n_obs
+    } else{
 
-      post <- method2post(method = settings$method)
-      dag <- switch(post,
-                    star = bnlearn::amat(settings$bn.fit),
-                    bma = NULL,
-                    eg = bnlearn::amat(bnlearn::empty.graph(settings$nodes)),
-                    rounds[[post]][t,])
-      ## mu and se
-      rounds <- compute_mu_se(t = t, rounds = rounds, target = target,
-                              dag = dag, type = "est", post = post, est = "est")
       rounds$n_bda[t,] <-
         sapply(rounds$bda[sapply(rounds$arms, `[[`, "node")],
                function(x) max(x[[target]]$n_bda, na.rm = TRUE))
-      rounds$n_nig[t,] <-
-        sapply(rounds$bda[sapply(rounds$arms, `[[`, "node")],
-               function(x) max(x[[target]]$n_nig, na.rm = TRUE))
     }
   } else if (settings$type == "bn.fit.dnet"){
 
@@ -885,7 +982,9 @@ initialize_rounds <- function(settings,
       x <- x[seq_len(n_cache), , drop = FALSE]
       rbind(x, matrix(0, nrow = n_blank, ncol = ncol(x)))
     })
-    if (n_obs != settings$rounds0$settings$n_obs){
+    if (n_cache != settings$rounds0$settings$n_obs ||
+        ## TODO: remove; temporary because of update
+        all(rounds$nig[n_cache,] == 0)){
 
       rounds$ps <- list()
       rounds$bda <- list()
@@ -894,9 +993,9 @@ initialize_rounds <- function(settings,
                                                                   n_blank),]
     rounds$node_values <- bn.fit2values(bn.fit =
                                           bn.fit)  # used in estimate.R
-    rounds <- update_rounds(t = n_obs,
+    rounds <- update_rounds(t = n_cache,
                             a = 0,
-                            data_t = rounds$data[n_obs,],
+                            data_t = rounds$data[n_cache,],
                             settings = settings,
                             rounds = rounds,
                             debug = debug)
@@ -1315,17 +1414,4 @@ method2post <- function(method){
                  `bcb-eg` = "eg",
                  "bma")  # default bma
   return(post)
-}
-
-
-
-# Generate mu marginal with t-distribution using nig parameters
-
-rt_nig <- function(n, mu, nu, b, a){
-
-  value <- mu +
-    rt(n = n, df = 2 * a) *
-    sqrt(b / a / nu)
-
-  return(unname(value))
 }
