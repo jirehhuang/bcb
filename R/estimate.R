@@ -48,7 +48,7 @@ compute_bda <- function(data,
           ## deviations, and mean estimates for each intervention value
           i_values <- rounds$node_values[[i]]
           as.data.frame(
-            sapply(c("t_bda", "t_int", "n_bda", "xtx", "rss", "n_nig",
+            sapply(c("t_bda", "t_int", "n_bda", "xtx", "rss", "n_ess",
                      "beta_bda", "se_bda",
                      sprintf("mu%g_bda", seq_len(length(i_values))),
                      "beta_est", "se_est",
@@ -106,7 +106,7 @@ compute_bda <- function(data,
               lm_cpp(X = Xy[, ik, drop = FALSE],
                      y = Xy[, j], values = values)
               temp[[j]][l, c("beta_bda", "se_bda",
-                             "rss", "xtx", "n_nig")] <- values
+                             "rss", "xtx", "n_ess")] <- values
 
               for (b in seq_len(length(i_values))){
 
@@ -164,12 +164,12 @@ compute_bda <- function(data,
 
                 ## priors with bda
                 n_bda <- temp[[j]]$n_bda[l]
-                n_nig <- temp[[j]]$n_nig[l]
-                n_nig <- ifelse(settings$initial_n_ess <= 0,
-                                max(min(n_nig, n_int), 1),
-                                min(n_nig, settings$initial_n_ess))
-                nu_0 <- n_nig
-                a_0 <- max(1, n_nig / 2)
+                n_ess <- temp[[j]]$n_ess[l]
+                n_ess <- ifelse(settings$initial_n_ess <= 0,
+                                max(min(n_ess, n_int), 1),
+                                min(n_ess, settings$initial_n_ess))
+                nu_0 <- n_ess
+                a_0 <- max(1, n_ess / 2)
 
                 beta_0 <- temp[[j]]$beta_bda[l]
                 b_0 <- temp[[j]]$rss[l] * a_0 / (n_bda / 2)  # sum of squared residuals

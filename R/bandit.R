@@ -101,7 +101,7 @@ apply_method <- function(t,
 
         mu <- rounds$mu_est[t-1,]
         se <- rounds$se_est[t-1,]
-        n_nig <- rounds$n_nig[t-1,]
+        n_ess <- rounds$n_ess[t-1,]
         n_int <- sapply(rounds$arms, function(arm){
 
           sum(rounds$selected$interventions == arm$node)
@@ -109,7 +109,7 @@ apply_method <- function(t,
         t_ <- sapply(unique(sapply(rounds$arms, `[[`, "node")), function(node){
 
           a <- match(node, sapply(rounds$arms, `[[`, "node"))
-          rt(n = 1, df = n_nig[a] + n_int[a])
+          rt(n = 1, df = n_ess[a] + n_int[a])
         })
         criteria <- sapply(seq_len(length(rounds$arms)), function(a){
 
@@ -118,7 +118,7 @@ apply_method <- function(t,
         ## TODO: check whether symmetric (above) or indep (below) criteria
         # t_ <- sapply(seq_len(length(rounds$arms)), function(a){
         #
-        #   rt(n = 1, df = n_nig[a] + n_int[a])
+        #   rt(n = 1, df = n_ess[a] + n_int[a])
         # })
         # criteria <- sapply(seq_len(length(rounds$arms)), function(a){
         #
@@ -160,7 +160,7 @@ apply_method <- function(t,
 
         mu <- rounds$mu_est[t-1,]
         se <- rounds$se_est[t-1,]
-        n_nig <- rounds$n_nig[t-1,]
+        n_ess <- rounds$n_ess[t-1,]
 
         if (mu_0 == 0){
 
@@ -172,7 +172,7 @@ apply_method <- function(t,
           t_ <- sapply(unique(sapply(rounds$arms, `[[`, "node")), function(node){
 
             a <- match(node, sapply(rounds$arms, `[[`, "node"))
-            rt(n = 1, df = n_nig[a] + n_int[a])
+            rt(n = 1, df = n_ess[a] + n_int[a])
           })
           criteria <- sapply(seq_len(length(rounds$arms)), function(a){
 
@@ -187,7 +187,7 @@ apply_method <- function(t,
           })
           t_ <- sapply(seq_len(length(rounds$arms)), function(a){
 
-            rt(n = 1, df = n_nig[a] + n_int[a])
+            rt(n = 1, df = n_ess[a] + n_int[a])
           })
           criteria <- sapply(seq_len(length(rounds$arms)), function(a){
 
@@ -491,7 +491,7 @@ update_rounds <- function(t,
 
         sqrt(par[["b"]] / par[["a"]] / par[["nu"]])
       })
-      rounds$n_nig[t,] <- sapply(seq_len(length(rounds$arms)), function(a){
+      rounds$n_ess[t,] <- sapply(seq_len(length(rounds$arms)), function(a){
 
         par <- params[[ifelse(mu_0 == 0, rounds$arms[[a]]$node, a)]]
 
@@ -512,11 +512,11 @@ update_rounds <- function(t,
         rounds <- compute_mu_se(t = t, rounds = rounds, target = target,
                                 dag = dag, type = "est", post = post, est = "est")
       }
-      rounds$n_nig[t,] <- sapply(rounds$arms, function(arm){
+      rounds$n_ess[t,] <- sapply(rounds$arms, function(arm){
 
         expect_post(rounds = rounds, dag = dag,
                     from = arm$node, to = target,
-                    metric = "n_nig")
+                    metric = "n_ess")
       })
     }
     if (t <= n_obs){
@@ -660,7 +660,7 @@ summarize_rounds <- function(bn.fit,
       data.frame(arm = (a <- arms_ordering[i]),
                  mu_true = rounds$mu_true[a],
                  n_bda = rounds$n_bda[, a],
-                 n_nig = rounds$n_nig[, a],
+                 n_ess = rounds$n_ess[, a],
                  criteria = rounds$criteria[, a]),
       do.call(cbind, sapply(
         sprintf("mu_%s", c(avail_bda, "int", "est")), function(x){
@@ -900,7 +900,7 @@ initialize_rounds <- function(settings,
              simplify = FALSE, USE.NAMES = TRUE),
       sapply(c(sprintf("mu_%s", c(avail_bda, "int", "est")),
                sprintf("se_%s", c(avail_bda, "int", "est")),
-               "n_bda", "n_nig", "criteria"),
+               "n_bda", "n_ess", "criteria"),
              function(x) acal,
              simplify = FALSE, USE.NAMES = TRUE)
     )
@@ -975,7 +975,7 @@ initialize_rounds <- function(settings,
              sprintf("beta_%s", avail_bda), "blmat",
              sprintf("mu_%s", c(avail_bda, "int", "est")),
              sprintf("se_%s", c(avail_bda, "int", "est")),
-             "n_bda", "n_nig", "criteria")
+             "n_bda", "n_ess", "criteria")
 
     rounds[nms] <- lapply(rounds[nms], function(x){
 
