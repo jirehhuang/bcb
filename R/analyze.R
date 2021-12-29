@@ -93,7 +93,8 @@ compile_path <- function(path,
           }) > 0)
           which_arms <- union(which_arms, seq_len(nrow(roundsj$arms)))
           roundsj <- roundsj[c("arms", "selected", "beta_true",
-                               "mu_true", "mu_est", "criteria", "ji",
+                               "mu_true", "mu_est", "se_est",
+                               "criteria", "ji",
                                sprintf("arm%g", which_arms))]
 
         }
@@ -263,47 +264,46 @@ compiled2results <- function(path,
   results <- list()
   for (file in files){
 
-    debug_cli(debug, cli::cli_alert,
-              "reading {file}")
+    tryCatch({
 
-    nm <- gsub(".rds", "", file)
-    results[[nm]] <- readRDS(file.path(compiled_path, file))
+      debug_cli(debug, cli::cli_alert,
+                "reading {file}")
 
-    if (format == 1){
+      nm <- gsub(".rds", "", file)
+      results[[nm]] <- readRDS(file.path(compiled_path, file))
 
-      results[[nm]] <- average_compiled(compiled = results[[nm]],
-                                        across_networks = FALSE, normalize = TRUE)
-      # results[[nm]] <- lapply(results[[nm]], function(x){
-      #
-      #   list(averaged = x)
-      # })
-    } else if (format == 2){
+      if (format == 1){
 
-      results[[nm]] <- average_compiled(compiled = results[[nm]],
-                                        across_networks = TRUE, normalize = TRUE)
-      # results[[nm]] <- list(
-      #   averaged = list(
-      #     averaged = average_compiled(compiled = results[[nm]],
-      #                                 across_networks = TRUE, normalize = TRUE)
-      #   )
-      # )
-    }
-    if (as_df){
+        results[[nm]] <- average_compiled(compiled = results[[nm]],
+                                          across_networks = FALSE, normalize = TRUE)
+      } else if (format == 2){
 
-      results[[nm]] <- lapply(results[[nm]], function(x){
+        results[[nm]] <- average_compiled(compiled = results[[nm]],
+                                          across_networks = TRUE, normalize = TRUE)
+      }
+      if (as_df){
 
-        lapply(x, rounds2df)
-      })
-      results[[nm]] <- do.call(rbind, lapply(names(results[[nm]]), function(network){
+        results[[nm]] <- lapply(results[[nm]], function(x){
 
-        cbind(data.frame(network = network),
-              do.call(rbind, lapply(names(results[[nm]][[network]]), function(rounds){
+          lapply(x, rounds2df)
+        })
+        results[[nm]] <- do.call(rbind, lapply(names(results[[nm]]), function(network){
 
-                cbind(data.frame(rounds = rounds),
-                      results[[nm]][[network]][[rounds]])
-              })))
-      }))
-    }
+          cbind(data.frame(network = network),
+                do.call(rbind, lapply(names(results[[nm]][[network]]), function(rounds){
+
+                  cbind(data.frame(rounds = rounds),
+                        results[[nm]][[network]][[rounds]])
+                })))
+        }))
+      }
+    },
+    error = function(err){
+
+      debug_cli(debug, cli::cli_alert_danger,
+                "error reading {file}: {as.character(err)}")
+      results <- results[names(results) != nm]
+    })
   }
   if (as_df){
 
