@@ -301,7 +301,9 @@ compiled2results <- function(path,
     error = function(err){
 
       debug_cli(debug, cli::cli_alert_danger,
-                "error reading {file}: {as.character(err)}")
+                "error reading {file}: {as.character(err)}",
+                .envir = environment())
+
       results <- results[names(results) != nm]
     })
   }
