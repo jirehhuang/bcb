@@ -58,121 +58,140 @@ simulate_method <- function(method_num,
   ## function for simulating
   sim_fn <- function(i){
 
-    error <- tryCatch(
-      {
-        ## prepare data row and directory
-        data_row <- dataset_grid[i, , drop = FALSE]
-        data_dir <- file.path(path,
-                              nm <- sprintf("%s%g_%s_%g",
-                                            data_row$index, data_row$id,
-                                            data_row$network, data_row$n_obs))
-        method_data_dir <- file.path(method_dir, nm)
+    error <- tryCatch({
 
-        j <- data_row$dataset
-        rounds_rds <- file.path(method_data_dir, "rds",
-                                sprintf("rounds%g.rds", j))
+      ## prepare data row and directory
+      data_row <- dataset_grid[i, , drop = FALSE]
+      data_dir <- file.path(path,
+                            nm <- sprintf("%s%g_%s_%g",
+                                          data_row$index, data_row$id,
+                                          data_row$network, data_row$n_obs))
+      method_data_dir <- file.path(method_dir, nm)
 
-        ## keep track of whether in progress
-        progressi <- file.path(method_dir, "progress",
-                               sprintf("progress%g", i))
-        if (!resimulate &&
-            file.exists(progressi)){
+      j <- data_row$dataset
+      rounds_rds <- file.path(method_data_dir, "rds",
+                              sprintf("rounds%g.rds", j))
 
-          debug_cli(debug, cli::cli_alert_success,
-                    "{i} already executed {method}{method_num} on dataset {j} of {data_row$n_dat} for network {data_row$network}",
-                    .envir = environment())
+      ## keep track of whether in progress
+      progressi <- file.path(method_dir, "progress",
+                             sprintf("progress%g", i))
+      if (!resimulate &&
+          file.exists(progressi)){
 
-          return(NULL)  # skip if in progress or complete
-        }
-        write.table(x = 0, file = progressi,  # mark as in progress
-                    row.names = FALSE, col.names = FALSE)
-        ## TODO: delete doesn't always work when manually stop multi-core
-        on.exit(expr = {  # delete if failed before completion
-
-          if (!file.exists(rounds_rds)){
-
-            if (file.exists(progressi))
-              file.remove(progressi)
-
-          } else{
-
-            write.table(x = 1, file = progressi,  # mark as complete
-                        row.names = FALSE, col.names = FALSE)
-          }
-        }, add = TRUE)
-        debug_cli(debug, "",
-                  "{i} executing {method}{method_num} on dataset {j} of {data_row$n_dat} for network {data_row$network}",
+        debug_cli(debug, cli::cli_alert_success,
+                  "{i} already executed {method}{method_num} on dataset {j} of {data_row$n_dat} for network {data_row$network}",
                   .envir = environment())
 
-        ## settings
-        bn.fit <- readRDS(file.path(data_dir, "bn.fit.rds"))
-        seed0 <- data_row$seed * data_row$n_dat
-        if (method == "cache"){
+        return(NULL)  # skip if in progress or complete
+      }
+      write.table(x = 0, file = progressi,  # mark as in progress
+                  row.names = FALSE, col.names = FALSE)
+      ## TODO: delete doesn't always work when manually stop multi-core
+      on.exit(expr = {  # delete if failed before completion
 
-          settings$n_obs <- min(settings$n_obs, data_row$n_obs)
-          seed0 <- seed0 - settings$n_obs
+        if (!file.exists(rounds_rds)){
+
+          if (file.exists(progressi))
+            file.remove(progressi)
 
         } else{
 
-          cache_data_dir <- gsub(sprintf("%s%s", method, method_num),
-                                 "cache", method_data_dir)
-          cache_file <- file.path(cache_data_dir, "rds",
-                                  sprintf("rounds%g.rds", j))
-          if (file.exists(cache_file))
-            settings$rounds0 <- readRDS(cache_file)
+          write.table(x = 1, file = progressi,  # mark as complete
+                      row.names = FALSE, col.names = FALSE)
         }
-        settings$target <- data_row$target
-        settings$run <- j
-        settings$data_obs <- file.path(data_dir,
-                                       sprintf("data%g.txt", j))
-        ## ensure unique id; reset in bandit()
-        set.seed(round(as.numeric(Sys.time()) * 1e6) %%
-                   .Machine$integer.max)
-        settings$id <- random_id(n = 12)
+      }, add = TRUE)
+      debug_cli(debug, "",
+                "{i} executing {method}{method_num} on dataset {j} of {data_row$n_dat} for network {data_row$network}",
+                .envir = environment())
 
-        ## execute bandit
-        roundsj <- bandit(bn.fit = bn.fit, settings = settings,
-                          seed0 = seed0, debug = debug)
+      ## settings
+      bn.fit <- readRDS(file.path(data_dir, "bn.fit.rds"))
+      seed0 <- data_row$seed * data_row$n_dat
+      if (method == "cache"){
 
-        ## write results in folder roundsj and as roundsj.rds
-        # write_rounds(rounds = roundsj, where = file.path(method_data_dir, "txt",
-        #                                                  sprintf("rounds%g", j)))
-        dir_check(file.path(method_data_dir, "rds"))
-        write_rounds(rounds = roundsj, where = rounds_rds)
+        settings$n_obs <- min(settings$n_obs, data_row$n_obs)
+        seed0 <- seed0 - settings$n_obs
 
-        ## write progress
-        progress <- get_progress(path = path, data_grid = data_grid)
-        write.table(x = progress, file = file.path(path, "progress.txt"),
-                    quote = FALSE, row.names = TRUE, col.names = TRUE)
+      } else{
 
-        ## print progress
-        k <- trimws(rownames(progress)) == sprintf("%s%s", method,
-                                                   method_num)
-        last2 <- ncol(progress) - c(1, 0)
-        tot <- paste(progress[k, last2], collapse = " + ")
-        prog <- unlist(progress[k, -last2])
-        names(prog) <- seq_len(length(prog))
-        prog <- prog[prog != "1.000"]
-        prog <- paste(sapply(names(prog), function(x){
-
-          sprintf("%s. %s", x, prog[x])
-
-        }), collapse = " | ")
-        prog <- ifelse(nchar(prog) == 0, tot,
-                       sprintf("%s || %s", prog, tot))
-        debug_cli(TRUE, cli::cli_alert,
-                  "{sprintf('%s%s || %s', method, method_num, prog)}",
-                  .envir = environment())
-
-        return(NULL)
-
-      }, error = function(err){
-
-        debug_cli(TRUE, cli::cli_alert_danger, "error in {i}: {err}",
-                  .envir = environment())
-        browser()
+        cache_data_dir <- gsub(sprintf("%s%s", method, method_num),
+                               "cache", method_data_dir)
+        cache_file <- file.path(cache_data_dir, "rds",
+                                sprintf("rounds%g.rds", j))
+        if (file.exists(cache_file))
+          settings$rounds0 <- readRDS(cache_file)
       }
-    )
+      settings$target <- data_row$target
+      settings$run <- j
+      settings$data_obs <- file.path(data_dir,
+                                     sprintf("data%g.txt", j))
+      ## ensure unique id; reset in bandit()
+      set.seed(round(as.numeric(Sys.time()) * 1e6) %%
+                 .Machine$integer.max)
+      settings$id <- random_id(n = 12)
+
+      ## execute bandit
+      roundsj <- bandit(bn.fit = bn.fit, settings = settings,
+                        seed0 = seed0, debug = debug)
+
+      ## write results in folder roundsj and as roundsj.rds
+      # write_rounds(rounds = roundsj, where = file.path(method_data_dir, "txt",
+      #                                                  sprintf("rounds%g", j)))
+      dir_check(file.path(method_data_dir, "rds"))
+      write_rounds(rounds = roundsj, where = rounds_rds)
+
+      ## write progress
+      progress <- get_progress(path = path, data_grid = data_grid)
+      write.table(x = progress, file = file.path(path, "progress.txt"),
+                  quote = FALSE, row.names = TRUE, col.names = TRUE)
+
+      ## print progress
+      k <- trimws(rownames(progress)) == sprintf("%s%s", method,
+                                                 method_num)
+      last2 <- ncol(progress) - c(1, 0)
+      tot <- paste(progress[k, last2], collapse = " + ")
+      prog <- unlist(progress[k, -last2])
+      names(prog) <- seq_len(length(prog))
+      prog <- prog[prog != "1.000"]
+      prog <- paste(sapply(names(prog), function(x){
+
+        sprintf("%s. %s", x, prog[x])
+
+      }), collapse = " | ")
+      prog <- ifelse(nchar(prog) == 0, tot,
+                     sprintf("%s || %s", prog, tot))
+      debug_cli(TRUE, cli::cli_alert,
+                "{sprintf('%s%s || %s', method, method_num, prog)}",
+                .envir = environment())
+
+      return(NULL)
+    },
+    error = function(err){
+
+      msg <- sprintf("error executing %s%s on dataset %s: %s",
+                     method, method_num, i, as.character(err))
+
+      debug_cli(TRUE, cli::cli_alert_danger, msg,
+                .envir = environment())
+
+      ## write in method error folder
+      method_err_dir <- file.path(method_dir, "errors")
+      dir_check(method_err_dir)
+      file <- file.path(method_err_dir, sprintf("%s_%s_%s.txt", nodename,
+                                                i, gsub(" ", "_", Sys.time())))
+      write.table(x = msg, file = file,
+                  quote = FALSE, row.names = FALSE, col.names = FALSE)
+
+      ## write in path error folder
+      err_method_dir <- file.path(path, "errors", sprintf("%s%s", method, method_num))
+      dir_check(err_method_dir)
+      file <- file.path(err_method_dir, sprintf("%s_%s_%s.txt", nodename,
+                                                i, gsub(" ", "_", Sys.time())))
+      write.table(x = msg, file = file,
+                  quote = FALSE, row.names = FALSE, col.names = FALSE)
+
+      return(NULL)
+    })
   }
   null <- mclapply(seq_len(nrow(dataset_grid)), mc.cores = n_cores,
                    mc.preschedule = FALSE, sim_fn)
@@ -203,16 +222,39 @@ sim_method_grid <- function(method,
   ## execute
   null <- lapply(method_nums, function(method_num){
 
-    settings <- as.list(method_grid[ifelse(method_num == "",
-                                           1, method_num),])
-    settings$method <- method
+    error <- tryCatch({
 
-    simulate_method(method_num = method_num,
-                    settings = settings,
-                    path = path,
-                    n_cores = n_cores,
-                    resimulate = resimulate,
-                    debug = debug)
+      settings <- as.list(method_grid[ifelse(method_num == "",
+                                             1, method_num),])
+      settings$method <- method
+
+      simulate_method(method_num = method_num,
+                      settings = settings,
+                      path = path,
+                      n_cores = n_cores,
+                      resimulate = resimulate,
+                      debug = debug)
+    },
+    error = function(err){
+
+      msg <- sprintf("error executing %s%s (%s): %s",
+                     method, method_num, paste(method_nums, collapse = ","), as.character(err))
+
+      bcb:::debug_cli(TRUE, cli::cli_alert_danger, msg,
+                      .envir = environment())
+
+      ## write in path error folder
+      err_dir <- file.path(path, "errors")
+      dir_check(err_dir)
+      file <- file.path(err_dir, sprintf("%s_%s%s_%s_%s.txt",
+                                         nodename, method, method_num,
+                                         paste(method_nums, collapse = ","),
+                                         gsub(" ", "_", Sys.time())))
+      write.table(x = msg, file = file,
+                  quote = FALSE, row.names = FALSE, col.names = FALSE)
+
+      return(NULL)
+    })
   })
 }
 
