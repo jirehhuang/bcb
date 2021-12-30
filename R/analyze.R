@@ -134,14 +134,14 @@ average_compiled <- function(compiled,
   if (across_networks)
     normalize <- TRUE
 
-  nms <- names(compiled[[1]][[1]])
   averaged <- sapply(compiled, function(net_rounds){
 
     net_rounds <- net_rounds[sapply(net_rounds, length) > 0]
+    nms <- names(net_rounds[[1]])
     max_mu <- max(abs(net_rounds[[1]]$mu_true))
     net_averaged <- sapply(nms, function(nm){
 
-      is_numeric <- sapply(compiled[[1]][[1]][[nm]],
+      is_numeric <- sapply(net_rounds[[1]][[nm]],
                            is.numeric)
       reduced <- Reduce(`+`, lapply(net_rounds, function(roundsj){
 
@@ -300,7 +300,7 @@ compiled2results <- function(path,
     },
     error = function(err){
 
-      debug_cli(debug, cli::cli_alert_danger,
+      debug_cli(TRUE, cli::cli_alert_danger,
                 "error reading {file}: {as.character(err)}",
                 .envir = environment())
 
