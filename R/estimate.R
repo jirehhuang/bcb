@@ -75,6 +75,7 @@ compute_bda <- function(data,
       for (l in rounds$ps[[i]][, "ordering"]){
 
         ## TODO: can be problematic when concentrating around a dag
+        ## TODO: update 12-29-21: circumvented by setting threshold = 1 for mds
         if (rounds$ps[[i]][l, "prob"] == 0) break
 
         k <- pars[l, !is.na(pars[l, ])]  # indices of parents

@@ -109,7 +109,9 @@ apply_method <- function(t,
         t_ <- sapply(unique(sapply(rounds$arms, `[[`, "node")), function(node){
 
           a <- match(node, sapply(rounds$arms, `[[`, "node"))
-          rt(n = 1, df = n_ess[a] + n_int[a])
+
+          ifelse(n_ess[a] == 0, 0,
+                 rt(n = 1, df = n_ess[a] + n_int[a]))
         })
         criteria <- sapply(seq_len(length(rounds$arms)), function(a){
 
@@ -285,11 +287,11 @@ get_greedy_expected <- function(settings,
     ests <- sapply(rounds$arms, function(arm) arm$estimate)
     chosen_arms <- which(ests == max(ests))
 
-    sr <- mean(sapply(chosen_arms, function(a){
+    greedy_expected <- mean(sapply(chosen_arms, function(a){
 
       rounds$mu_true[a]
     }))
-    return(sr)
+    return(greedy_expected)
 
   } else if (settings$type == "bn.fit.dnet"){
 
@@ -1174,9 +1176,10 @@ check_settings <- function(settings,
   ## check threshold
   if (is.null(settings$threshold) ||
       settings$threshold < 0 || settings$threshold > 1){
-    settings$threshold <- 0.999
-    debug_cli(debug >= 3, "", "default threshold = {settings$threshold}")
+    settings$threshold <- ifelse(settings$method == "bcb-mds", 1, 0.999)
+    debug_cli(debug >= 3, "", "default threshold = {settings$threshold} for method = {settings$method}")
   }
+  settings$threshold <- ifelse(settings$method == "bcb-mds", 1, 0.999)
 
   ## check eta
   if (is.null(settings$eta) ||
