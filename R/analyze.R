@@ -134,10 +134,15 @@ average_compiled <- function(compiled,
   if (across_networks)
     normalize <- TRUE
 
+  compiled <- sapply(compiled, function(net_rounds){
+
+    net_rounds[sapply(net_rounds, length) > 0]
+
+  }, simplify = FALSE)
+  nms <- names(compiled[[1]][[1]])
+
   averaged <- sapply(compiled, function(net_rounds){
 
-    net_rounds <- net_rounds[sapply(net_rounds, length) > 0]
-    nms <- names(net_rounds[[1]])
     max_mu <- max(abs(net_rounds[[1]]$mu_true))
     net_averaged <- sapply(nms, function(nm){
 
