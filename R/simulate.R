@@ -331,17 +331,12 @@ clear_path <- function(path,
                        method = "all",
                        clear_type = c("incomplete", "all"),
                        match_type = c("multiple", "single"),
+                       n_cores = -1,
                        debug = 1){
 
   clear_type <- match.arg(clear_type)
   match_type <- match.arg(match_type)
 
-  ## TODO: remove; temporary for development
-  # if (!dir.exists(path)){
-  #
-  #   path <- file.path(get_projects_dir(debug = 0),
-  #                     "current","simulations", path)
-  # }
   path <- check_path(path)
   methods <- list.files(path)
   methods <- methods[grepl(paste(avail_methods,
@@ -352,11 +347,18 @@ clear_path <- function(path,
                       multiple = methods[grepl(method, methods)],
                       single = match.arg(method, methods))
   }
+  ## set up parallel execution
+  if (n_cores < 1)
+    n_cores <- min(parallel::detectCores(), length(methods))
+  n_cores <- round(n_cores)
+  mclapply <- get_mclapply(n_cores = n_cores)
+
   debug_cli(debug && length(methods), cli::cli_alert_info,
             c("clearing {clear_type} files ",
-              "for method(s): {paste(methods, collapse = ', ')}"))
+              "for method(s): {paste(methods, collapse = ', ')}",
+              "with n_cores = {n_cores}"))
 
-  for (method in methods){
+  clr_fn <- function(method){
 
     progress_dir <- file.path(path, method, "progress")
     files <- list.files(progress_dir)
@@ -375,6 +377,8 @@ clear_path <- function(path,
       }
     }
   }
+  null <- mclapply(methods, mc.cores = n_cores,
+                   mc.preschedule = FALSE, clr_fn)
 }
 
 
