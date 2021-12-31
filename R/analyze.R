@@ -117,7 +117,8 @@ compile_path <- function(path,
 
 average_compiled <- function(compiled,
                              across_networks = FALSE,
-                             normalize = TRUE){
+                             normalize = TRUE,
+                             n_cores = -1){
 
   if (across_networks)
     normalize <- TRUE
@@ -129,47 +130,51 @@ average_compiled <- function(compiled,
   }, simplify = FALSE)
   nms <- names(compiled[[1]][[1]])
 
-  averaged <- sapply(compiled, function(net_rounds){
+  ## set up parallel execution
+  if (n_cores < 1)
+    n_cores <- min(parallel::detectCores(), length(compiled))
+  n_cores <- round(n_cores)
+  mclapply <- get_mclapply(n_cores = n_cores)
 
-    max_mu <- max(abs(net_rounds[[1]]$mu_true))
-    net_averaged <- sapply(nms, function(nm){
+  avg_fn1 <- function(nm){
 
-      is_numeric <- sapply(net_rounds[[1]][[nm]],
-                           is.numeric)
-      reduced <- Reduce(`+`, lapply(net_rounds, function(roundsj){
+    is_numeric <- sapply(net_rounds[[1]][[nm]],
+                         is.numeric)
+    reduced <- Reduce(`+`, lapply(net_rounds, function(roundsj){
 
-        roundsj[[nm]][is_numeric]
+      roundsj[[nm]][is_numeric]
 
-      })) / length(net_rounds)
+    })) / length(net_rounds)
 
-      if (is.matrix(net_rounds[[1]][[nm]])){
+    if (is.matrix(net_rounds[[1]][[nm]])){
 
-        dim(reduced) <- dim(net_rounds[[1]][[nm]])
-        dimnames(reduced) <- dimnames(net_rounds[[1]][[nm]])
+      dim(reduced) <- dim(net_rounds[[1]][[nm]])
+      dimnames(reduced) <- dimnames(net_rounds[[1]][[nm]])
+    }
+    if (normalize){
+
+      if (nm %in% c("arms", "selected", "mu_est", "criteria",
+                    sprintf("arm%g", seq_len(nrow(net_rounds[[1]]$arms))))){
+
+        exclude <- c("n", "value", "N",
+                     "arm", "mu_est")
+        reduced[, setdiff(names(reduced), exclude)] <-
+          reduced[, setdiff(names(reduced), exclude)] / max_mu
+
+      } else if (nm %in% c("beta_true", "mu_true")){
+
+        reduced <- reduced / max_mu
       }
-      if (normalize){
-
-        if (nm %in% c("arms", "selected", "mu_est", "criteria",
-                      sprintf("arm%g", seq_len(nrow(net_rounds[[1]]$arms))))){
-
-          exclude <- c("n", "value", "N",
-                       "arm", "mu_est")
-          reduced[, setdiff(names(reduced), exclude)] <-
-            reduced[, setdiff(names(reduced), exclude)] / max_mu
-
-        } else if (nm %in% c("beta_true", "mu_true")){
-
-          reduced <- reduced / max_mu
-        }
-      }
-      return(reduced)
-
-    }, simplify = FALSE)
-  }, simplify = FALSE)
+    }
+    return(reduced)
+  }
+  averaged <- mclapply(compiled, mc.cores = n_cores,
+                       mc.preschedule = FALSE, avg_fn1)
+  names(averaged) <- names(compiled)
 
   if (across_networks){
 
-    averaged <- sapply(nms, function(nm){
+    avg_fn2 <- function(nm){
 
       is_numeric <- sapply(averaged[[1]][[nm]],
                            is.numeric)
@@ -185,8 +190,10 @@ average_compiled <- function(compiled,
         dimnames(reduced) <- dimnames(averaged[[1]][[nm]])
       }
       return(reduced)
-
-    }, simplify = FALSE)
+    }
+    averaged <- mclapply(nms, mc.cores = n_cores,
+                         mc.preschedule = FALSE, avg_fn2)
+    names(averaged) <- nms
   }
   ## adjust format
   if (across_networks){
@@ -239,11 +246,8 @@ compiled2results <- function(path,
                              concise = TRUE,
                              format = 2,
                              as_df = TRUE,
+                             n_cores = -1,
                              debug = 1){
-
-  debug_cli(debug, cli::cli_alert_info,
-            c("arranging results from files in {path}/{ifelse(concise, 'concise', 'complete')} ",
-              "with format = {format} and as_df = {as_df}"))
 
   path <- bcb:::check_path(path)
 
@@ -253,6 +257,15 @@ compiled2results <- function(path,
   files <- files[grepl(paste(bcb:::avail_methods[-1],
                              collapse = "|"), files) &
                    !grepl("results|df", files)]
+
+  ## set up parallel execution
+  if (n_cores < 1)
+    n_cores <- min(parallel::detectCores(), length(files))
+  n_cores <- round(n_cores)
+
+  debug_cli(debug, cli::cli_alert_info,
+            c("arranging results from {length(files)} files in {path}/{ifelse(concise, 'concise', 'complete')} ",
+              "with format = {format}, as_df = {as_df}, and n_cores = {n_cores}"))
 
   results <- list()
   for (file in files){
@@ -267,12 +280,12 @@ compiled2results <- function(path,
 
       if (format == 1){
 
-        results[[nm]] <- average_compiled(compiled = results[[nm]],
-                                          across_networks = FALSE, normalize = TRUE)
+        results[[nm]] <- average_compiled(compiled = results[[nm]], across_networks = FALSE,
+                                          normalize = TRUE, n_cores = n_cores)
       } else if (format == 2){
 
-        results[[nm]] <- average_compiled(compiled = results[[nm]],
-                                          across_networks = TRUE, normalize = TRUE)
+        results[[nm]] <- average_compiled(compiled = results[[nm]], across_networks = TRUE,
+                                          normalize = TRUE, n_cores = n_cores)
       }
       if (as_df){
 
