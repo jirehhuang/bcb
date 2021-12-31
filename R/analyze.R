@@ -136,37 +136,42 @@ average_compiled <- function(compiled,
   n_cores <- round(n_cores)
   mclapply <- get_mclapply(n_cores = n_cores)
 
-  avg_fn1 <- function(nm){
+  avg_fn1 <- function(net_rounds){
 
-    is_numeric <- sapply(net_rounds[[1]][[nm]],
-                         is.numeric)
-    reduced <- Reduce(`+`, lapply(net_rounds, function(roundsj){
+    max_mu <- max(abs(net_rounds[[1]]$mu_true))
+    net_averaged <- sapply(nms, function(nm){
 
-      roundsj[[nm]][is_numeric]
+      is_numeric <- sapply(net_rounds[[1]][[nm]],
+                           is.numeric)
+      reduced <- Reduce(`+`, lapply(net_rounds, function(roundsj){
 
-    })) / length(net_rounds)
+        roundsj[[nm]][is_numeric]
 
-    if (is.matrix(net_rounds[[1]][[nm]])){
+      })) / length(net_rounds)
 
-      dim(reduced) <- dim(net_rounds[[1]][[nm]])
-      dimnames(reduced) <- dimnames(net_rounds[[1]][[nm]])
-    }
-    if (normalize){
+      if (is.matrix(net_rounds[[1]][[nm]])){
 
-      if (nm %in% c("arms", "selected", "mu_est", "criteria",
-                    sprintf("arm%g", seq_len(nrow(net_rounds[[1]]$arms))))){
-
-        exclude <- c("n", "value", "N",
-                     "arm", "mu_est")
-        reduced[, setdiff(names(reduced), exclude)] <-
-          reduced[, setdiff(names(reduced), exclude)] / max_mu
-
-      } else if (nm %in% c("beta_true", "mu_true")){
-
-        reduced <- reduced / max_mu
+        dim(reduced) <- dim(net_rounds[[1]][[nm]])
+        dimnames(reduced) <- dimnames(net_rounds[[1]][[nm]])
       }
-    }
-    return(reduced)
+      if (normalize){
+
+        if (nm %in% c("arms", "selected", "mu_est", "criteria",
+                      sprintf("arm%g", seq_len(nrow(net_rounds[[1]]$arms))))){
+
+          exclude <- c("n", "value", "N",
+                       "arm", "mu_est")
+          reduced[, setdiff(names(reduced), exclude)] <-
+            reduced[, setdiff(names(reduced), exclude)] / max_mu
+
+        } else if (nm %in% c("beta_true", "mu_true")){
+
+          reduced <- reduced / max_mu
+        }
+      }
+      return(reduced)
+
+    }, simplify = FALSE)
   }
   averaged <- mclapply(compiled, mc.cores = n_cores,
                        mc.preschedule = FALSE, avg_fn1)
@@ -249,6 +254,7 @@ compiled2results <- function(path,
                              n_cores = -1,
                              debug = 1){
 
+  path0 <- path  # for debugging
   path <- bcb:::check_path(path)
 
   files <- list.files(compiled_path <- file.path(path, ifelse(concise, "concise",
@@ -264,7 +270,7 @@ compiled2results <- function(path,
   n_cores <- round(n_cores)
 
   debug_cli(debug, cli::cli_alert_info,
-            c("arranging results from {length(files)} files in {path}/{ifelse(concise, 'concise', 'complete')} ",
+            c("arranging results from {length(files)} files in {path0}/{ifelse(concise, 'concise', 'complete')} ",
               "with format = {format}, as_df = {as_df}, and n_cores = {n_cores}"))
 
   results <- list()
