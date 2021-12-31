@@ -149,9 +149,13 @@ apply_method <- function(t,
     } else if (method == "ucb"){
 
       mu <- rounds$mu_int[t-1,]
-      N <- pmax(1, sapply(rounds$arms, `[[`, "N"))
+      n_int <- sapply(seq_len(length(rounds$arms)), function(a){
+
+        sum(rounds$selected$interventions == rounds$arms[[a]]$node)
+      })
+      n_int <- pmax(1, n_int)
       criteria <-
-        mu + settings$c * sqrt(log(t - settings$n_obs) / N)
+        mu + settings$c * sqrt(log(t - settings$n_obs) / n_int)
 
     } else if (method == "ts"){
 
@@ -185,7 +189,7 @@ apply_method <- function(t,
           ## independent criteria
           n_int <- sapply(seq_len(length(rounds$arms)), function(a){
 
-            sum(rounds$selected$arm == a)
+            sum(rounds$selected$arm == rounds$arms[[a]]$node)
           })
           t_ <- sapply(seq_len(length(rounds$arms)), function(a){
 
@@ -415,90 +419,43 @@ update_rounds <- function(t,
       list2env(settings[c("mu_0", "nu_0", "b_0", "a_0")],
                envir = environment())
 
-      if (mu_0 == 0){
+      mu_int <- rounds$mu_int[t,]
+      params <- lapply(seq_len(length(rounds$arms)), function(a){
 
-        beta_0 <- mu_0
-        int_nodes <- unique(sapply(rounds$arms, `[[`, "node"))
-        params <- sapply(int_nodes, function(node){
+        bool_int <- rounds$selected$interventions == rounds$arms[[a]]$node
+        x_int <- as.numeric(
+          sapply(rounds$selected$arm[bool_int], function(x){
 
-          ## posterior update
-          bool_int <- rounds$selected$interventions == node
-          x_int <- as.numeric(
-            sapply(rounds$selected$arm[bool_int], function(x){
+            rounds$arms[[x]]$value
+          })
+        ) * rounds$data[bool_int, settings$target]
+        x_int <- x_int * rounds$arms[[a]]$value
+        n_int <- length(x_int)
 
-              rounds$arms[[x]]$value
-            })
-          ) * rounds$data[bool_int, settings$target]
-          n_int <- length(x_int)
-          beta_int <- ifelse(n_int, mean(x_int), 0)
+        if (n_int == 0){
 
-          nu <- nu_0 + n_int
-          beta <- (nu_0 * beta_0 + n_int * beta_int) / nu
-
-          a_ <- a_0 + n_int / 2
-          b <- b_0 + 1/2 * sum((x_int - beta_int)^2) +
-            n_int * nu_0 / nu * (beta_int - beta_0)^2 / 2
-
-          return(c(beta = beta, nu = nu, b = b, a = a_))
-
-        }, simplify = FALSE)
-
-      } else{
-
-        mu_int <- rounds$mu_int[t,]
-        params <- lapply(seq_len(length(rounds$arms)), function(a){
-
-          bool_int <- rounds$selected$interventions == rounds$arms[[a]]$node
-          x_int <- as.numeric(
-            sapply(rounds$selected$arm[bool_int], function(x){
-
-              rounds$arms[[x]]$value
-            })
-          ) * rounds$data[bool_int, settings$target]
-          x_int <- x_int * rounds$arms[[a]]$value
-          n_int <- length(x_int)
-
-          if (n_int == 0){
-
-            return(c(mu = mu_0, nu = nu_0, b = b_0, a = a_0))
-
-          } else{
-
-            ## posterior update
-            nu <- nu_0 + n_int
-            mu <- (mu_0 * nu_0 + n_int * rounds$mu_int[t, a]) / nu
-
-            a_ <- a_0 + n_int / 2
-            b <- b_0 + 1/2 * sum((x_int - rounds$mu_int[t, a])^2) +
-              n_int * nu_0 / nu * (rounds$mu_int[t, a] - mu_0)^2 / 2
-
-            return(c(mu = mu, nu = nu, b = b, a = a_))
-          }
-        })
-      }
-      rounds$mu_est[t,] <- sapply(seq_len(length(rounds$arms)), function(a){
-
-        if (mu_0 == 0){
-
-          params[[rounds$arms[[a]]$node]][["beta"]] * rounds$arms[[a]]$value
+          return(c(mu = mu_0, nu = nu_0, b = b_0, a = a_0))
 
         } else{
 
-          params[[a]][["mu"]]
+          ## posterior update
+          nu <- nu_0 + n_int
+          mu <- (mu_0 * nu_0 + n_int * rounds$mu_int[t, a]) / nu
+
+          a_ <- a_0 + n_int / 2
+          b <- b_0 + 1/2 * sum((x_int - rounds$mu_int[t, a])^2) +
+            n_int * nu_0 / nu * (rounds$mu_int[t, a] - mu_0)^2 / 2
+
+          return(c(mu = mu, nu = nu, b = b, a = a_))
         }
       })
+      rounds$mu_est[t,] <- sapply(params, `[[`, "mu")
       rounds$se_est[t,] <- sapply(seq_len(length(rounds$arms)), function(a){
-
-        par <- params[[ifelse(mu_0 == 0, rounds$arms[[a]]$node, a)]]
 
         sqrt(par[["b"]] / par[["a"]] / par[["nu"]])
       })
-      rounds$n_ess[t,] <- sapply(seq_len(length(rounds$arms)), function(a){
-
-        par <- params[[ifelse(mu_0 == 0, rounds$arms[[a]]$node, a)]]
-
-        2 * par[["a"]]
-      })
+      rounds$n_ess[t,] <- 2 * sapply(params,
+                                     `[[`, "a")
     } else{  # else if (settings$method != "ts")
 
       if (t <= n_obs ||
