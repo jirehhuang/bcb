@@ -63,7 +63,8 @@ avail_bcb_combine <- c("average",    # weighted average
 
 # Available bcb methods for determining criteria
 
-avail_bcb_criteria <- c("ucb",  # upper confidence bound
+avail_bcb_criteria <- c("bcb",  # default
+                        "ucb",  # upper confidence bound
                         "ts",   # thompson sampling
                         "uq")   # upper quantile; ucb with no log(t)
 

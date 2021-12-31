@@ -92,10 +92,20 @@ apply_method <- function(t,
       mu <- rounds$mu_est[t-1,]
       se <- rounds$se_est[t-1,]
 
-      if (settings$bcb_criteria == "ucb"){
+      if (settings$bcb_criteria == "bcb"){
 
         criteria <-
           mu + se * settings$c * sqrt(log(t - settings$n_obs))
+
+      }  else if (settings$bcb_criteria == "ucb"){
+
+        n_int <- sapply(seq_len(length(rounds$arms)), function(a){
+
+          sum(rounds$selected$interventions == rounds$arms[[a]]$node)
+        })
+        n_int <- pmax(1, n_int)
+        criteria <-
+          mu + settings$c * sqrt(log(t - settings$n_obs) / n_int)
 
       } else if (settings$bcb_criteria == "ts"){
 
@@ -1215,7 +1225,7 @@ check_settings <- function(settings,
     if (is.null(settings$bcb_criteria) ||
         !is.character(settings$bcb_criteria) ||
         !settings$bcb_criteria %in% avail_bcb_criteria){
-      settings$bcb_criteria <- "ucb"
+      settings$bcb_criteria <- "bcb"
       debug_cli(debug >= 3, "", "default bcb_criteria = {settings$bcb_criteria} for bcb")
     }
   }
