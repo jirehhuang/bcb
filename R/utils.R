@@ -206,6 +206,7 @@ random_id <- function(n = 12){
 # Load an example, for testing
 
 load_example <- function(eg = c("gnet"),
+                         method = "random",
                          network = "survey",
                          envir = sys.frame(-1)){
 
@@ -217,6 +218,14 @@ load_example <- function(eg = c("gnet"),
                                                      eg, network)))){
     objs <- readRDS(file = rds)
 
+    if (objs$settings$method != method){
+
+      objs$settings$method <- method
+      objs$settings <- objs$settings[c("method", "n_obs", "n_int", "score",
+                                       "max_parents", "nodes", "temp_dir")]
+      settings <- check_settings(bn.fit = objs$bn.fit,
+                                 settings = objs$settings)
+    }
   } else{
 
     if (eg == "gnet"){
@@ -249,7 +258,6 @@ load_example <- function(eg = c("gnet"),
     data <- ribn(x = bn.fit, intervene = intervene, seed = 1)
 
     ## prepare settings
-    method <- "random"  # whatever method is being worked on
     settings <- list(method = method, n_obs = 100, n_int = 100,
                      score = score, max_parents = 5, nodes = names(data),
                      temp_dir = temp_dir)
@@ -420,8 +428,8 @@ get_projects_dir <- function(scratch = TRUE,
 
 get_mclapply <- function(n_cores = 1){
 
-  if (FALSE && ncores > 1 &&
-      Sys.info()[["sysname"]] %in% c("Windows")){
+  mclapply <- if (FALSE && ncores > 1 &&
+                  Sys.info()[["sysname"]] %in% c("Windows")){
 
     ## TODO: eventually support windows
     ## windows workaround with https://github.com/nathanvan/parallelsugar
@@ -432,3 +440,5 @@ get_mclapply <- function(n_cores = 1){
     ## reduces to lapply() when ncores = 1
     parallel::mclapply
   }
+  return(mclapply)
+}
