@@ -391,7 +391,9 @@ clear_path <- function(path,
           any(read.table(progressi) == 0)){
 
         debug_cli(debug, cli::cli_alert,
-                  "deleting `{file}` for `{method}`")
+                  "deleting `{file}` for `{method}`",
+                  .envir = environment())
+
         file.remove(progressi)
       }
     }
