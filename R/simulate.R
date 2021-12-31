@@ -355,11 +355,29 @@ clear_path <- function(path,
 
   debug_cli(debug && length(methods), cli::cli_alert_info,
             c("clearing {clear_type} files ",
-              "for method(s): {paste(methods, collapse = ', ')}",
+              "for method(s): `{paste(methods, collapse = ', ')}` ",
               "with n_cores = {n_cores}"))
 
+  err_dir <- file.path(path, "errors")
+  if (dir.exists(err_dir)){
+
+    debug_cli(debug, cli::cli_alert_info,
+              c("deleting {length(list.files(err_dir, all.files = TRUE, recursive = TRUE))} ",
+                "error files"))
+    unlink(err_dir, recursive = TRUE)
+
+  }
   clr_fn <- function(method){
 
+    err_dir <- file.path(path, method, "errors")
+    if (dir.exists(err_dir)){
+
+      debug_cli(debug, cli::cli_alert_info,
+                c("deleting {length(list.files(err_dir, all.files = TRUE, recursive = TRUE))} ",
+                  "error files for `{method}`"))
+      unlink(err_dir, recursive = TRUE)
+
+    }
     progress_dir <- file.path(path, method, "progress")
     files <- list.files(progress_dir)
     files <- files[grepl("progress", files)]
