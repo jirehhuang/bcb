@@ -364,8 +364,8 @@ clear_path <- function(path,
     debug_cli(debug, cli::cli_alert_info,
               c("deleting {length(list.files(err_dir, all.files = TRUE, recursive = TRUE))} ",
                 "error files"))
-    unlink(err_dir, recursive = TRUE)
 
+    unlink(err_dir, recursive = TRUE)
   }
   clr_fn <- function(method){
 
@@ -374,9 +374,10 @@ clear_path <- function(path,
 
       debug_cli(debug, cli::cli_alert_info,
                 c("deleting {length(list.files(err_dir, all.files = TRUE, recursive = TRUE))} ",
-                  "error files for `{method}`"))
-      unlink(err_dir, recursive = TRUE)
+                  "error files for `{method}`"),
+                .envir = environment())
 
+      unlink(err_dir, recursive = TRUE)
     }
     progress_dir <- file.path(path, method, "progress")
     files <- list.files(progress_dir)
