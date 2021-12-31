@@ -25,7 +25,7 @@ compile_path <- function(path,
 
   ## set up parallel execution
   if (n_cores < 1)
-    n_cores <- min(parallel::detectCores(), nrow(data_grid))
+    n_cores <- min(parallel::detectCores(), length(methods))
   n_cores <- round(n_cores)
 
   debug_cli(debug && length(methods), cli::cli_alert_info,
