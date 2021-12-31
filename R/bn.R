@@ -513,6 +513,41 @@ bn.fit2values <- function(bn.fit){
 
 
 
+# Obtain ancestor relation matrix from dag
+
+dag2arp <- function(dag = bnlearn::amat(bn.fit),
+                    nodes = colnames(dag),
+                    bn.fit){
+
+  if (!missing(bn.fit)){
+
+    dag <- bnlearn::amat(bn.fit)
+    nodes <- names(bn.fit)
+  }
+  mode(dag) <- "integer"
+
+  if (is.null(nodes)){
+
+    nodes <- sprintf("V%g", seq_len(ncol(dag)))
+  }
+  ancestors <- diag(length(nodes))
+  rownames(ancestors) <- colnames(ancestors) <- nodes
+
+  for (i in seq_len(length(nodes))){
+
+    for (j in seq_len(length(nodes))[-i]){
+
+      if (phsl:::has_path(i = i, j = j, amat = dag,
+                          nodes = nodes)){
+        ancestors[i, j] <- 1
+      }
+    }
+  }
+  return(ancestors)
+}
+
+
+
 # Zero intercepts of bn.fit
 
 zero_bn.fit <- function(bn.fit){

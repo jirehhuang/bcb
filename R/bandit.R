@@ -367,21 +367,10 @@ update_rounds <- function(t,
     ## if dag, determine arp deterministically
     if (!is.null(dag) &&
         all(dag %in% c(0, 1)) &&
-        !any(dag * t(dag) > 0)){
+        !any((dag <- row2mat(row = dag,
+                             nodes = settings$nodes)) * t(dag) > 0)){
 
-      arp <- diag(settings$nnodes)
-      for (i in seq_len(settings$nnodes)){
-
-        for (j in seq_len(settings$nnodes)[-i]){
-
-          if (phsl:::has_path(i = i, j = j, amat = dag,
-                              nodes = settings$nodes)){
-            arp[i, j] <- 1
-          }
-        }
-      }
-      rownames(arp) <- colnames(arp) <- settings$nodes
-      rounds$arp <- arp
+      rounds$arp <- dag2arp(dag = dag, nodes = settings$nodes)
 
     } else{
 
