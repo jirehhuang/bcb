@@ -462,7 +462,7 @@ update_rounds <- function(t,
       rounds$mu_est[t,] <- sapply(params, `[[`, "mu")
       rounds$se_est[t,] <- sapply(seq_len(length(rounds$arms)), function(a){
 
-        sqrt(par[["b"]] / par[["a"]] / par[["nu"]])
+        sqrt(params[[a]][["b"]] / params[[a]][["a"]] / params[[a]][["nu"]])
       })
       rounds$n_ess[t,] <- 2 * sapply(params,
                                      `[[`, "a")
