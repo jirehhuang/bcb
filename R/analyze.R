@@ -27,23 +27,11 @@ compile_path <- function(path,
   if (n_cores < 1)
     n_cores <- min(parallel::detectCores(), length(methods))
   n_cores <- round(n_cores)
+  mclapply <- get_mclapply(n_cores = n_cores)
 
   debug_cli(debug && length(methods), cli::cli_alert_info,
             c("compiling {ifelse(concise, 'concise', 'complete')} .rds files ",
               "for {length(methods)} method(s) using {n_cores} core(s)"))
-
-  mclapply <- if (FALSE && ncores > 1 &&
-                  Sys.info()[["sysname"]] %in% c("Windows")){
-
-    ## TODO: eventually support windows
-    ## windows workaround with https://github.com/nathanvan/parallelsugar
-    # parallelsugar::mclapply
-
-  } else{
-
-    ## reduces to lapply() when ncores = 1
-    parallel::mclapply
-  }
 
   ## function for writing rds file
   write_fn <- function(method){

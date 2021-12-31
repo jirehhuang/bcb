@@ -412,3 +412,23 @@ get_projects_dir <- function(scratch = TRUE,
 
   return(projects_dir)
 }
+
+
+
+# Function to select mclapply based on platform
+# Currently, this package only supports unix systems
+
+get_mclapply <- function(n_cores = 1){
+
+  if (FALSE && ncores > 1 &&
+      Sys.info()[["sysname"]] %in% c("Windows")){
+
+    ## TODO: eventually support windows
+    ## windows workaround with https://github.com/nathanvan/parallelsugar
+    # parallelsugar::mclapply
+
+  } else{
+
+    ## reduces to lapply() when ncores = 1
+    parallel::mclapply
+  }

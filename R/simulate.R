@@ -38,22 +38,10 @@ simulate_method <- function(method_num,
   if (n_cores < 1)
     n_cores <- min(parallel::detectCores(), nrow(dataset_grid))
   n_cores <- round(n_cores)
+  mclapply <- get_mclapply(n_cores = n_cores)
 
   debug_cli(debug, cli::cli_alert_info,
             "executing {method}{method_num} on {sum(data_grid$n_dat)} datasets using {n_cores} core(s)")
-
-  mclapply <- if (FALSE && ncores > 1 &&
-                  Sys.info()[["sysname"]] %in% c("Windows")){
-
-    ## TODO: eventually support windows
-    ## windows workaround with https://github.com/nathanvan/parallelsugar
-    # parallelsugar::mclapply
-
-  } else{
-
-    ## reduces to lapply() when ncores = 1
-    parallel::mclapply
-  }
 
   ## function for simulating
   sim_fn <- function(i){
