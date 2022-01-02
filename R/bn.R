@@ -31,99 +31,6 @@ bn_list2bn.fit <- function(bn_list){
 
 
 
-# Compute log joint probability table from bn.fit
-
-bn.fit2jpt <- function(bn.fit){
-
-  ## initialize
-  ordering <- bnlearn:::topological.ordering(x = bn.fit)
-
-  ## initialize joint probability table (jpt)
-  dim_jpt <- sapply(ordering, function(node){
-
-    dim(bn.fit[[node]]$prob)[1]
-  })
-  debug_cli(prod(dim_jpt) > 1e6, cli::cli_abort,
-            "jpt will have {prod(dim_jpt)} > 1e6 elements")
-
-  log_jpt <- array(0, dim = dim_jpt)
-  dimnames(log_jpt) <- sapply(ordering, function(node){
-
-    dimnames(bn.fit[[node]]$prob)[[1]]
-
-  }, simplify = FALSE)
-
-  for (node in ordering){
-
-    ## permute dimensions according to ordering
-    prob <- bn.fit[[node]]$prob
-    perm <- order(match(names(dimnames(prob)), ordering))
-    prob <- aperm(prob, perm)
-
-    ## manipulate dimension to element-wise multiply by joint distribution
-    dim_prob <- rep(1, length(ordering))
-    dim_prob[match(names(dimnames(prob)), ordering)] <- dim(prob)
-    dim(prob) <- dim_prob
-
-    ## element-wise multiply
-    dims <- which(dim_prob == 1)
-    idx <- lapply(dim(log_jpt)[dims], function(x) rep(1, x))
-    log_jpt <- log_jpt + log(abind::asub(prob, idx, dims))
-  }
-  class(log_jpt) <- "table"
-  return(exp(log_jpt))
-}
-
-
-
-# Query log joint probability table from bn.fit
-
-query_jpt <- function(jpt,
-                      target,
-                      given = character(0)){
-
-  nodes <- names(dimnames(jpt))
-  if (is.numeric(target))
-    target <- nodes[target]
-  if (is.numeric(given))
-    given <- nodes[given]
-
-  debug_cli(length(intersect(target, given)) ||
-              any(! c(target, given) %in% nodes),
-            cli::cli_abort, "invalid target or given")
-
-  ## sort according to jpt
-  target <- nodes[sort(match(target, nodes))]
-  given <- nodes[sort(match(given, nodes))]
-
-  ## sum across irrelevant dimensions
-  log_pt <- log(apply(jpt, MARGIN = match(c(target, given), nodes), sum))
-
-  ## divide by conditioning dimensions
-  if (length(given)){
-
-    ## joint probability table of conditioning variables
-    prob <- apply(exp(log_pt), MARGIN = match(given, names(dimnames(log_pt))), sum)
-    if (is.null(dim(prob)))
-      dim(prob) <- length(prob)
-
-    ## manipulate dimension to element-wise divide
-    ## by joint distribution of conditioning variables
-    dim_prob <- rep(1, length(dim(log_pt)))
-    dim_prob[match(given, names(dimnames(log_pt)))] <- dim(prob)
-    dim(prob) <- dim_prob
-
-    ## element-wise divide
-    dims <- which(dim_prob == 1)
-    idx <- lapply(dim(log_pt)[dims], function(x) rep(1, x))
-    log_pt <- log_pt - log(abind::asub(prob, idx, dims))
-  }
-  class(log_pt) <- "table"
-  return(exp(log_pt))
-}
-
-
-
 # Reorder bn.fit
 
 reorder_bn.fit <- function(bn.fit,
@@ -657,4 +564,118 @@ zero_bn.fit <- function(bn.fit){
   attr(bn.fit, "obs_means") <- obs_means
 
   return(bn.fit)
+}
+
+
+
+# Compute log joint probability table from bn.fit
+
+bn.fit2jpt <- function(bn.fit){
+
+  ## initialize
+  # nodes <- bnlearn:::topological.ordering(x = bn.fit)
+  nodes <- names(bn.fit)
+
+  ## initialize joint probability table (jpt)
+  dim_jpt <- sapply(nodes, function(node){
+
+    dim(bn.fit[[node]]$prob)[1]
+  })
+  debug_cli(prod(dim_jpt) > 1e6, cli::cli_abort,
+            "jpt will have {prod(dim_jpt)} > 1e6 elements")
+
+  log_jpt <- array(0, dim = dim_jpt)
+  dimnames(log_jpt) <- sapply(nodes, function(node){
+
+    dimnames(bn.fit[[node]]$prob)[[1]]
+
+  }, simplify = FALSE)
+
+  for (node in nodes){
+
+    ## permute dimensions according to nodes
+    prob <- bn.fit[[node]]$prob
+    perm <- order(match(names(dimnames(prob)), nodes))
+    prob <- aperm(prob, perm)
+
+    ## manipulate dimension to element-wise multiply by joint distribution
+    dim_prob <- rep(1, length(nodes))
+    dim_prob[match(names(dimnames(prob)), nodes)] <- dim(prob)
+    dim(prob) <- dim_prob
+
+    ## element-wise multiply
+    dims <- which(dim_prob == 1)
+    idx <- lapply(dim(log_jpt)[dims], function(x) rep(1, x))
+    log_jpt <- log_jpt + log(abind::asub(prob, idx, dims))
+  }
+  class(log_jpt) <- "table"
+  return(exp(log_jpt))
+}
+
+
+
+# Query log joint probability table from bn.fit
+
+query_jpt <- function(jpt,
+                      target,
+                      given = character(0)){
+
+  nodes <- names(dimnames(jpt))
+  if (is.numeric(target))
+    target <- nodes[target]
+  if (is.numeric(given))
+    given <- nodes[given]
+
+  debug_cli(length(intersect(target, given)) ||
+              any(! c(target, given) %in% nodes),
+            cli::cli_abort, "invalid target or given")
+
+  ## sort according to jpt
+  target <- nodes[sort(match(target, nodes))]
+  given <- nodes[sort(match(given, nodes))]
+
+  ## sum across irrelevant dimensions
+  log_pt <- log(apply(jpt, MARGIN = match(c(target, given), nodes), sum))
+  dim(log_pt) <- dim(jpt)[c(target, given)]
+  dimnames(log_pt) <- dimnames(jpt)[c(target, given)]
+
+  ## divide by conditioning dimensions
+  if (length(given)){
+
+    ## joint probability table of conditioning variables
+    prob <- apply(exp(log_pt), MARGIN = match(given, names(dimnames(log_pt))), sum)
+    if (is.null(dim(prob)))
+      dim(prob) <- length(prob)
+
+    ## manipulate dimension to element-wise divide
+    ## by joint distribution of conditioning variables
+    dim_prob <- rep(1, length(dim(log_pt)))
+    dim_prob[match(given, names(dimnames(log_pt)))] <- dim(prob)
+    dim(prob) <- dim_prob
+
+    ## element-wise divide
+    dims <- which(dim_prob == 1)
+    idx <- lapply(dim(log_pt)[dims], function(x) rep(1, x))
+    log_pt <- log_pt - log(abind::asub(prob, idx, dims))
+  }
+  class(log_pt) <- "table"
+  return(exp(log_pt))
+}
+
+
+
+# Get joint and marginal probability tables
+
+get_j_m_pt <- function(bn.fit){
+
+  jpt <- bn.fit2jpt(bn.fit = bn.fit)
+
+  lapply(bn.fit, function(node){
+
+    node <- node[names(node)]
+    node$jpt <- query_jpt(jpt = jpt, target = c(node$node, node$parents))
+    node$mpt <- query_jpt(jpt = node$jpt, target = node$node, given = character(0))
+
+    return(node)
+  })
 }
