@@ -460,15 +460,34 @@ bn.fit2effects <- function(bn.fit){
 
   } else if ("bn.fit.dnet" %in% class(bn.fit)){
 
-    browser()
+    node_values <- bn.fit2values(bn.fit = bn.fit)
 
-    ## TODO: discrete version
+    for (node in names(bn.fit)){
 
-    bn_list0 <- bn.fit[seq_len(length(bn.fit))]
+      for (value in node_values[[node]]){
 
-    bn_list0
+        if (length(bn.fit[[node]]$parents)){
+
+          bn.fit0 <- remove_arcs(bn.fit = bn.fit,
+                                 arcs = as.matrix(data.frame(bn.fit[[node]]$parents,
+                                                             node)))
+        } else{
+
+          bn.fit0 <- bn.fit
+        }
+        bn_list0 <- bn.fit0[seq_len(length(bn.fit0))]
+        bn_list0[[node]]$prob[] <- 0
+        bn_list0[[node]]$prob[value] <- 1
+        bn_list0 <- get_j_m_pt(bn.fit = bn_list0)
+
+        mpt <- sapply(bn_list0, `[[`, "mpt", simplify = FALSE)
+
+        node_i <- match(node, names(bn.fit))
+        effects[node_i, -node_i, 1] <- sapply(mpt[-node_i], `[[`, 1)
+        effects[node_i, -node_i, 2] <- sapply(mpt[-node_i], `[[`, 2)
+      }
+    }
   }
-  # return(effects_list)
   return(effects)
 }
 
@@ -585,6 +604,7 @@ bn.fit2jpt <- function(bn.fit){
 
     dim(bn.fit[[node]]$prob)[1]
   })
+  names(dim_jpt) <- nodes
   debug_cli(prod(dim_jpt) > 1e6, cli::cli_abort,
             "jpt will have {prod(dim_jpt)} > 1e6 elements")
 
@@ -605,6 +625,7 @@ bn.fit2jpt <- function(bn.fit){
     ## manipulate dimension to element-wise multiply by joint distribution
     dim_prob <- rep(1, length(nodes))
     dim_prob[match(names(dimnames(prob)), nodes)] <- dim(prob)
+    names(dim_prob) <- names(dimnames(prob))
     dim(prob) <- dim_prob
 
     ## element-wise multiply
@@ -655,6 +676,7 @@ query_jpt <- function(jpt,
     ## by joint distribution of conditioning variables
     dim_prob <- rep(1, length(dim(log_pt)))
     dim_prob[match(given, names(dimnames(log_pt)))] <- dim(prob)
+    names(dim_prob) <- given
     dim(prob) <- dim_prob
 
     ## element-wise divide
