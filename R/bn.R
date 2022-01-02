@@ -13,16 +13,20 @@ bn.fit2edgeList <- function(bn.fit){
 
 bn_list2bn.fit <- function(bn_list){
 
+  nodes <- sapply(bn_list, `[[`, "node")
+  bn <- sparsebnUtils::to_bn(bn.fit2edgeList(bn_list))
+  bnlearn::nodes(bn) <- nodes
+
   if (!is.null(bn_list[[1]]$prob)){
 
     ## bn.fit.dnet if has prob
-    bn.fit <- bnlearn::custom.fit(sparsebnUtils::to_bn(bn.fit2edgeList(bn_list)),
+    bn.fit <- bnlearn::custom.fit(bn,
                                   lapply(bn_list, function(x) x$prob))
 
   } else if (!is.null(bn_list[[1]]$coefficients)){
 
     ## bn.fit.gnet if has coefficients
-    bn.fit <- bnlearn::custom.fit(sparsebnUtils::to_bn(bn.fit2edgeList(bn_list)),
+    bn.fit <- bnlearn::custom.fit(bn,
                                   lapply(bn_list, function(x)
                                     list(coef = x$coefficients, sd = x$sd)))
   }
@@ -697,7 +701,7 @@ remove_arcs <- function(bn.fit,
 
     bn_list <- bn.fit[seq_len(length(bn.fit))]
 
-  } else if (class(bn.fit[2]) == "bn.fit.dnet"){
+  } else if (class(bn.fit)[2] == "bn.fit.dnet"){
 
     bn_list <- get_j_m_pt(bn.fit = bn.fit)
   }
@@ -722,7 +726,7 @@ remove_arcs <- function(bn.fit,
         ## remove coefficients
         bn_list[[node]]$coefficients <- bn_list[[node]]$coefficients[c("(Intercept)",
                                                                        bn_list[[node]]$parents)]
-      } else if (class(bn.fit[2]) == "bn.fit.dnet"){
+      } else if (class(bn.fit)[2] == "bn.fit.dnet"){
 
         ## marginalize out nodes to be removed
         bn_list[[node]]$prob <- query_jpt(jpt = bn_list[[node]]$jpt, target = node,
@@ -731,3 +735,4 @@ remove_arcs <- function(bn.fit,
     }
   }
   return(bn_list2bn.fit(bn_list = bn_list))
+}
