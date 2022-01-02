@@ -679,3 +679,55 @@ get_j_m_pt <- function(bn.fit){
     return(node)
   })
 }
+
+
+
+# Remove arcs from bn.fit object
+
+remove_arcs <- function(bn.fit,
+                        arcs = matrix(character(0), ncol = 2)){
+
+  amat <- bnlearn::amat(bn.fit)
+  if (length(arcs) == 0 ||  # no arcs specified
+      all(amat[arcs] == 0)){  # specified arcs are not present
+
+    return(bn.fit)
+  }
+  if (class(bn.fit)[2] == "bn.fit.gnet"){
+
+    bn_list <- bn.fit[seq_len(length(bn.fit))]
+
+  } else if (class(bn.fit[2]) == "bn.fit.dnet"){
+
+    bn_list <- get_j_m_pt(bn.fit = bn.fit)
+  }
+  for (node in names(bn_list)){
+
+    ## parents of node to be removed
+    remove_nodes <- arcs[arcs[, 2] == node, 1]
+
+    if (length(remove_nodes)){
+
+      ## remove as parents and children
+      bn_list[[node]]$parents <- setdiff(bn_list[[node]]$parents,
+                                         remove_nodes)
+      bn_list[remove_nodes] <- lapply(bn_list[remove_nodes], function(node){
+
+        node$children <- setdiff(node$children,
+                                 node)
+        return(node)
+      })
+      if (class(bn.fit)[2] == "bn.fit.gnet"){
+
+        ## remove coefficients
+        bn_list[[node]]$coefficients <- bn_list[[node]]$coefficients[c("(Intercept)",
+                                                                       bn_list[[node]]$parents)]
+      } else if (class(bn.fit[2]) == "bn.fit.dnet"){
+
+        ## marginalize out nodes to be removed
+        bn_list[[node]]$prob <- query_jpt(jpt = bn_list[[node]]$jpt, target = node,
+                                          given = bn_list[[node]]$parents)  # reduced parents
+      }
+    }
+  }
+  return(bn_list2bn.fit(bn_list = bn_list))
