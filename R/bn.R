@@ -31,6 +31,99 @@ bn_list2bn.fit <- function(bn_list){
 
 
 
+# Compute log joint probability table from bn.fit
+
+bn.fit2jpt <- function(bn.fit){
+
+  ## initialize
+  ordering <- bnlearn:::topological.ordering(x = bn.fit)
+
+  ## initialize joint probability table (jpt)
+  dim_jpt <- sapply(ordering, function(node){
+
+    dim(bn.fit[[node]]$prob)[1]
+  })
+  debug_cli(prod(dim_jpt) > 1e6, cli::cli_abort,
+            "jpt will have {prod(dim_jpt)} > 1e6 elements")
+
+  log_jpt <- array(0, dim = dim_jpt)
+  dimnames(log_jpt) <- sapply(ordering, function(node){
+
+    dimnames(bn.fit[[node]]$prob)[[1]]
+
+  }, simplify = FALSE)
+
+  for (node in ordering){
+
+    ## permute dimensions according to ordering
+    prob <- bn.fit[[node]]$prob
+    perm <- order(match(names(dimnames(prob)), ordering))
+    prob <- aperm(prob, perm)
+
+    ## manipulate dimension to element-wise multiply by joint distribution
+    dim_prob <- rep(1, length(ordering))
+    dim_prob[match(names(dimnames(prob)), ordering)] <- dim(prob)
+    dim(prob) <- dim_prob
+
+    ## element-wise multiply
+    dims <- which(dim_prob == 1)
+    idx <- lapply(dim(log_jpt)[dims], function(x) rep(1, x))
+    log_jpt <- log_jpt + log(abind::asub(prob, idx, dims))
+  }
+  class(log_jpt) <- "table"
+  return(exp(log_jpt))
+}
+
+
+
+# Query log joint probability table from bn.fit
+
+query_jpt <- function(jpt,
+                      target,
+                      given = character(0)){
+
+  nodes <- names(dimnames(jpt))
+  if (is.numeric(target))
+    target <- nodes[target]
+  if (is.numeric(given))
+    given <- nodes[given]
+
+  debug_cli(length(intersect(target, given)) ||
+              any(! c(target, given) %in% nodes),
+            cli::cli_abort, "invalid target or given")
+
+  ## sort according to jpt
+  target <- nodes[sort(match(target, nodes))]
+  given <- nodes[sort(match(given, nodes))]
+
+  ## sum across irrelevant dimensions
+  log_pt <- log(apply(jpt, MARGIN = match(c(target, given), nodes), sum))
+
+  ## divide by conditioning dimensions
+  if (length(given)){
+
+    ## joint probability table of conditioning variables
+    prob <- apply(exp(log_pt), MARGIN = match(given, names(dimnames(log_pt))), sum)
+    if (is.null(dim(prob)))
+      dim(prob) <- length(prob)
+
+    ## manipulate dimension to element-wise divide
+    ## by joint distribution of conditioning variables
+    dim_prob <- rep(1, length(dim(log_pt)))
+    dim_prob[match(given, names(dimnames(log_pt)))] <- dim(prob)
+    dim(prob) <- dim_prob
+
+    ## element-wise divide
+    dims <- which(dim_prob == 1)
+    idx <- lapply(dim(log_pt)[dims], function(x) rep(1, x))
+    log_pt <- log_pt - log(abind::asub(prob, idx, dims))
+  }
+  class(log_pt) <- "table"
+  return(exp(log_pt))
+}
+
+
+
 # Reorder bn.fit
 
 reorder_bn.fit <- function(bn.fit,
@@ -143,7 +236,7 @@ bn2gnet <- function(bn,
                     coefs = c(0, 0),
                     vars = c(0, 0),
                     normalize = TRUE,
-                    intercept = TRUE){
+                    intercept = FALSE){
 
   ## TODO: check arguments
 
@@ -387,7 +480,7 @@ bn.fit2data_row <- function(bn.fit,
     effects_array <- bn.fit2effects(bn.fit = bn.fit)
     effects <- effects_array[setdiff(names(bn.fit), data_row$target),
                              data_row$target, 1]
-    effects <- sort(abs(effects), decreasing = TRUE)
+    effects <- sort(abs(effects[effects != 0]), decreasing = TRUE)
     effects <- effects / effects[1]
     data_row$reg_lb <- 1 - effects[2]
     data_row$reg_ub <- 1 - effects[length(effects)]
@@ -459,6 +552,10 @@ bn.fit2effects <- function(bn.fit){
     browser()
 
     ## TODO: discrete version
+
+    bn_list0 <- bn.fit[seq_len(length(bn.fit))]
+
+    bn_list0
   }
   # return(effects_list)
   return(effects)
@@ -715,7 +812,7 @@ restrict_bn.fit <- function(bn.fit,
   if (any(n.levels > max.levels)){
 
     if (debug) cat(sprintf('restrict_bn.fit: Restricting %s nodes to %s levels \n',
-                             sum(n.levels > max.levels), max.levels))
+                           sum(n.levels > max.levels), max.levels))
 
     for (i in names(n.levels[n.levels > max.levels])){
 
@@ -800,7 +897,7 @@ restrict_bn.fit <- function(bn.fit,
   if (any(n.levels < min.levels)){
 
     if (debug) cat(sprintf('restrict_bn.fit: Removing %s nodes with fewer than %s levels \n',
-                             sum(n.levels < min.levels), min.levels))
+                           sum(n.levels < min.levels), min.levels))
 
     for (i in names(n.levels[n.levels < min.levels])){
 
@@ -834,7 +931,7 @@ restrict_bn.fit <- function(bn.fit,
   if (any(n.children > max.out.degree)){
 
     if (debug) cat(sprintf('restrict_bn.fit: Restricting %s nodes to %s children \n',
-                             sum(n.children > max.out.degree), max.out.degree))
+                           sum(n.children > max.out.degree), max.out.degree))
 
     for (i in names(n.children[n.children > max.out.degree])){
       cut.children <- names(sort(sapply(bn_list[[i]]$children,
@@ -857,7 +954,7 @@ restrict_bn.fit <- function(bn.fit,
   if (any(n.parents > max.in.degree)){
 
     if (debug) cat(sprintf('restrict_bn.fit: Restricting %s nodes to %s parents \n',
-                             sum(n.children > max.in.degree), max.in.degree))
+                           sum(n.children > max.in.degree), max.in.degree))
 
     for (i in names(n.parents[n.parents > max.in.degree])){
 
@@ -927,12 +1024,15 @@ compute_mpt <- function(bn.fit,
                       function(x) lapply(x, function(y) y))  # convert dnode to list as well. Slower
   }
   eL <- bn.fit2edgeList(bn_list)
+  arp <- dag2arp(bn.fit = bn.fit)
 
   for (i in seq_len(length(bn_list))){
 
-    browser()
+    ## TODO: update debugging
 
-    text <- sprintf("")
+    # browser()
+
+    # text <- sprintf("")
 
     ## for each node
     node <- bn_list[[i]]  # select node
@@ -941,9 +1041,9 @@ compute_mpt <- function(bn.fit,
     #                         stringr::str_pad(node$node, max(nchar(names(bn_list))), 'right'),
     #                         paste0(c(node$node, node$parents), collapse = ',')))
     if (debug) cat(sprintf('compute_mpt: %s %s P(%s) = ',
-                             stringr::str_pad(i, nchar(length(bn.fit)), 'right'),
-                             stringr::str_pad(node$node, max(nchar(names(bn_list))), 'right'),
-                             paste0(match(c(node$node, node$parents), names(bn_list)), collapse = ',')))
+                           stringr::str_pad(i, nchar(length(bn.fit)), 'right'),
+                           stringr::str_pad(node$node, max(nchar(names(bn_list))), 'right'),
+                           paste0(match(c(node$node, node$parents), names(bn_list)), collapse = ',')))
 
     # debug_cli(debug >= 2, cli::cli_info)
 
@@ -951,14 +1051,14 @@ compute_mpt <- function(bn.fit,
       ## if no parents, marginal and joint are just the conditional
       node$marginal <- node$joint <- node$prob
       # if (debug) cat(sprintf('P(%s) \n', node$node))
-      if (debug) cat(sprintf('P(%s) \n', match(node$node, names(bn_list))))
+      if (debug) cat(sprintf('P(%s)\n', match(node$node, names(bn_list))))
 
     } else{
       ## if exist parents
       # if(debug) cat(sprintf('P(%s|%s) ', c(node$node),
       #                         paste0(c(node$parents), collapse = ',')))
       if(debug) cat(sprintf('P(%s|%s) ', match(node$node, names(bn_list)),
-                              paste0(match(node$parents, names(bn_list)), collapse = ',')))
+                            paste0(match(node$parents, names(bn_list)), collapse = ',')))
       joint <- node$prob  # initialize joint probability with conditional
       done <- c()  # store completed ancestors
 
@@ -967,11 +1067,17 @@ compute_mpt <- function(bn.fit,
         parent <- bn_list[[node$parents[j]]]  # current parent
         shields <- parent$parents[which(parent$parents %in% node$parents)]  # shields (not exact definition, but grandparents that are parents of node)
 
+        # browser()
+
+        # shields <- parent$parents[arp[parent$parents, node$parents] == 1]
+
         if (! parent$node %in% done){  # if not done
           ## get probability table (pt)
           x <- c(parent$node, shields[! shields %in% done])  # pt of parent and incomplete shields
           S <- shields[shields %in% done]  # conditioned on completed shields
           if (is.null(parent$joint)) browser()
+          if (is.null(names(dimnames(parent$joint))))
+            names(dimnames(parent$joint)) <- parent$node
           prob <- query_jpt(parent$joint, x = x, S = S)  # if length(x)==1 and S is empty, marginal
 
           ## permute
@@ -992,7 +1098,7 @@ compute_mpt <- function(bn.fit,
           # if (debug) sapply(x, function(y) cat(sprintf('P(%s%s) ', y,
           #                                                ifelse(length(S) > 0, paste0('|', paste0(S, collapse = ',')), ''))))
           if (debug) sapply(x, function(y) cat(sprintf('P(%s%s) ', match(y, names(bn_list)),
-                                                         ifelse(length(S) > 0, paste0('|', paste0(match(S, names(bn_list)), collapse = ',')), ''))))
+                                                       ifelse(length(S) > 0, paste0('|', paste0(match(S, names(bn_list)), collapse = ',')), ''))))
         }  # end if not done
       }
       if (debug) cat('\n')
@@ -1020,63 +1126,4 @@ compute_mpt <- function(bn.fit,
   attr(bn_list, "min_joint") = min_joint
 
   return(bn_list)
-}
-
-
-
-# Get probability table from joint probability table
-
-query_jpt <- function(jpt,  # joint probability table
-                   x,  # names of node(s) whose distribution is desired
-                   S = character(0)){  # names of conditioning set
-
-  dims <- dim(jpt)
-  dnm <- dimnames(jpt)
-
-  nm <- names(dnm)
-  if (length(dims) > 1){
-
-    x <- as.character(sort(factor(x, levels = nm)))  # resort according to jpt order
-    S <- as.character(sort(factor(S, levels = nm)))  # resort according to jpt order
-
-  } else{
-
-    debug_cli(length(x) > 1, cli::cli_abort,
-              "x too long for dimension of jpt")
-    S <- character(0)
-  }
-
-  if (is.null(dim(jpt))){
-
-    browser()  # TODO: check
-  }
-  ## sum over irrelevant dimensions
-  pt <- apply(jpt, MARGIN = match(c(x, S), nm), sum)
-
-  ## divide by conditioning dimensions
-  if (length(S)){
-
-    browser()
-
-    joint <- apply(jpt, MARGIN = match(S, nm), sum)
-    if (is.null(dim(joint))) dim(joint) <- length(joint)  # if length(S)==1, is just marginal
-
-    ## manipulate dimension to element-wise multiply by joint distribution
-    dimension <- rep(1, length(dim(pt)))
-    dimension[match(S, names(dimnames(pt)))] <- dim(joint)
-
-    dim(joint) <- dimension  # adjust dimension of prob
-    idx <- lapply(dim(pt), function(x) rep(1, x))[which(dimension == 1)]  # replicate dimension to match the dimension of pt
-    dims <- which(dimension == 1)  # which dimensions to replicate
-    pt <- pt / abind::asub(joint, idx, dims)  # divide by joint (perhaps marginal)
-    pt[which(is.na(pt) | is.nan(pt) | is.infinite(pt), arr.ind = TRUE)] <- rep(1, dim(pt)[1]) / dim(pt)[1]
-  }
-
-  if (is.null(dim(pt))){
-    dnm <- list(names(pt)); names(dnm) = x
-    dim(pt) <- length(pt)
-    dimnames(pt) <- dnm
-  }
-
-  return(pt)
 }
