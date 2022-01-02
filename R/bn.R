@@ -386,15 +386,11 @@ bn.fit2data_row <- function(bn.fit,
     data_row$var_lb <- min(vars)
     data_row$var_ub <- max(vars)
 
-    ## regret bounds
-    node_values <- bn.fit2values(bn.fit = zero_bn.fit(bn.fit = bn.fit))
+    ## effects on target
+    node_values <- bn.fit2values(bn.fit = zero_bn.fit(bn.fit = bn.fit))  # TODO: zero_bn.fit() not needed?
     effects_array <- bn.fit2effects(bn.fit = bn.fit)
     effects <- effects_array[setdiff(names(bn.fit), data_row$target),
                              data_row$target, 1]
-    effects <- sort(abs(effects[effects != 0]), decreasing = TRUE)
-    effects <- effects / effects[1]
-    data_row$reg_lb <- 1 - effects[2]
-    data_row$reg_ub <- 1 - effects[length(effects)]
 
   } else if ("bn.fit.dnet" %in% class(bn.fit)){
 
@@ -404,10 +400,18 @@ bn.fit2data_row <- function(bn.fit,
     data_row$var_lb <- min(n_lev)
     data_row$var_ub <- max(n_lev)
 
-    browser()
-
-    ## TODO: discrete regret bounds
+    ## effects on target
+    node_values <- bn.fit2values(bn.fit = bn.fit)
+    effects_array <- bn.fit2effects(bn.fit = bn.fit)
+    effects <- effects_array[setdiff(names(bn.fit), data_row$target),
+                             data_row$target, ]
   }
+  ## regret bounds
+  effects <- sort(abs(effects[effects != 0]), decreasing = TRUE)
+  effects <- effects / effects[1]
+  data_row$reg_lb <- 1 - effects[2]
+  data_row$reg_ub <- 1 - effects[length(effects)]
+
   return(data_row)
 }
 
