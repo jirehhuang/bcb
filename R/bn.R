@@ -576,35 +576,20 @@ bn.fit2values <- function(bn.fit){
 
   if ("bn.fit.gnet" %in% class(bn.fit)){
 
-    # beta <- wamat(bn.fit)  # coefficient matrix
-    # I <- diag(length(bn.fit))  # identity matrix
-    # Omega <- diag(sapply(bn.fit, `[[`, "sd")^2)  # error variances
-    # Sigma <- solve(t(I - beta)) %*% Omega %*% solve(I - beta)
-
-    ## zero sds
-    bn_list0 <- bn.fit[seq_len(length(bn.fit))]
-    for (node in nodes){
-
-      bn_list0[[node]]$sd <- 0
-    }
-    bn.fit0 <- bn_list2bn.fit(bn_list0)
-
-    means <- unlist(ribn(x = bn.fit0, n = 1))
-    # stds <- sqrt(diag(Sigma))
-
     node_values <- sapply(nodes, function(node){
 
-      means[node] + c(-1, 1)
+      c(-1, 1)
 
     }, simplify = FALSE)
 
   } else if ("bn.fit.dnet" %in% class(bn.fit)){
 
-    browser()
+    node_values <- sapply(nodes, function(node){
 
-    ## TODO: discrete version
+      c(1, 2)
+
+    }, simplify = FALSE)
   }
-  # return(effects_list)
   return(node_values)
 }
 
