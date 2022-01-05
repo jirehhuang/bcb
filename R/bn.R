@@ -709,47 +709,71 @@ validate_cpt <- function(cpt,
 
 query_jpt <- function(jpt,
                       target,
-                      given = character(0)){
+                      given = character(0),
+                      adjust = character(0)){
+
+  ## TODO: test adjusting parents with length(given) > 1
 
   nodes <- names(dimnames(jpt))
   if (is.numeric(target))
     target <- nodes[target]
   if (is.numeric(given))
     given <- nodes[given]
+  if (is.numeric(adjust))
+    adjust <- nodes[adjust]
+  adjust <- setdiff(adjust, given)
+  given <- c(given, adjust)
 
   debug_cli(length(intersect(target, given)) ||
-              any(! c(target, given) %in% nodes),
-            cli::cli_abort, "invalid target or given")
+              length(intersect(target, adjust)) ||
+              !all(c(target, given, adjust) %in% nodes),
+            cli::cli_abort, "invalid target, given, or adjust")
 
   ## sort according to jpt
   target <- nodes[sort(match(target, nodes))]
   given <- nodes[sort(match(given, nodes))]
+  adjust <- nodes[sort(match(adjust, nodes))]
+  tgp <- c(target, union(given, adjust))
 
   ## sum across irrelevant dimensions
-  log_pt <- log(apply(jpt, MARGIN = match(c(target, given), nodes), sum))
-  dim(log_pt) <- dim(jpt)[c(target, given)]
-  dimnames(log_pt) <- dimnames(jpt)[c(target, given)]
+  log_pt <- log(sum_pt(jpt, nodes = tgp))
 
   ## divide by conditioning dimensions
   if (length(given)){
 
     ## joint probability table of conditioning variables
-    prob <- apply(exp(log_pt), MARGIN = match(given, names(dimnames(log_pt))), sum)
-    if (is.null(dim(prob)))
-      dim(prob) <- length(prob)
+    gpt <- sum_pt(exp(log_pt), given)
 
     ## manipulate dimension to element-wise divide
     ## by joint distribution of conditioning variables
-    dim_prob <- rep(1, length(dim(log_pt)))
-    dim_prob[match(given, names(dimnames(log_pt)))] <- dim(prob)
-    names(dim_prob) <- given
-    dim(prob) <- dim_prob
+    gpt <- reshape_dim(gpt, dimnames(log_pt))
 
+    if (length(adjust)){
+
+      ## joint probability table of adjustment variables
+      ppt <- sum_pt(exp(log_pt), adjust)
+    }
     ## element-wise divide
-    dims <- which(dim_prob == 1)
-    idx <- lapply(dim(log_pt)[dims], function(x) rep(1, x))
-    log_pt <- log_pt - log(abind::asub(prob, idx, dims))
+    log_gpt <- ifelse((log_gpt <- log(gpt)) == -Inf, 1, log_gpt)
+    log_pt <- log_pt - log_gpt
+
+    if (length(adjust)){
+
+      ## manipulate dimension to element-wise multiply
+      ## by joint distribution of adjustment variables
+      ppt <- reshape_dim(ppt, dimnames(log_pt))
+
+      ## element-wise multiply
+      log_pt <- log_pt + log(ppt)
+
+      ## sum over adjust
+      log_pt <- log(apply(exp(log_pt),
+                          MARGIN = match(c(target, setdiff(given, adjust)),
+                                         names(dimnames(log_pt))), sum))
+    }
   }
+  log_pt <- log(validate_cpt(cpt = exp(log_pt),
+                             given = setdiff(given, adjust)))
   class(log_pt) <- "table"
   return(exp(log_pt))
 }
