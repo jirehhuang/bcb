@@ -643,6 +643,88 @@ bn.fit2jpt <- function(bn.fit){
 
 
 
+# Relatively trivial function for summing over jpt
+
+sum_pt <- function(pt, nodes){
+
+  if (length(nodes) == 0){
+
+    return(sum(pt))
+  }
+  pt_ <- apply(pt, MARGIN = match(nodes,
+                                  names(dimnames(pt))), sum)
+  dim(pt_) <- dim(pt)[match(nodes,
+                            names(dimnames(pt)))]
+  dimnames(pt_) <- dimnames(pt)[nodes]
+
+  return(pt_)
+}
+
+
+
+# Reshape dimension of pt to match that of new_dimnames
+
+reshape_dim <- function(pt, new_dimnames, repl = TRUE){
+
+  ## permute dimensions of pt according to new_dimnames
+  if (!is.null(dimnames(pt))){
+
+    perm <- order(match(names(dimnames(pt)),
+                        names(new_dimnames)))
+    pt <- aperm(pt, perm)
+  }
+
+  ## manipulate dimension
+  dim_pt <- rep(1, length(new_dimnames))
+  names(dim_pt) <- names(new_dimnames)
+  dim_pt[names(dimnames(pt))] <- dim(pt)
+  dim(pt) <- dim_pt
+
+  new_dim <- sapply(new_dimnames, length)
+  if (repl){
+
+    debug_cli(prod(new_dim) > 1e8, cli::cli_abort,
+              "probability table will have {prod(new_dim)} > 1e8 elements")
+
+    ## replicate to match
+    dims <- which(dim(pt) == 1)
+    idx <- lapply(new_dim[dims], function(x) rep(1, x))
+    pt <- abind::asub(pt, idx, dims)
+    dimnames(pt) <- new_dimnames
+
+  } else{
+
+    dimnames(pt) <- sapply(names(new_dimnames), function(node){
+
+      if (dim(pt)[node] == new_dim[node])
+        new_dimnames[[node]]
+      else
+        paste(new_dimnames[[node]], collapse = "")
+
+    }, simplify = FALSE)
+  }
+  return(pt)
+}
+
+
+
+# Validate conditional probability table
+
+validate_cpt <- function(cpt,
+                         given = character(0)){
+
+  ## normalize, if necessary
+  sums <- sum_pt(cpt,
+                 given)
+  if (any(sums != 1)){
+
+    cpt <- exp(log(cpt) - reshape_dim(log(sums), dimnames(cpt)))
+  }
+  return(cpt)
+}
+
+
+
 # Query log joint probability table from bn.fit
 
 query_jpt <- function(jpt,
