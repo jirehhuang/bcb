@@ -617,7 +617,6 @@ bn.fit2jpt <- function(bn.fit){
                         new_dimnames = dimnames(log_jpt))
     log_jpt <- log_jpt + log(prob)
   }
-  class(log_jpt) <- "table"
   return(exp(log_jpt))
 }
 
@@ -683,6 +682,7 @@ reshape_dim <- function(pt, new_dimnames, repl = TRUE){
 
     }, simplify = FALSE)
   }
+  class(pt) <- "table"
   return(pt)
 }
 
@@ -700,6 +700,7 @@ validate_cpt <- function(cpt,
 
     cpt <- exp(log(cpt) - reshape_dim(log(sums), dimnames(cpt)))
   }
+  class(cpt) <- "table"
   return(cpt)
 }
 
@@ -774,7 +775,6 @@ query_jpt <- function(jpt,
   }
   log_pt <- log(validate_cpt(cpt = exp(log_pt),
                              given = setdiff(given, adjust)))
-  class(log_pt) <- "table"
   return(exp(log_pt))
 }
 
