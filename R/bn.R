@@ -604,38 +604,18 @@ bn.fit2jpt <- function(bn.fit){
   nodes <- names(bn.fit)
 
   ## initialize joint probability table (jpt)
-  dim_jpt <- sapply(nodes, function(node){
-
-    dim(bn.fit[[node]]$prob)[1]
-  })
-  names(dim_jpt) <- nodes
-  debug_cli(prod(dim_jpt) > 1e6, cli::cli_abort,
-            "jpt will have {prod(dim_jpt)} > 1e6 elements")
-
-  log_jpt <- array(0, dim = dim_jpt)
-  dimnames(log_jpt) <- sapply(nodes, function(node){
+  new_dimnames <- sapply(nodes, function(node){
 
     dimnames(bn.fit[[node]]$prob)[[1]]
 
   }, simplify = FALSE)
+  log_jpt <- reshape_dim(0, new_dimnames = new_dimnames, repl = TRUE)
 
   for (node in nodes){
 
-    ## permute dimensions according to nodes
-    prob <- bn.fit[[node]]$prob
-    perm <- order(match(names(dimnames(prob)), nodes))
-    prob <- aperm(prob, perm)
-
-    ## manipulate dimension to element-wise multiply by joint distribution
-    dim_prob <- rep(1, length(nodes))
-    dim_prob[match(names(dimnames(prob)), nodes)] <- dim(prob)
-    names(dim_prob) <- names(dimnames(prob))
-    dim(prob) <- dim_prob
-
-    ## element-wise multiply
-    dims <- which(dim_prob == 1)
-    idx <- lapply(dim(log_jpt)[dims], function(x) rep(1, x))
-    log_jpt <- log_jpt + log(abind::asub(prob, idx, dims))
+    prob <- reshape_dim(bn.fit[[node]]$prob,
+                        new_dimnames = dimnames(log_jpt))
+    log_jpt <- log_jpt + log(prob)
   }
   class(log_jpt) <- "table"
   return(exp(log_jpt))
