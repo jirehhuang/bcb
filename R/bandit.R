@@ -603,8 +603,17 @@ summarize_rounds <- function(bn.fit,
       mat <- row2mat(row = row, nodes = settings$nodes)
 
       ## mse of effects
-      rounds$selected[[sprintf("beta_%s", est)]][t] <-
-        mean((mat - rounds$beta_true)[not_diag]^2)
+      if (class(bn.fit)[2] == "bn.fit.gnet"){
+
+        rounds$selected[[sprintf("beta_%s", est)]][t] <-
+          mean((mat - rounds$beta_true[,,1])[not_diag]^2)
+
+      } else if (class(bn.fit)[2] == "bn.fit.dnet"){
+
+        browser()
+
+        ## TODO: discrete implementation
+      }
     }
   }
   ## fill columns for all data.frames
@@ -706,6 +715,8 @@ read_rounds <- function(where){
     rounds <- readRDS(where)
 
   } else{
+
+    ## TODO: remove .txt version
 
     debug_cli(! dir.exists(where), cli::cli_abort,
               "specified directory does not exist")
@@ -832,7 +843,7 @@ initialize_rounds <- function(settings,
       ps = list(),
       bda = list(),
       arp = matrix(NA, nrow = settings$nnodes, ncol = settings$nnodes),
-      beta_true = bn.fit2effects(bn.fit = bn.fit)[, , 1],
+      beta_true = bn.fit2effects(bn.fit = bn.fit),
       mu_true = numeric()
     )
     rounds$selected$reward[seq_len(n_obs)] <-
@@ -842,7 +853,15 @@ initialize_rounds <- function(settings,
 
     rounds$mu_true <- sapply(rounds$arms, function(arm){
 
-      arm$value * rounds$beta_true[arm$node, settings$target]
+      ## TODO: change
+      if (class(bn.fit)[2] == "bn.fit.gnet"){
+
+        arm$value * rounds$beta_true[arm$node, settings$target, 1]
+
+      } else if (class(bn.fit)[2] == "bn.fit.dnet"){
+
+        rounds$beta_true[arm$node, settings$target, arm$value]
+      }
     })
 
     acal <- matrix(0, nrow = n_obs + n_int,
@@ -1318,7 +1337,7 @@ check_settings <- function(settings,
 
       if (settings$type == "bn.fit.dnet")
         settings$data_obs <- as.data.frame(lapply(settings$data_obs,
-                                                  function(x) as.factor))
+                                                  function(x) as.factor(x)))
     }
   } else if (is.null(settings$data_obs)){
 
