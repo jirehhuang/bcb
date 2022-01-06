@@ -906,8 +906,8 @@ initialize_rounds <- function(settings,
                                           bn.fit)  # used in estimate.R
   } else{
 
-    debug_cli(!identical(bn.fit, settings$rounds0$settings$bn.fit), cli::cli_abort,
-              "bn.fit must be identical to that of cached rounds")
+    debug_cli(all.equal(bn.fit, settings$rounds0$settings$bn.fit) != TRUE,
+              cli::cli_abort, "bn.fit must be identical to that of cached rounds")
 
     nms <- names(settings$rounds0)
     nms <- nms[!grepl("dag|settings", nms)]
