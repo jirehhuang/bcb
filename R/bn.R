@@ -780,6 +780,98 @@ query_jpt <- function(jpt,
 
 
 
+# Return nodes along directed path from one node to another
+
+nodes_along_path <- function(from,
+                             to,
+                             bn.fit){
+
+  ig <- igraph::graph.adjacency(bnlearn::amat(bn.fit))
+
+  paths <- igraph::all_simple_paths(graph = ig,
+                                    from = from, to = to)
+  nodes <- setdiff(Reduce(union, lapply(paths,
+                                        function(x) x$name)),
+                   c(from, to))
+
+  if (is.null(nodes))
+    nodes <- character(0)
+
+  return(nodes)
+}
+
+
+
+# Recursively get joint probability table
+# WARNING: not guaranteed to be correct in every case; use with care
+
+get_jpt <- function(bn.fit,
+                    nodes = bnlearn::nodes(bn.fit)){
+
+  ## initialize joint probability table (jpt)
+  parents <- Reduce(union, sapply(nodes, bnlearn::parents,
+                                  x = bn.fit, simplify = FALSE))
+  between <- Reduce(union, lapply(parents, function(from){
+
+    Reduce(union, lapply(setdiff(parents, from), function(to){
+
+      nodes_along_path(from, to, bn.fit)
+    }))
+  }))
+  parents <- union(parents,
+                   between)
+  new_dimnames <- sapply(union(nodes, parents), function(node){
+
+    dimnames(bn.fit[[node]]$prob)[[1]]
+
+  }, simplify = FALSE)
+  log_jpt <- reshape_dim(0, new_dimnames = new_dimnames, repl = TRUE)
+
+  for (node in nodes){
+
+    prob <- reshape_dim(bn.fit[[node]]$prob,
+                        new_dimnames = dimnames(log_jpt))
+    log_jpt <- log_jpt + log(prob)
+  }
+  if (length(unresolved <- setdiff(parents, nodes))){
+
+    ## group parents that have a directed path between them
+    g <- sapply(match(unresolved, names(bn.fit)), function(i){
+
+      sapply(match(unresolved, names(bn.fit)), function(j){
+
+        phsl:::has_path(i = i, j = j,
+                        amat = bnlearn::amat(bn.fit),
+                        nodes = names(bn.fit)) * 1
+      })
+    })
+    g <- as.matrix(g)
+    rownames(g) <- colnames(g) <- unresolved
+    groups <- lapply(igraph::decompose.graph(igraph::graph.adjacency(g)),
+                     function(x) igraph::V(x)$name)
+
+    log_probs <- lapply(groups, function(group){
+
+      prob <- get_jpt(bn.fit, nodes = group)
+      log(reshape_dim(prob,
+                      new_dimnames = dimnames(log_jpt)))
+    })
+    log_jpt <- log_jpt + Reduce(`+`, log_probs)
+  }
+  jpt <- sum_pt(exp(log_jpt),
+                nodes = nodes)
+  if (sum(jpt) != 1){
+
+    debug_cli(abs(sum(jpt) - 1) > .Machine$double.eps, cli::cli_warn,
+              "numerical error greater than {.Machine$double.eps}")
+
+    jpt <- jpt / sum(jpt)
+  }
+  return(jpt)
+}
+
+
+
 # Get joint and marginal probability tables
 
 get_j_m_pt <- function(bn.fit){
