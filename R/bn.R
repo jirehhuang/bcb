@@ -1007,3 +1007,172 @@ remove_arcs <- function(bn.fit,
   }
   return(bn_list2bn.fit(bn_list = bn_list))
 }
+
+
+
+# Restrict the number of categorical levels in a discrete Bayesian network
+
+process_dnet <- function(bn.fit,
+                         min_levels = 2,
+                         max_levels = 2,
+                         merge_order = c("increasing", "decreasing", "random"),
+                         rename = TRUE,
+                         debug = 1){
+
+  if (class(bn.fit)[2] == "bn.fit.gnet"){
+
+    return(bn.fit)
+  }
+  bn_list <- add_j_m_pt(bn.fit = bn.fit)
+
+  debug_cli(debug, cli::cli_alert_info,
+            c("restricting {sum(sapply(bn.fit, function(x) dim(x$prob)[1] < min_levels || dim(x$prob)[1] > max_levels))} ",
+              "nodes to between {min_levels} and {max_levels} levels"))
+
+  ## restrict levels by mergin levels
+  merge_order <- match.arg(merge_order)
+
+  ## check each node
+  for (i in bnlearn:::node.ordering(bn.fit)){
+
+    node <- bn_list[[i]]
+    if (length(node$mpt) >= min_levels &&
+        length(node$mpt) <= max_levels &&
+        all(node$mpt > 0)) next
+
+    ## determine order to assign
+    ord <- switch(merge_order,
+                  random = sample(length(node$mpt)),
+                  order(node$mpt, decreasing = (merge_order ==
+                                                  "decreasing")))
+
+    ## initialize groups with levels with highest marginal probability,
+    ## only allowing non-zero marginals
+    groups <- lapply(tail(ord, min(max_levels, sum(node$mpt > 0))), function(x) x)
+    if (length(groups) < min_levels)
+      groups <- list(Reduce(union, groups))  # single group
+
+    ## merge smaller
+    for (j in head(ord, length(ord) - length(groups))){
+
+      ## add to group based on merge order
+      marginals <- sapply(groups, function(x) sum(node$mpt[x]))
+      k <- switch(merge_order,
+                  random = sample(length(groups)),
+                  increasing = which.min(marginals),
+                  decreasing = which.max(marginals))
+
+      groups[[k]] <- c(groups[[k]], j)
+    }
+    debug_cli(debug >= 2, cli::cli_alert,
+              c("for node {j}, merging {length(ord)} levels ({sum(node$mpt > 0)} non-zero) ",
+                "into {length(groups)} levels"))
+
+    ## create and replace with new cpt
+    node_prob <- do.call(abind::abind, c(
+
+      ## along first dimension corresponding to node
+      list(along = 1),
+
+      ## for each group
+      lapply(groups, function(lvls){
+
+        ## reshape and add each level in the group
+        reshape_dim(Reduce(`+`, lapply(lvls, function(idx){
+
+          abind::asub(node$prob, idx = idx, dims = 1, drop = FALSE)
+
+        })), new_dimnames = dimnames(node$prob), repl = FALSE)
+      })
+    ))
+    dimnames(node_prob)[[1]] <- do.call(c, lapply(groups, function(lvls){
+
+      paste(dimnames(node$prob)[[1]][lvls], collapse = "|")
+    }))
+    names(dimnames(node_prob)) <- c(node$node,
+                                    node$parents)
+    bn_list[[i]]$prob <- validate_cpt(cpt = node_prob,
+                                      given = node$parents)
+
+    ## adjust each child
+    for (j in node$children){
+
+      debug_cli(debug >= 2, cli::cli_alert,
+                "adjusting child {j} of node {i}")
+
+      child <- bn_list[[j]]
+      along <- match(node$node, names(dimnames(child$prob)))
+
+      ## create and replace with new cpt
+      child_prob <- do.call(abind::abind, c(
+
+        ## along dimension corresponding to node
+        list(along = along),
+
+        ## for each group
+        lapply(groups, function(lvls){
+
+          ## reshape and add each level in the group
+          reshape_dim(Reduce(`+`, lapply(lvls, function(idx){
+
+            abind::asub(child$prob, idx = idx, dims = along, drop = FALSE) *
+              node$mpt[idx]  # multiply by corresponding marginal
+
+          })), new_dimnames = dimnames(child$prob), repl = FALSE) /
+            sum(node$mpt[lvls])  # normalize by sum of marginals
+        })
+      ))
+      dimnames(child_prob)[[along]] <- do.call(c, lapply(groups, function(lvls){
+
+        paste(dimnames(child$prob)[[along]][lvls], collapse = "|")
+      }))
+      names(dimnames(child_prob)) <- c(child$node,
+                                       child$parents)
+      bn_list[[j]]$prob <- validate_cpt(cpt = child_prob,
+                                        given = child$parents)
+
+      ## cut off parents if fewer than min_levels
+      if (length(groups) < min_levels){
+
+        debug_cli(debug >= 2, cli::cli_alert,
+                  "removing {i} as a parent of {j}")
+
+        bn_list[[j]]$parents <- setdiff(bn_list[[j]]$parents,
+                                        node$node)
+
+        new_dimnames <- dimnames(bn_list[[j]]$prob)[-along]
+        bn_list[[j]]$prob <- abind::asub(bn_list[[j]]$prob,
+                                         idx = 1, dims = along, drop = TRUE)
+        if (is.null(dim(bn_list[[j]]$prob))){
+
+          dim(bn_list[[j]]$prob) <- length(bn_list[[j]]$prob)
+          dimnames(bn_list[[j]]$prob) <- new_dimnames
+        }
+      }
+    }  # end for j in children
+
+    ## remove node if fewer than min_levels
+    if (length(groups) < min_levels){
+
+      debug_cli(debug >= 2, cli::cli_alert,
+                "removing node {i}, which has fewer than {min_levels} levels")
+
+      ## remove as a child of parents
+      for (j in bn_list[[i]]$parents){
+
+        bn_list[[j]]$children <- setdiff(bn_list[[j]]$children,
+                                         node$node)
+      }
+      ## remove node
+      bn_list <- bn_list[-match(node$node, names(bn_list))]
+    }
+  }  # end for i in nodes
+
+  ## update bn.fit
+  bn.fit <- bn_list2bn.fit(bn_list)
+
+  ## rename categorical levels of bn.fit
+  if (rename)
+    bn.fit <- rename_bn.fit(bn.fit = bn.fit, nodes = names(bn.fit), categories = TRUE)
+
+  return(bn.fit)
