@@ -13,7 +13,7 @@ bn.fit2edgeList <- function(bn.fit){
 
 bn_list2bn.fit <- function(bn_list){
 
-  nodes <- sapply(bn_list, `[[`, "node")
+  nodes <- unname(sapply(bn_list, `[[`, "node"))
   bn <- sparsebnUtils::to_bn(bn.fit2edgeList(bn_list))
   bnlearn::nodes(bn) <- nodes
 
@@ -883,8 +883,15 @@ get_jpt <- function(bn.fit,
 
 # Get joint and marginal probability tables
 
-add_j_m_pt <- function(bn.fit){
+add_j_m_pt <- function(bn.fit,
+                       ignore_if_present = TRUE){
 
+  ## if mpt and jpt already present for each node, ignore
+  if (ignore_if_present &&
+      !any(sapply(bn.fit, function(node) is.null(node$mpt) || is.null(node$jpt)))){
+
+    return(bn.fit)
+  }
   ## attempt using bn.fit2jpt()
   bn_list <- tryCatch({
 
@@ -926,7 +933,7 @@ add_j_m_pt <- function(bn.fit){
       },
       error = function(err){
 
-        debug_cli(TRUE, cli::cli_alert,
+        debug_cli(TRUE, cli::cli_alert_danger,
                   c("error in {.fn get_jpt} for node {node$node}: ",
                     "{gsub('\\n', ' ', as.character(err))}"),
                   .envir = environment())
@@ -960,21 +967,24 @@ add_j_m_pt <- function(bn.fit){
 # Remove arcs from bn.fit object
 
 remove_arcs <- function(bn.fit,
-                        arcs = matrix(character(0), ncol = 2)){
+                        arcs = matrix(character(0), ncol = 2),
+                        debug = 0){
 
-  amat <- bnlearn::amat(bn.fit)
+  as_bn.fit <- class(bn.fit)[1] == "bn.fit"
+  amat <- bnlearn::amat(bn_list2bn.fit(bn.fit))
   if (length(arcs) == 0 ||  # no arcs specified
       all(amat[arcs] == 0)){  # specified arcs are not present
 
     return(bn.fit)
   }
-  if (class(bn.fit)[2] == "bn.fit.gnet"){
+  if (!is.null(bn.fit[[1]]$coefficients)){  # gnet
 
     bn_list <- bn.fit[seq_len(length(bn.fit))]
 
-  } else if (class(bn.fit)[2] == "bn.fit.dnet"){
+  } else if (!is.null(bn.fit[[1]]$prob)){  # dnet
 
-    bn_list <- add_j_m_pt(bn.fit = bn.fit)
+    bn_list <- add_j_m_pt(bn.fit = bn.fit,
+                          ignore_if_present = TRUE)
   }
   for (node in names(bn_list)){
 
@@ -983,29 +993,45 @@ remove_arcs <- function(bn.fit,
 
     if (length(remove_nodes)){
 
+      debug_cli(debug, cli::cli_alert,
+                "removing {paste(remove_nodes, collapse = ',')} -> {node}")
+
       ## remove as parents and children
       bn_list[[node]]$parents <- setdiff(bn_list[[node]]$parents,
                                          remove_nodes)
-      bn_list[remove_nodes] <- lapply(bn_list[remove_nodes], function(node){
+      bn_list[remove_nodes] <- lapply(bn_list[remove_nodes], function(parent){
 
-        node$children <- setdiff(node$children,
-                                 node)
-        return(node)
+        parent$children <- setdiff(parent$children,
+                                   node)
+        return(parent)
       })
-      if (class(bn.fit)[2] == "bn.fit.gnet"){
+      if (!is.null(bn.fit[[1]]$coefficients)){
 
         ## remove coefficients
         bn_list[[node]]$coefficients <- bn_list[[node]]$coefficients[c("(Intercept)",
                                                                        bn_list[[node]]$parents)]
-      } else if (class(bn.fit)[2] == "bn.fit.dnet"){
+      } else if (!is.null(bn.fit[[1]]$prob)){
 
         ## marginalize out nodes to be removed
         bn_list[[node]]$prob <- query_jpt(jpt = bn_list[[node]]$jpt, target = node,
                                           given = bn_list[[node]]$parents)  # reduced parents
+        if (!as_bn.fit){
+
+          ## also reduce joint probability table
+          bn_list[[node]]$jpt <- query_jpt(jpt = bn_list[[node]]$jpt,
+                                           target = c(node, bn_list[[node]]$parents))
+        }
       }
     }
   }
-  return(bn_list2bn.fit(bn_list = bn_list))
+  if (as_bn.fit){
+
+    return(bn_list2bn.fit(bn_list = bn_list))
+
+  } else{
+
+    return(bn_list)
+  }
 }
 
 
@@ -1013,9 +1039,13 @@ remove_arcs <- function(bn.fit,
 # Restrict the number of categorical levels in a discrete Bayesian network
 
 process_dnet <- function(bn.fit,
-                         min_levels = 2,
-                         max_levels = 2,
+                         min_levels = min(sapply(bn.fit, function(x) dim(x$prob)[1])),
+                         max_levels = max(sapply(bn.fit, function(x) dim(x$prob)[1])),
                          merge_order = c("increasing", "decreasing", "random"),
+                         max_in_deg = max(sapply(bn.fit, function(x) length(x$parents))),
+                         max_out_deg = max(sapply(bn.fit, function(x) length(x$children))),
+                         remove_order = c("decreasing", "random"),
+                         min_cp = .Machine$double.eps,  # minimum conditional probability
                          rename = TRUE,
                          debug = 1){
 
@@ -1171,8 +1201,91 @@ process_dnet <- function(bn.fit,
   ## update bn.fit
   bn.fit <- bn_list2bn.fit(bn_list)
 
+  ## restrict in-degree and out-degree
+  in_deg <- sapply(bn.fit, function(x) length(x$parents))
+  out_deg <- sapply(bn.fit, function(x) length(x$children))
+
+  if (any(in_deg > max_in_deg) || any(out_deg > max_out_deg)){
+
+    ## order by which to remove arcs
+    remove_order <- match.arg(remove_order)
+
+    ## add jpt and mpt; need jpt for remove_arcs()
+    bn_list <- add_j_m_pt(bn.fit = bn.fit)
+
+    ## first, restrict in-degree
+    arcs <- do.call(rbind, lapply(bn.fit, function(node){
+
+      if (length(node$parents) > max_in_deg){
+
+        remove_parents <- switch(remove_order,
+                                 decreasing = node$parents[order(out_deg[node$parents],
+                                                                 decreasing = TRUE)[seq_len(max_in_deg)]],
+                                 random = sample(node$parents,
+                                                 size = max_in_deg))
+        return(unname(cbind(remove_parents,
+                            node$node)))
+      }
+      return(NULL)
+    }))
+    ## remove arcs and update degrees
+    bn_list <- remove_arcs(bn.fit = bn_list,
+                           arcs = arcs)
+    in_deg <- sapply(bn_list, function(x) length(x$parents))
+    out_deg <- sapply(bn_list, function(x) length(x$children))
+
+    ## second, restrict out-degree
+    arcs <- do.call(rbind, lapply(bn.fit, function(node){
+
+      if (length(node$children) > max_out_deg){
+
+        remove_children <- switch(remove_order,
+                                  decreasing = node$children[order(in_deg[node$children],
+                                                                   decreasing = TRUE)[seq_len(max_out_deg)]],
+                                  random = sample(node$children,
+                                                  size = max_out_deg))
+        return(unname(cbind(node$node,
+                            remove_children)))
+      }
+      return(NULL)
+    }))
+    ## remove arcs and convert to bn.fit
+    bn_list <- remove_arcs(bn.fit = bn_list,
+                           arcs = arcs)
+    bn.fit <- bn_list2bn.fit(bn_list = bn_list)
+
+    ## TODO: remove; temporary for checking
+    in_deg <- sapply(bn_list, function(x) length(x$parents))
+    out_deg <- sapply(bn_list, function(x) length(x$children))
+    if (any(in_deg > max_in_deg) || any(out_deg > max_out_deg)){
+
+      browser()
+    }
+  }
+  ## minimum conditional probability
+  small <- which(sapply(bn.fit, function(node){
+
+    sum(node$prob < min_cp) > 0
+  }))
+  if (length(small)){
+
+    bn_list <- bn.fit[seq_len(length(bn.fit))]
+    bn_list[small] <- lapply(bn_list[small], function(node){
+
+      while (any(node$prob < min_cp)){
+
+        node$prob[] <- runif(length(node$prob))
+        node$prob <- validate_cpt(cpt = node$prob,
+                                  given = node$parents)
+      }
+      return(node)
+    })
+    bn.fit <- bn_list2bn.fit(bn_list)
+  }
+
   ## rename categorical levels of bn.fit
   if (rename)
     bn.fit <- rename_bn.fit(bn.fit = bn.fit, nodes = names(bn.fit), categories = TRUE)
 
   return(bn.fit)
+}
