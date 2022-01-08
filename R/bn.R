@@ -465,6 +465,10 @@ bn.fit2effects <- function(bn.fit){
   } else if ("bn.fit.dnet" %in% class(bn.fit)){
 
     node_values <- bn.fit2values(bn.fit = bn.fit)
+    success <- 1  # TODO: generalize
+
+    ## TODO: remove; temporary for checking
+    jpt <- bn.fit2jpt(bn.fit)
 
     for (node in names(bn.fit)){
 
@@ -482,13 +486,38 @@ bn.fit2effects <- function(bn.fit){
         bn_list0 <- bn.fit0[seq_len(length(bn.fit0))]
         bn_list0[[node]]$prob[] <- 0
         bn_list0[[node]]$prob[value] <- 1
-        bn_list0 <- get_j_m_pt(bn.fit = bn_list0)
+        bn_list0 <- add_j_m_pt(bn.fit = bn_list0)
 
         mpt <- sapply(bn_list0, `[[`, "mpt", simplify = FALSE)
 
         node_i <- match(node, names(bn.fit))
-        effects[node_i, -node_i, 1] <- sapply(mpt[-node_i], `[[`, 1)
-        effects[node_i, -node_i, 2] <- sapply(mpt[-node_i], `[[`, 2)
+        effects[node_i, -node_i, value] <- sapply(mpt[-node_i], `[[`, success)
+
+        ## TODO: remove below; temporary for checking
+        effects_i_value <- sapply(names(bn.fit)[-node_i], function(target){
+
+          if (target %in% bn.fit[[node]]$parents){
+
+            query_jpt(jpt = jpt, target = target)[success]
+
+          } else{
+
+            query_jpt(jpt = jpt, target = target, given = setdiff(node, target),
+                      adjust = setdiff(bn.fit[[node]]$parents, target))[success, value]
+          }
+        })
+        bool_valid <- bnlearn::amat(bn.fit)[-node_i,
+                                            node_i] == 0  # target -/-> node
+        ae <- all.equal(effects[node_i, -node_i, value][bool_valid],
+                        effects_i_value[bool_valid], check.attributes = FALSE)
+        if (ae != TRUE){
+
+          print(ae)
+          print(effects[node_i, -node_i, value])
+          print(effects_i_value)
+          browser()
+        }
+        ## TODO: remove above; temporary for checking
       }
     }
   }
