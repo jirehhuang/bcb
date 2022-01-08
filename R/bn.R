@@ -913,47 +913,56 @@ get_jpt <- function(bn.fit,
 # Get joint and marginal probability tables
 
 add_j_m_pt <- function(bn.fit,
+                       nodes = names(bn.fit),
                        ignore_if_present = TRUE){
 
   ## if mpt and jpt already present for each node, ignore
   if (ignore_if_present &&
-      !any(sapply(bn.fit, function(node) is.null(node$mpt) || is.null(node$jpt)))){
+      !any(sapply(bn.fit[nodes], function(node) is.null(node$mpt) || is.null(node$jpt)))){
 
     return(bn.fit)
   }
-  ## attempt using bn.fit2jpt()
-  bn_list <- tryCatch({
+  if (setequal(names(bn.fit), nodes)){
 
-    jpt <- bn.fit2jpt(bn.fit = bn.fit)
+    ## attempt using bn.fit2jpt()
+    bn_list <- tryCatch({
 
-    lapply(bn.fit, function(node){
+      jpt <- bn.fit2jpt(bn.fit = bn.fit)
 
-      node <- node[names(node)]
-      node$jpt <- query_jpt(jpt = jpt, target = c(node$node, node$parents))
-      node$mpt <- query_jpt(jpt = node$jpt, target = node$node, given = character(0))
+      lapply(bn.fit, function(node){
 
-      return(node)
+        node <- node[names(node)]
+        node$jpt <- query_jpt(jpt = jpt, target = c(node$node, node$parents))
+        node$mpt <- query_jpt(jpt = node$jpt, target = node$node, given = character(0))
+
+        return(node)
+      })
+    },
+    error = function(err){
+
+      debug_cli(TRUE, cli::cli_alert_danger,
+                c("error using {.fn bn.fit2jpt} for {length(bn.fit)} nodes: ",
+                  "{gsub('\\n', ' ', as.character(err))}"),
+                .envir = environment())
+
+      return(NULL)
     })
-  },
-  error = function(err){
+  } else{
 
-    debug_cli(TRUE, cli::cli_alert_danger,
-              c("error using {.fn bn.fit2jpt} for {length(bn.fit)} nodes: ",
-                "{gsub('\\n', ' ', as.character(err))}"),
-              .envir = environment())
-
-    return(NULL)
-  })
+    nodes <- unique(nodes)
+    bn_list <- NULL
+  }
   ## reattempt using get_jpt() and then empirical jpt
   if (length(bn_list) == 0){
 
-    debug_cli(TRUE, cli::cli_alert,
+    debug_cli(setequal(names(bn.fit), nodes), cli::cli_alert,
               "reattempting by applying {.fn get_jpt} to each node")
 
     data <- NULL
     envir <- environment()
 
-    bn_list <- lapply(bn.fit, function(node){
+    bn_list <- bn.fit[seq_len(length(bn.fit))]
+    bn_list[nodes] <- lapply(bn.fit[nodes], function(node){
 
       node <- node[names(node)]
       node$jpt <- tryCatch({
@@ -1013,6 +1022,7 @@ remove_arcs <- function(bn.fit,
   } else if (!is.null(bn.fit[[1]]$prob)){  # dnet
 
     bn_list <- add_j_m_pt(bn.fit = bn.fit,
+                          nodes = unique(arcs[, 2]),
                           ignore_if_present = TRUE)
   }
   for (node in names(bn_list)){
