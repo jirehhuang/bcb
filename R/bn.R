@@ -668,7 +668,7 @@ reshape_dim <- function(pt, new_dimnames, repl = TRUE){
     ## replicate to match
     dims <- which(dim(pt) == 1)
     idx <- lapply(new_dim[dims], function(x) rep(1, x))
-    pt <- abind::asub(pt, idx, dims)
+    pt <- abind::asub(pt, idx, dims, drop = FALSE)
     dimnames(pt) <- new_dimnames
 
   } else{
@@ -696,6 +696,15 @@ validate_cpt <- function(cpt,
   ## normalize, if necessary
   sums <- sum_pt(cpt,
                  given)
+  if (any(sums == 0)){
+
+    browser()
+
+    ## TODO: conditional probabilities when probability of condition is 0
+
+    sums <- ifelse(sums == 0,
+                   1, sums)
+  }
   if (any(sums != 1)){
 
     cpt <- exp(log(cpt) - reshape_dim(log(sums), dimnames(cpt)))
@@ -863,7 +872,7 @@ get_jpt <- function(bn.fit,
   if (sum(jpt) != 1){
 
     debug_cli(abs(sum(jpt) - 1) > .Machine$double.eps, cli::cli_warn,
-              "numerical error greater than {.Machine$double.eps}")
+              "numerical error of {abs(sum(jpt) - 1)} > {.Machine$double.eps}")
 
     jpt <- jpt / sum(jpt)
   }
@@ -874,18 +883,76 @@ get_jpt <- function(bn.fit,
 
 # Get joint and marginal probability tables
 
-get_j_m_pt <- function(bn.fit){
+add_j_m_pt <- function(bn.fit){
 
-  jpt <- bn.fit2jpt(bn.fit = bn.fit)
+  ## attempt using bn.fit2jpt()
+  bn_list <- tryCatch({
 
-  lapply(bn.fit, function(node){
+    jpt <- bn.fit2jpt(bn.fit = bn.fit)
 
-    node <- node[names(node)]
-    node$jpt <- query_jpt(jpt = jpt, target = c(node$node, node$parents))
-    node$mpt <- query_jpt(jpt = node$jpt, target = node$node, given = character(0))
+    lapply(bn.fit, function(node){
 
-    return(node)
+      node <- node[names(node)]
+      node$jpt <- query_jpt(jpt = jpt, target = c(node$node, node$parents))
+      node$mpt <- query_jpt(jpt = node$jpt, target = node$node, given = character(0))
+
+      return(node)
+    })
+  },
+  error = function(err){
+
+    debug_cli(TRUE, cli::cli_alert_danger,
+              c("error using {.fn bn.fit2jpt} for {length(bn.fit)} nodes: ",
+                "{gsub('\\n', ' ', as.character(err))}"),
+              .envir = environment())
+
+    return(NULL)
   })
+  ## reattempt using get_jpt() and then empirical jpt
+  if (length(bn_list) == 0){
+
+    debug_cli(TRUE, cli::cli_alert,
+              "reattempting by applying {.fn get_jpt} to each node")
+
+    data <- NULL
+    envir <- environment()
+
+    bn_list <- lapply(bn.fit, function(node){
+
+      node <- node[names(node)]
+      node$jpt <- tryCatch({
+
+        get_jpt(bn.fit = bn.fit, nodes = c(node$node, node$parents))
+      },
+      error = function(err){
+
+        debug_cli(TRUE, cli::cli_alert,
+                  c("error in {.fn get_jpt} for node {node$node}: ",
+                    "{gsub('\\n', ' ', as.character(err))}"),
+                  .envir = environment())
+
+        debug_cli(TRUE, cli::cli_alert,
+                  "resorting to empirical jpt for node {node$node}",
+                  .envir = environment())
+
+        if (is.null(data)){
+
+          debug_cli(TRUE, cli::cli_alert,
+                    "generating {1e7} samples of observational data",
+                    .envir = environment())
+
+          assign(x = "data", value = ribn(x = bn.fit,
+                                          n = 1e7, seed = 1), envir = envir)
+        }
+        do.call(table, sapply(Reduce(union, node[c("node", "parents")]),
+                              function(x) data[[x]], simplify = FALSE)) / nrow(data)
+      })
+      node$mpt <- query_jpt(jpt = node$jpt, target = node$node)
+
+      return(node)
+    })
+  }
+  return(bn_list)
 }
 
 
@@ -907,7 +974,7 @@ remove_arcs <- function(bn.fit,
 
   } else if (class(bn.fit)[2] == "bn.fit.dnet"){
 
-    bn_list <- get_j_m_pt(bn.fit = bn.fit)
+    bn_list <- add_j_m_pt(bn.fit = bn.fit)
   }
   for (node in names(bn_list)){
 
