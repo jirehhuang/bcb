@@ -11,6 +11,35 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
+// obj_cpp
+double obj_cpp(arma::vec par, arma::uvec pt_dim, arma::mat x_tp_, arma::vec b_t, arma::mat a_p);
+RcppExport SEXP _bcb_obj_cpp(SEXP parSEXP, SEXP pt_dimSEXP, SEXP x_tp_SEXP, SEXP b_tSEXP, SEXP a_pSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type par(parSEXP);
+    Rcpp::traits::input_parameter< arma::uvec >::type pt_dim(pt_dimSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type x_tp_(x_tp_SEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type b_t(b_tSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type a_p(a_pSEXP);
+    rcpp_result_gen = Rcpp::wrap(obj_cpp(par, pt_dim, x_tp_, b_t, a_p));
+    return rcpp_result_gen;
+END_RCPP
+}
+// con_cpp
+Rcpp::List con_cpp(Rcpp::NumericVector par, arma::uvec pt_dim, arma::mat x_tp_, arma::vec b_t);
+RcppExport SEXP _bcb_con_cpp(SEXP parSEXP, SEXP pt_dimSEXP, SEXP x_tp_SEXP, SEXP b_tSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type par(parSEXP);
+    Rcpp::traits::input_parameter< arma::uvec >::type pt_dim(pt_dimSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type x_tp_(x_tp_SEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type b_t(b_tSEXP);
+    rcpp_result_gen = Rcpp::wrap(con_cpp(par, pt_dim, x_tp_, b_t));
+    return rcpp_result_gen;
+END_RCPP
+}
 // beta_cpp
 void beta_cpp(arma::mat& X, arma::vec& y, arma::vec& beta);
 RcppExport SEXP _bcb_beta_cpp(SEXP XSEXP, SEXP ySEXP, SEXP betaSEXP) {
@@ -99,6 +128,8 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_bcb_obj_cpp", (DL_FUNC) &_bcb_obj_cpp, 5},
+    {"_bcb_con_cpp", (DL_FUNC) &_bcb_con_cpp, 4},
     {"_bcb_beta_cpp", (DL_FUNC) &_bcb_beta_cpp, 3},
     {"_bcb_lm_cpp", (DL_FUNC) &_bcb_lm_cpp, 3},
     {"_bcb_lm_nig", (DL_FUNC) &_bcb_lm_nig, 10},

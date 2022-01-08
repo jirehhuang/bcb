@@ -1328,3 +1328,149 @@ process_dnet <- function(bn.fit,
 
   return(bn.fit)
 }
+
+
+
+# Generate and solve discrete conditional probability table for new parents using
+# Tsamardinos, 2006b: Generating realistic large Bayesian networks by tiling
+
+solve_cpt_dnet <- function(bn.fit,
+                           target,
+                           parents,
+                           ordered = FALSE,
+                           debug = 1){
+
+  ## remove parents of target
+  if (length(bn.fit[[target]]$parents)){
+
+    bn.fit <- remove_arcs(bn.fit = bn.fit, arcs = cbind(bn.fit[[target]]$parents, target))
+  }
+  ## if no parents, return as is
+  if (length(parents) == 0)
+    return(bn.fit)
+
+  ## reorder bn.fit and new parents
+  if (!ordered){
+
+    bn.fit <- reorder_bn.fit(bn.fit = bn.fit, ordering = TRUE)
+    revert <- attr(bn.fit, "revert")
+  }
+  parents <- intersect(names(bn.fit), parents)
+
+  new_dimnames <- sapply(bn.fit[c(target, parents)],
+                         function(x) dimnames(x$prob)[[1]], simplify = FALSE)
+  parent_dimnames <- list(apply(do.call(expand.grid, new_dimnames[-1]),
+                                1, paste, collapse = "_"))
+  names(parent_dimnames) <- paste(names(new_dimnames[-1]),
+                                  collapse = "_")
+  temp_dimnames <- c(new_dimnames[1],
+                     parent_dimnames)
+
+  dim_tp <- sapply(temp_dimnames, length)
+  debug_cli(prod(dim_tp) > 2^12, cli::cli_abort,
+            "new cpt contains {prod(dim_tp)} > {2^12} elements")
+
+  debug_cli(debug, cli::cli_alert_info,
+            c("attempting to add parent(s) {paste(parents, collapse = ',')} ",
+              "({dim_tp[2]} configurations) to target {target} ({dim_tp[1]} levels)"),
+            .envir = environment())
+
+  ## P(Pa_T = p) where Pa_T is the parents of target variable T
+  a_p <- c(get_jpt(bn.fit = bn.fit, nodes = parents))
+  dim(a_p) <- length(a_p)
+  dimnames(a_p) <- temp_dimnames[-1]
+  a_p <- reshape_dim(a_p,
+                     new_dimnames = temp_dimnames)
+
+  ## P(T = t) where T is the target variable
+  b_t <- bn.fit[[target]]$prob
+
+  ## objective and constraint functions
+  obj <- function(par){
+    return(obj_cpp(par, dim_tp, x_tp_, b_t, a_p))
+  }
+  con <- function(par){
+    return(lapply(con_cpp(par, dim_tp, x_tp_, b_t), c))
+  }
+
+  ## initialize parameters
+  par0 <- rep(1, sum(dim_tp))
+  best <- list(par = par0, fn = Inf)  # obj(par0))
+  success <- FALSE
+
+  ## begin attempts
+  tol <- 1e-8
+  n_attempts <- 100
+  time_limit <- 120
+  start_time <- Sys.time()
+  for (i in seq_len(n_attempts)){
+
+    null <- tryCatch({
+
+      setTimeLimit(time_limit)
+      debug_cli(debug, cli::cli_alert,
+                "attempt {i} of adding parent(s) {paste(parents, collapse = ',')} to target {target}",
+                .envir = environment())
+
+      x_tp_ <- runif(n = prod(dim_tp))
+      dim(x_tp_) <- dim_tp
+
+      soln <- NlcOptim::solnl(par0, obj, con,
+                              tolX = tol, maxIter = 100)
+      if (soln$fn < best$fn){
+
+        best <- soln
+      }
+      if (best$fn < 1e-6){
+        debug_cli(debug, cli::cli_alert_success,
+                  c("achieved desired tolerance on attempt {i} with value {best$fn} ",
+                    "in {prettyunits::pretty_sec(as.numeric(Sys.time() - start_time, unit = 'secs'))}"),
+                  .envir = environment())
+        success <- TRUE
+        break
+      }
+    }, error = function(err) {
+
+      debug_cli(TRUE, cli::cli_alert_danger,
+                "error in attempt {i}: {as.character(err)}",
+                .envir = environment())
+    })
+  }
+  debug_cli(!success, cli::cli_abort,
+            "failed to add parent(s) {paste(parents, collapse = ',')}
+            ({dim_tp[2]} configurations) to target {target} ({dim_tp[1]} levels)
+            after {n_attempts} attempts with {best$fn} < {tol} achieved",
+            .envir = environment())
+
+  ## create cpt
+  par <- c(best$par)
+  r_t <- par[seq_len(dim_tp[1])]
+  c_p <- par[-seq_len(dim_tp[1])]
+
+  x_tp <- x_tp_ * (as.matrix(r_t) %*% t(c_p))
+  dimnames(x_tp) <- temp_dimnames
+  x_tp <- validate_cpt(cpt = x_tp,
+                       given = names(temp_dimnames)[-1])
+
+  dim(x_tp) <- sapply(new_dimnames, length)
+  dimnames(x_tp) <- new_dimnames
+
+  ## prepare bn.fit
+  bn_list <- bn.fit[seq_len(length(bn.fit))]
+  bn_list[[target]]$parents <- parents
+  bn_list[[target]]$prob <- x_tp
+
+  for (parent in bn_list[[target]]$parents){
+
+    bn_list[[parent]]$children <- union(bn_list[[parent]]$children,
+                                        target)
+  }
+  bn.fit <- bn_list2bn.fit(bn_list)
+
+  ## reverse ordering, if not supplied as ordered
+  if (!ordered){
+
+    bn.fit <- reorder_bn.fit(bn.fit = bn.fit, ordering = revert)
+  }
+  return(bn.fit)
+}
