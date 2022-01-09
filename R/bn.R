@@ -1078,15 +1078,15 @@ remove_arcs <- function(bn.fit,
 # Restrict the number of categorical levels in a discrete Bayesian network
 
 process_dnet <- function(bn.fit,
-                         min_levels = min(sapply(bn.fit, function(x) dim(x$prob)[1])),
-                         max_levels = max(sapply(bn.fit, function(x) dim(x$prob)[1])),
+                         min_levels = 2,
+                         max_levels = Inf,
                          merge_order = c("increasing", "decreasing", "random"),
                          max_in_deg = max(sapply(bn.fit, function(x) length(x$parents))),
                          max_out_deg = max(sapply(bn.fit, function(x) length(x$children))),
                          remove_order = c("decreasing", "random"),
-                         min_cp = .Machine$double.eps,  # minimum conditional probability
+                         min_cp = -1,  # minimum conditional probability
                          rename = TRUE,
-                         debug = 1){
+                         debug = 3){
 
   if (class(bn.fit)[2] == "bn.fit.gnet"){
 
@@ -1094,7 +1094,7 @@ process_dnet <- function(bn.fit,
   }
   bn_list <- add_j_m_pt(bn.fit = bn.fit)
 
-  debug_cli(debug, cli::cli_alert_info,
+  debug_cli(debug >= 2, cli::cli_alert_info,
             c("restricting {sum(sapply(bn.fit, function(x) dim(x$prob)[1] < min_levels || dim(x$prob)[1] > max_levels))} ",
               "nodes to between {min_levels} and {max_levels} levels"))
 
@@ -1133,7 +1133,7 @@ process_dnet <- function(bn.fit,
 
       groups[[k]] <- c(groups[[k]], j)
     }
-    debug_cli(debug >= 2, cli::cli_alert,
+    debug_cli(debug >= 3, cli::cli_alert,
               c("for node {j}, merging {length(ord)} levels ({sum(node$mpt > 0)} non-zero) ",
                 "into {length(groups)} levels"))
 
@@ -1166,7 +1166,7 @@ process_dnet <- function(bn.fit,
     ## adjust each child
     for (j in node$children){
 
-      debug_cli(debug >= 2, cli::cli_alert,
+      debug_cli(debug >= 3, cli::cli_alert,
                 "adjusting child {j} of node {i}")
 
       child <- bn_list[[j]]
@@ -1203,7 +1203,7 @@ process_dnet <- function(bn.fit,
       ## cut off parents if fewer than min_levels
       if (length(groups) < min_levels){
 
-        debug_cli(debug >= 2, cli::cli_alert,
+        debug_cli(debug >= 3, cli::cli_alert,
                   "removing {i} as a parent of {j}")
 
         bn_list[[j]]$parents <- setdiff(bn_list[[j]]$parents,
@@ -1223,7 +1223,7 @@ process_dnet <- function(bn.fit,
     ## remove node if fewer than min_levels
     if (length(groups) < min_levels){
 
-      debug_cli(debug >= 2, cli::cli_alert,
+      debug_cli(debug >= 3, cli::cli_alert,
                 "removing node {i}, which has fewer than {min_levels} levels")
 
       ## remove as a child of parents
@@ -1338,7 +1338,9 @@ solve_cpt_dnet <- function(bn.fit,
                            target,
                            parents,
                            ordered = FALSE,
-                           debug = 1){
+                           n_attempts = 100,
+                           time_limit = 60,
+                           debug = 3){
 
   ## remove parents of target
   if (length(bn.fit[[target]]$parents)){
@@ -1370,7 +1372,7 @@ solve_cpt_dnet <- function(bn.fit,
   debug_cli(prod(dim_tp) > 2^12, cli::cli_abort,
             "new cpt contains {prod(dim_tp)} > {2^12} elements")
 
-  debug_cli(debug, cli::cli_alert_info,
+  debug_cli(debug >= 2, cli::cli_alert_info,
             c("attempting to add parent(s) {paste(parents, collapse = ',')} ",
               "({dim_tp[2]} configurations) to target {target} ({dim_tp[1]} levels)"),
             .envir = environment())
@@ -1396,19 +1398,17 @@ solve_cpt_dnet <- function(bn.fit,
   ## initialize parameters
   par0 <- rep(1, sum(dim_tp))
   best <- list(par = par0, fn = Inf)  # obj(par0))
-  success <- FALSE
+  tolX <- 1e-8
 
   ## begin attempts
-  tol <- 1e-8
-  n_attempts <- 100
-  time_limit <- 120
+  success <- FALSE
   start_time <- Sys.time()
   for (i in seq_len(n_attempts)){
 
     null <- tryCatch({
 
       setTimeLimit(time_limit)
-      debug_cli(debug, cli::cli_alert,
+      debug_cli(debug >= 3, cli::cli_alert,
                 "attempt {i} of adding parent(s) {paste(parents, collapse = ',')} to target {target}",
                 .envir = environment())
 
@@ -1416,20 +1416,22 @@ solve_cpt_dnet <- function(bn.fit,
       dim(x_tp_) <- dim_tp
 
       soln <- NlcOptim::solnl(par0, obj, con,
-                              tolX = tol, maxIter = 100)
+                              tolX = tolX, maxIter = 100)
       if (soln$fn < best$fn){
 
         best <- soln
       }
       if (best$fn < 1e-6){
-        debug_cli(debug, cli::cli_alert_success,
+
+        debug_cli(debug >= 2, cli::cli_alert_success,
                   c("achieved desired tolerance on attempt {i} with value {best$fn} ",
-                    "in {prettyunits::pretty_sec(as.numeric(Sys.time() - start_time, unit = 'secs'))}"),
+                    "after {prettyunits::pretty_sec(as.numeric(Sys.time() - start_time, unit = 'secs'))}"),
                   .envir = environment())
+
         success <- TRUE
         break
       }
-    }, error = function(err) {
+    }, error = function(err){
 
       debug_cli(TRUE, cli::cli_alert_danger,
                 "error in attempt {i}: {as.character(err)}",
@@ -1473,4 +1475,92 @@ solve_cpt_dnet <- function(bn.fit,
     bn.fit <- reorder_bn.fit(bn.fit = bn.fit, ordering = revert)
   }
   return(bn.fit)
+}
+
+
+
+# Convert bn to a "default" bn.fit.dnet object
+
+bn2dnet <- function(bn,
+                    seed,
+                    min_levels = 2,
+                    max_levels = 2,
+                    min_marginal = 1e-2,
+                    n_attempts = 100,
+                    time_limit = 60,
+                    debug = 3){
+
+  ## TODO: check arguments
+
+  bnlearn:::check.bn.or.fit(bn)
+
+  if (!missing(seed) && is.numeric(seed) && !is.na(seed))
+    set.seed(seed)
+
+  ## attempt
+  success <- FALSE
+  start_time <- Sys.time()
+  for (i in seq_len(n_attempts)){
+
+    null <- tryCatch({
+
+      setTimeLimit(time_limit)
+      debug_cli(debug >= 3, cli::cli_alert,
+                c("attempt {i} of generating dnet with {length(bnlearn::nodes(bn))} ",
+                  "nodes and {sum(bnlearn::amat(bn))} edges"),
+                .envir = environment())
+
+      ## initialize with empty graph with random marginal probabilities
+      dnet <- bnlearn::empty.graph(nodes = bnlearn::nodes(bn))
+      dist <- sapply(bnlearn::nodes(bn), function(node){
+
+        prob <- -1
+        while (any(prob < min_marginal)){
+
+          n_levels <- floor(runif(1, min = min_levels,
+                                  max = max_levels + 1 - .Machine$double.eps))
+          prob <- runif(n_levels)
+          prob <- prob / sum(prob)
+        }
+        dim(prob) <- length(prob)
+        dimnames(prob) <- list(seq_len(length(prob)) - 1)
+        names(dimnames(prob)) <- node
+
+        return(prob)
+
+      }, simplify = FALSE)
+      dnet <- bnlearn::custom.fit(bnlearn::empty.graph(nodes = bnlearn::nodes(bn)), dist)
+
+      ## add parents for each node
+      ordering <- bnlearn:::topological.ordering(bn)
+      ordered <- identical(ordering, bnlearn::nodes(bn))
+      for (node in ordering){
+
+        dnet <- solve_cpt_dnet(bn.fit = dnet, target = node,
+                               parents = bnlearn::parents(x = bn, node = node),
+                               ordered = ordered, n_attempts = n_attempts,
+                               time_limit = time_limit, debug = debug)
+      }
+      ## if successfully reached this point, successful
+      debug_cli(debug >= 2, cli::cli_alert_success,
+                c("successfully generated dnet on attempt {i} ",
+                  "after {prettyunits::pretty_sec(as.numeric(Sys.time() - start_time, unit = 'secs'))}"),
+                .envir = environment())
+
+      success <- TRUE
+      break
+    },
+    error = function(err){
+
+      debug_cli(TRUE, cli::cli_alert_danger,
+                "error in attempt {i}: {as.character(err)}",
+                .envir = environment())
+    })
+  }
+  debug_cli(!success, cli::cli_abort,
+            "failed to generate dnet with {length(bnlearn::nodes(bn))} and
+            {sum(bnlearn::amat(bn))} edges after {n_attempts} attempts",
+            .envir = environment())
+
+  return(dnet)
 }
