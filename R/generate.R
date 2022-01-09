@@ -120,8 +120,65 @@ gen_data_grid <- function(data_grid = build_data_grid(),
           }
         } else if (data_row$data_type == "discrete"){
 
-          ## TODO: generate cpts
-        }
+          if (data_row$normalize){
+
+            bn.fit <- process_dnet(bn.fit,
+                                   min_levels = 1,
+                                   max_levels = Inf,
+                                   max_in_deg = data_row$max_in_deg,
+                                   max_out_deg = data_row$max_out_deg,
+                                   remove_order = "decreasing",
+                                   min_cp = -1,
+                                   rename = TRUE,
+                                   debug = debug)
+            ## generate cpts
+            attempt <- 1
+            repeat{
+
+              seed <- data_row$seed + (attempt - 1) * nrow(data_grid)
+              dnet <- bn2dnet(bn = bn.fit,
+                              seed = seed,
+                              min_levels = data_row$var_lb,
+                              max_levels = data_row$var_ub,
+                              min_marginal = data_row$coef_lb,
+                              n_attempts = 100,
+                              time_limit = 60,
+                              debug = debug)
+
+              ## check if invalid
+              temp_row <- bn.fit2data_row(dnet, data_row)
+              invalid <- temp_row$reg_lb < data_row$reg_lb ||
+                temp_row$reg_ub > data_row$reg_ub
+
+              debug_cli(debug, ifelse(invalid, cli::cli_alert_danger, cli::cli_alert_success),
+                        c("dnet {ifelse(invalid, 'violates', 'satisfies')} regret constraints ",
+                          "on attempt {attempt} with (",
+                          "{format(temp_row$reg_lb, digits = 3, nsmall = 3)}, ",
+                          "{format(temp_row$reg_ub, digits = 3, nsmall = 3)})"),
+                        .envir = environment())
+
+              if (! invalid){
+
+                bn.fit <- dnet
+                data_row$seed <- seed
+                break
+              }
+              attempt <- attempt + 1
+            }
+          } else{
+
+            bn.fit <- process_dnet(bn.fit,
+                                   min_levels = data_row$var_lb,
+                                   max_levels = data_row$var_ub,
+                                   merge_order = "increasing",
+                                   max_in_deg = data_row$max_in_deg,
+                                   max_out_deg = data_row$max_out_deg,
+                                   remove_order = "decreasing",
+                                   min_cp = .Machine$double.eps,
+                                   rename = TRUE,
+                                   debug = debug)
+          }  # end if else normalize
+        }  # end if gaussian else if discrete
 
         ## true graphs
         true_dag <- bnlearn::amat(bn.fit)
