@@ -704,11 +704,21 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
 
 
     ## combine all saved results
-    files <- list.files(path)
-    files <- files[grepl(".rds", files)]
-    files <- file.path(path, files)
-    df <- do.call(rbind, lapply(files, readRDS))
-    saveRDS(object = df, file.path(path, "test_Var_Pr.rds"))
+    tryCatch({
+
+      files <- list.files(path)
+      files <- files[grepl(".rds", files)]
+      files <- files[!grepl("test_Var_Pr", files)]
+      files <- file.path(path, files)
+      df <- do.call(rbind, lapply(files, readRDS))
+      saveRDS(object = df, file.path(path, "test_Var_Pr.rds"))
+    },
+    error = function(err){
+
+      debug_cli(debug, cli::cli_alert_danger,
+                "error: {as.character(err)}",
+                .envir = environment())
+    })
   }
   sapply(seq_len(nrow(eg)), fn)
 
