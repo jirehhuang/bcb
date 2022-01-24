@@ -526,6 +526,27 @@ bn.fit2effects <- function(bn.fit){
 
 
 
+# Extract pairwise causal effects for a gnet
+# TODO: fold into bn.fit2effects
+
+gnet2effects <- function(gnet){
+
+  Beta <- wamat(bn.fit = gnet)
+  # Reduce(`+`, lapply(seq_len(ncol(Beta)),
+  #                    function(i) expm::`%^%`(Beta, i)))  # slow for large p
+  effects_list <- vector(mode = "list", length = length(gnet))
+
+  for (i in seq_len(length(gnet))){
+
+    effects_list[[i]] <- expm::`%^%`(Beta, i)
+
+    if (!any(effects_list[[i]] != 0)) break
+  }
+  return(Reduce(`+`, effects_list[seq_len(i)]))
+}
+
+
+
 # bn.fit to intervention values
 
 bn.fit2values <- function(bn.fit){
