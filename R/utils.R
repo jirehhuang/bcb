@@ -205,7 +205,7 @@ random_id <- function(n = 12){
 
 # Load an example, for testing
 
-load_example <- function(eg = c("gnet"),
+load_example <- function(eg = c("gnet", "dnet"),
                          method = "random",
                          network = "survey",
                          envir = sys.frame(-1)){
@@ -249,11 +249,29 @@ load_example <- function(eg = c("gnet"),
 
                            rep(names(x)[1], x$n)
                          })))
-    } else{
 
-      browser()
+    } else if (eg == "dnet"){
 
-      ## TODO: add more examples
+      bn.fit <- phsl::bnrepository(x = network)
+      bn.fit <- rename_bn.fit(bn.fit)
+      bn.fit <- bn2dnet(bn = bn.fit, seed = 2,
+                        min_levels = 2, max_levels = 2,
+                        min_marginal = 1e-2)
+
+      score <- "bde"
+      intervene <- c(
+        list(list(n = 100)),
+        lapply(names(bn.fit), function(x){
+          int <- list(1, 10)
+          names(int) <- c(x, "n")
+          return(int)
+        })
+      )
+      interventions <- c(rep("", 100),
+                         do.call(c, lapply(intervene[-1], function(x){
+
+                           rep(names(x)[1], x$n)
+                         })))
     }
     data <- ribn(x = bn.fit, intervene = intervene, seed = 1)
 
