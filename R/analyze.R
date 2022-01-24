@@ -388,7 +388,25 @@ theme_fixed <- function(base_size = 11,
 
 df2line <- function(df,
                     metrics = c("expected_cumulative", "expected_regret"),
+                    labels = if (is.factor(df$method)) levels(df$method) else unique(df$method),
+                    colors = scales::hue_pal()(length(labels)),
+                    ltys = scales::linetype_pal()(length(labels)),
                     ...){
+
+  methods <- if (is.factor(df$method)){
+
+    levels(df$method)
+
+  } else{
+
+    unique(df$method)
+  }
+  if (is.null(names(labels)) ||
+      !all(methods %in% names(labels))){
+
+    names(labels) <- methods
+  }
+  df$method <- factor(labels[df$method], levels = labels)
 
   metrics <- metrics[metrics %in% names(df)]
   ylabs <- sapply(metrics, function(x){
@@ -419,8 +437,53 @@ df2line <- function(df,
                color = method, lty = method)) +
       geom_line(size = 1) +
       theme_fixed(...) +
-      ylab(ylabs[i])
+      ylab(ylabs[i]) +
+      scale_fill_manual(values = colors, breaks = labels) +
+      scale_color_manual(values = colors, breaks = labels) +
+      scale_linetype_manual(values = ltys, breaks = labels)
   })
-  ggarrange(plotlist = plotlist,
-            common.legend = TRUE)
+  if (length(plotlist) > 1){
+
+    ggarrange(plotlist = plotlist,
+              common.legend = TRUE)
+  } else{
+
+    plotlist[[1]]
+  }
+}
+
+
+
+# Average numeric variable for a method across nums
+#' @export
+
+average_df_across_methods <- function(df,
+                                      method,
+                                      nums){
+
+  is_numeric <- sapply(df,
+                       is.numeric)
+  df_list <- lapply(nums, function(num){
+
+    df[df$method == sprintf("%s%s", method, num), is_numeric]
+  })
+  nums <- nums[sapply(df_list,
+                      nrow) > 0]
+  df_list <- df_list[sapply(df_list,
+                            nrow) > 0]
+
+  averaged_df <- cbind(
+
+    ## new method name
+    method = sprintf("%s%s", method, paste(nums, collapse = ",")),
+
+    ## add original network and rounds
+    # df[1, c("network", "rounds")],
+    data.frame(network = df$network[1],
+               rounds = df$rounds[1]),
+
+    ## averaged dfs
+    Reduce(`+`, df_list) / length(df_list)
+  )
+  return(averaged_df)
 }
