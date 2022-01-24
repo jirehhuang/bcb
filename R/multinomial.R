@@ -488,7 +488,10 @@ Cov_Q <- function(n, p, i, j, M_plus = 0, W_plus = 0){
 
 # Var(Pr)
 
-Var_Pr <- function(n, p, M_plus = 0, W_plus = 0){
+Var_Pr <- function(n,
+                   p,
+                   M_plus = 0,
+                   W_plus = 0){
 
   seq_r <- seq_len(nrow(p))
   sum(sapply(seq_r, function(i){
@@ -503,7 +506,10 @@ Var_Pr <- function(n, p, M_plus = 0, W_plus = 0){
 
 # Empirical boostrap version
 
-boot_Var_Pr <- function(n, p, nreps = 1e3, nprior = 0){
+boot_Var_Pr <- function(n,
+                        p,
+                        nreps = 1e3,
+                        nprior = 0){
 
   p <- (p + nprior / n)
   p <- p / sum(p)
@@ -580,4 +586,115 @@ jpt2p <- function(jpt,
     })
   }))
   return(p)
+}
+
+
+
+# Test Var_Pr()
+
+test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
+                        path,
+                        nlarge = 1e5,
+                        nreps = 1e3,
+                        clear = FALSE,
+                        debug = 1){
+
+
+  debug_cli(debug, cli::cli_alert,
+            c("simulating {nrow(eg)} scenarios with ",
+              "nlarge = {nlarge} and nreps = {nreps}"))
+
+
+  ## function to use on.exit()
+  fn <- function(i){
+
+
+    ## file setup
+    rds <- file.path(path, sprintf("%s.rds", paste(eg[i,], collapse = "_")))
+    if (file.exists(rds)){
+
+      if (clear && is.null(readRDS(file = rds))){
+
+        debug_cli(debug, cli::cli_alert,
+                  "deleting file {i}")
+        file.remove(rds)
+      }
+      return(NULL)
+    }
+    saveRDS(object = NULL, file = rds)
+    on.exit(expr = {  # delete if failed before completion
+
+      if (is.null(readRDS(file = rds))){
+
+        file.remove(rds)
+      }
+    }, add = FALSE)
+
+
+    ## simulate
+    list2env(eg[i,], envir = environment())
+    debug_cli(debug, cli::cli_alert,
+              "{i}. seed = {seed}, r = {r}, n = {n}",
+              .envir = environment())
+    set.seed(seed)
+
+    p <- runif(r * 3)
+    p <- p / sum(p)
+    dim(p) <- c(r, 3)
+
+    X <- rmultinom(n = nlarge, size = n, prob = p)
+    N <- t(X)
+    dim(N) <- c(ncol(X), nrow(p), 3)
+    Phat <- N / n
+    Q <- M <- W <- matrix(0, nrow = ncol(X), ncol = nrow(p))
+    M <- N[,,1] * (N[,,1] + N[,,2] + N[,,3])
+    W <- N[,,1] + N[,,2]
+    Q <- M / W
+    Pr <- rowSums(Q) / n
+
+
+    ## compute estimates
+    estimates <- list()
+
+    ## simulated true sampling distribution
+    estimates$sampling <- apply(aperm(replicate(n = nlarge, p), c(3, 1, 2)), 1,
+                                bcb:::boot_Var_Pr,
+                                n = n, nreps = nreps, nprior = 1)
+
+    ## proposed
+    estimates$proposed00 <- apply(Phat, 1, bcb:::Var_Pr,
+                                  n = n, M_plus = 0, W_plus = 0)
+    estimates$proposed01 <- apply(Phat, 1, bcb:::Var_Pr,
+                                  n = n, M_plus = 0, W_plus = 1)
+    estimates$proposed11 <- apply(Phat, 1, bcb:::Var_Pr,
+                                  n = n, M_plus = 1, W_plus = 1)
+
+    ## bootstrap from p-hat estimates
+    estimates$bootstrap0 <- apply(Phat, 1, bcb:::boot_Var_Pr,
+                                  n = n, nreps = nreps, nprior = 0)
+    estimates$bootstrap1 <- apply(Phat, 1, bcb:::boot_Var_Pr,
+                                  n = n, nreps = nreps, nprior = 1)
+
+
+    ## compile and save results
+    results <- do.call(rbind, lapply(estimates, function(x){
+
+      x <- x[!is.na(x)]
+      temp <- data.frame(matrix(quantile(x, probs = seq(0, 1, 0.25)), nrow = 1))
+      names(temp) <- sprintf("quantile%s", c("000", "025", "050", "075", "100"))
+      temp <- cbind(data.frame(mean = mean(x), sd = sd(x)),
+                    temp, data.frame(na_method = (nlarge - length(x)) / nlarge))
+      return(temp)
+    }))
+    results <- cbind(eg[rep(i,6),],
+                     sampling = mean(estimates$sampling, na.rm = TRUE),
+                     large = var(Pr, na.rm = TRUE), na_large = mean(is.na(Pr)),
+                     method = names(estimates), results)
+    rownames(results) <- NULL
+
+    saveRDS(object = results, file = rds)
+  }
+  sapply(seq_len(nrow(eg)), fn)
+
+  return(NULL)
 }
