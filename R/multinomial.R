@@ -610,7 +610,8 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
 
 
     ## file setup
-    rds <- file.path(path, sprintf("%s.rds", paste(eg[i,], collapse = "_")))
+    rds <- file.path(path, sprintf("%s_%s_%s.rds", paste(eg[i,], collapse = "_"),
+                                   nlarge, nreps))
     if (file.exists(rds)){
 
       if (clear && is.null(readRDS(file = rds))){
@@ -629,6 +630,7 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
         file.remove(rds)
       }
     }, add = FALSE)
+    start_time <- Sys.time()
 
 
     ## simulate
@@ -692,6 +694,13 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
                      method = names(estimates), results)
     rownames(results) <- NULL
     saveRDS(object = results, file = rds)
+
+
+    end_time <- Sys.time()
+    run_time <- as.numeric(end_time - start_time, units = 'secs')
+    debug_cli(debug, cli::cli_alert_success,
+              "completed {i} in {prettyunits::pretty_sec(run_time)}",
+              .envir = environment())
 
 
     ## combine all saved results
