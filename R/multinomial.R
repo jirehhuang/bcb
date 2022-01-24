@@ -691,8 +691,15 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
                      large = var(Pr, na.rm = TRUE), na_large = mean(is.na(Pr)),
                      method = names(estimates), results)
     rownames(results) <- NULL
-
     saveRDS(object = results, file = rds)
+
+
+    ## combine all saved results
+    files <- list.files(path)
+    files <- files[grepl(".rds", files)]
+    files <- file.path(path, files)
+    df <- do.call(rbind, lapply(files, readRDS))
+    saveRDS(object = df, file.path(path, "test_Var_Pr.rds"))
   }
   sapply(seq_len(nrow(eg)), fn)
 
