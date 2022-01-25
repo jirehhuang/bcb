@@ -508,13 +508,13 @@ Var_Pr <- function(n,
 
 boot_Var_Pr <- function(n,
                         p,
-                        nreps = 1e3,
+                        nrep = 1e3,
                         nprior = 0){
 
   p <- (p + nprior / n)
   p <- p / sum(p)
 
-  samples <- rmultinom(n = nreps,
+  samples <- rmultinom(n = nrep,
                        size = n, prob = p)
 
   estimates <- apply(samples, 2, function(x){
@@ -594,15 +594,44 @@ jpt2p <- function(jpt,
 
 test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
                         path,
-                        nlarge = 1e5,
-                        nreps = 1e3,
+                        nq = 1e5,
+                        nboot = 1e4,
+                        nrep = 1e3,
                         clear = FALSE,
                         debug = 1){
 
 
+  nq <- min(nq, 1e6)
+  nboot <- min(nboot, 1e6)
   debug_cli(debug, cli::cli_alert,
             c("simulating {nrow(eg)} scenarios with ",
-              "nlarge = {nlarge} and nreps = {nreps}"))
+              "nq = {nq}, nboot = {nboot}, and nrep = {nrep}"))
+  folder <- file.path(path, sprintf("%s_%s_%s", nq, nboot, nrep))
+  dir_check(folder)
+
+
+  ## combine all saved results
+  compile_fn <- function(){
+
+    tryCatch({
+
+      files <- list.files(folder)
+      files <- files[grepl(".rds", files)]
+      files <- files[!grepl("test_Var_Pr", files)]
+      files <- file.path(folder, files)
+      df <- do.call(rbind, lapply(files, readRDS))
+      saveRDS(object = df,
+              file.path(path, sprintf("test_Var_Pr_%s_%s_%s.rds",
+                                      nq, nboot, nrep)))
+    },
+    error = function(err){
+
+      debug_cli(debug, cli::cli_alert_danger,
+                "error: {as.character(err)}",
+                .envir = environment())
+    })
+  }
+  on.exit(compile_fn(), add = TRUE)
 
 
   ## function to use on.exit()
@@ -610,8 +639,7 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
 
 
     ## file setup
-    rds <- file.path(path, sprintf("%s_%s_%s.rds", paste(eg[i,], collapse = "_"),
-                                   nlarge, nreps))
+    rds <- file.path(folder, sprintf("%s.rds", paste(eg[i,], collapse = "_")))
     if (file.exists(rds)){
 
       if (clear && is.null(readRDS(file = rds))){
@@ -629,7 +657,7 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
 
         file.remove(rds)
       }
-    }, add = FALSE)
+    }, add = TRUE)
     start_time <- Sys.time()
 
 
@@ -644,48 +672,49 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
     p <- p / sum(p)
     dim(p) <- c(r, 3)
 
-    X <- rmultinom(n = nlarge, size = n, prob = p)
+    X <- rmultinom(n = 1e6, size = n, prob = p)
     N <- t(X)
     dim(N) <- c(ncol(X), nrow(p), 3)
-    Phat <- N / n
     Q <- M <- W <- matrix(0, nrow = ncol(X), ncol = nrow(p))
     M <- N[,,1] * (N[,,1] + N[,,2] + N[,,3])
     W <- N[,,1] + N[,,2]
     Q <- M / W
     Pr <- rowSums(Q) / n
+    Phat <- N / n
 
 
     ## compute estimates
     estimates <- list()
 
     ## simulated true sampling distribution
-    estimates$sampling <- apply(aperm(replicate(n = nlarge, p), c(3, 1, 2)), 1,
+    estimates$sampling <- apply(aperm(replicate(n = nboot, p), c(3, 1, 2)), 1,
                                 bcb:::boot_Var_Pr,
-                                n = n, nreps = nreps, nprior = 1)
+                                n = n, nrep = nrep, nprior = 1)
 
     ## proposed
-    estimates$proposed00 <- apply(Phat, 1, bcb:::Var_Pr,
+    estimates$proposed00 <- apply(Phat[seq_len(nq),,], 1, bcb:::Var_Pr,
                                   n = n, M_plus = 0, W_plus = 0)
-    estimates$proposed01 <- apply(Phat, 1, bcb:::Var_Pr,
+    estimates$proposed01 <- apply(Phat[seq_len(nq),,], 1, bcb:::Var_Pr,
                                   n = n, M_plus = 0, W_plus = 1)
-    estimates$proposed11 <- apply(Phat, 1, bcb:::Var_Pr,
+    estimates$proposed11 <- apply(Phat[seq_len(nq),,], 1, bcb:::Var_Pr,
                                   n = n, M_plus = 1, W_plus = 1)
 
     ## bootstrap from p-hat estimates
-    estimates$bootstrap0 <- apply(Phat, 1, bcb:::boot_Var_Pr,
-                                  n = n, nreps = nreps, nprior = 0)
-    estimates$bootstrap1 <- apply(Phat, 1, bcb:::boot_Var_Pr,
-                                  n = n, nreps = nreps, nprior = 1)
+    estimates$bootstrap0 <- apply(Phat[seq_len(nboot),,], 1, bcb:::boot_Var_Pr,
+                                  n = n, nrep = nrep, nprior = 0)
+    estimates$bootstrap1 <- apply(Phat[seq_len(nboot),,], 1, bcb:::boot_Var_Pr,
+                                  n = n, nrep = nrep, nprior = 1)
 
 
     ## compile and save results
     results <- do.call(rbind, lapply(estimates, function(x){
 
+      len <- length(x)
       x <- x[!is.na(x)]
       temp <- data.frame(matrix(quantile(x, probs = seq(0, 1, 0.25)), nrow = 1))
       names(temp) <- sprintf("quantile%s", c("000", "025", "050", "075", "100"))
       temp <- cbind(data.frame(mean = mean(x), sd = sd(x)),
-                    temp, data.frame(na_method = (nlarge - length(x)) / nlarge))
+                    temp, data.frame(na_method = (len - length(x)) / len))
       return(temp)
     }))
     results <- cbind(eg[rep(i,6),],
@@ -702,25 +731,9 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
               "completed {i} in {prettyunits::pretty_sec(run_time)}",
               .envir = environment())
 
-
-    ## combine all saved results
-    tryCatch({
-
-      files <- list.files(path)
-      files <- files[grepl(".rds", files)]
-      files <- files[!grepl("test_Var_Pr", files)]
-      files <- file.path(path, files)
-      df <- do.call(rbind, lapply(files, readRDS))
-      saveRDS(object = df, file.path(path, "test_Var_Pr.rds"))
-    },
-    error = function(err){
-
-      debug_cli(debug, cli::cli_alert_danger,
-                "error: {as.character(err)}",
-                .envir = environment())
-    })
+    compile_fn()
   }
-  sapply(seq_len(nrow(eg)), fn)
-
+  null <- sapply(seq_len(nrow(eg)),
+                 fn)
   return(NULL)
 }
