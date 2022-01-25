@@ -717,10 +717,16 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
                     temp, data.frame(na_method = (len - length(x)) / len))
       return(temp)
     }))
-    results <- cbind(eg[rep(i,6),],
-                     sampling = mean(estimates$sampling, na.rm = TRUE),
-                     large = var(Pr, na.rm = TRUE), na_large = mean(is.na(Pr)),
-                     method = names(estimates), results)
+    results <- cbind(
+      eg[rep(i,6),],
+      min_p = min(p), max_p = max(p),
+      mean_p1 = mean(p[,1]), mean_p2 = mean(p[,2]), mean_p3 = mean(p[,3]),
+      mean_Pr = mean(Pr, na.rm = TRUE), var_Pr = var(Pr, na.rm = TRUE),
+      na_Pr = mean(is.na(Pr)),
+      mean_sampling = mean(estimates$sampling, na.rm = TRUE),
+      sd_sampling = sd(estimates$sampling, na.rm = TRUE),
+      method = names(estimates), results
+    )
     rownames(results) <- NULL
     saveRDS(object = results, file = rds)
 
@@ -731,7 +737,8 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
               "completed {i} in {prettyunits::pretty_sec(run_time)}",
               .envir = environment())
 
-    compile_fn()
+    if (i %% 1e2 == 0 || i == nrow(eg))
+      compile_fn()
   }
   null <- sapply(seq_len(nrow(eg)),
                  fn)
