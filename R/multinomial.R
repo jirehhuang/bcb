@@ -471,6 +471,22 @@ Var_Q <- function(n, p, i, M_plus = 0, W_plus = 0){
 
 
 
+# E(Q_i, Q_j)
+
+E_Qi_Qj <- function(n, p, i, j, M_plus = 0, W_plus = 0){
+
+  mu_i <- c(E_M(n, p, i), E_W(n, p, i))
+  mu_j <- c(E_M(n, p, j), E_W(n, p, j))
+
+  q(mu_i, M_plus, W_plus) * q(mu_j, M_plus, W_plus) +
+    dqdM(mu_i, M_plus, W_plus) * dqdM(mu_j, M_plus, W_plus) * Cov_M(n, p, i, j) +
+    dqdM(mu_i, M_plus, W_plus) * dqdW(mu_j, M_plus, W_plus) * Cov_Mi_Wj(n, p, i, j) +
+    dqdW(mu_i, M_plus, W_plus) * dqdM(mu_j, M_plus, W_plus) * Cov_Mi_Wj(n, p, j, i) +
+    dqdW(mu_i, M_plus, W_plus) * dqdW(mu_j, M_plus, W_plus) * Cov_W(n, p, i, j)
+}
+
+
+
 # Cov(Q_i, Q_j)
 
 Cov_Q <- function(n, p, i, j, M_plus = 0, W_plus = 0){
@@ -583,10 +599,9 @@ MW2Var_Pr <- function(M, W, n){
   })
   sum(sapply(seq_r, function(i){
 
-    covQ[i,i] +
+    covQ[i, i] +
       2 * sum(unlist(sapply(seq_r[seq_r > i],
-                            function(j) cov(Q[,i], Q[,j],
-                                            use = "complete.obs"))))
+                            function(j) covQ[i, j])))
   })) / n^2
 }
 
@@ -625,7 +640,7 @@ jpt2p <- function(jpt,
                   nodes,
                   levels){
 
-  jpt <- bcb:::query_jpt(jpt, target = nodes)
+  jpt <- query_jpt(jpt, target = nodes)
   jpt <- aperm(a = jpt, perm = match(nodes, names(dimnames(jpt))))
 
   seq_nnodes <- seq_len(length(nodes))
@@ -751,23 +766,23 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
 
     ## simulated true sampling distribution
     estimates$sampling <- apply(aperm(replicate(n = nboot, p), c(3, 1, 2)), 1,
-                                bcb:::boot_Var_Pr,
+                                boot_Var_Pr,
                                 n = n, nrep = nrep, nprior = 1)
 
     ## proposed
-    estimates$proposed00 <- apply(Phat[seq_len(nq),,], 1, bcb:::Var_Pr,
+    estimates$proposed00 <- apply(Phat[seq_len(nq),,], 1, Var_Pr,
                                   n = n, M_plus = 0, W_plus = 0)
-    estimates$proposed01 <- apply(Phat[seq_len(nq),,], 1, bcb:::Var_Pr,
+    estimates$proposed01 <- apply(Phat[seq_len(nq),,], 1, Var_Pr,
                                   n = n, M_plus = 0, W_plus = 1)
-    estimates$proposed11 <- apply(Phat[seq_len(nq),,], 1, bcb:::Var_Pr,
+    estimates$proposed11 <- apply(Phat[seq_len(nq),,], 1, Var_Pr,
                                   n = n, M_plus = 1, W_plus = 1)
     estimates$proposed0_ <- ifelse(is.na(estimates$proposed00),
                                    estimates$proposed01, estimates$proposed00)
 
     ## bootstrap from p-hat estimates
-    estimates$bootstrap0 <- apply(Phat[seq_len(nboot),,], 1, bcb:::boot_Var_Pr,
+    estimates$bootstrap0 <- apply(Phat[seq_len(nboot),,], 1, boot_Var_Pr,
                                   n = n, nrep = nrep, nprior = 0)
-    estimates$bootstrap1 <- apply(Phat[seq_len(nboot),,], 1, bcb:::boot_Var_Pr,
+    estimates$bootstrap1 <- apply(Phat[seq_len(nboot),,], 1, boot_Var_Pr,
                                   n = n, nrep = nrep, nprior = 1)
     estimates$bootstrap_ <- ifelse(is.na(estimates$bootstrap0),
                                    estimates$bootstrap1, estimates$bootstrap0)
@@ -796,8 +811,9 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
       eg[rep(i, nrow(results)),],
       min_p = min(p), max_p = max(p),
       mean_p1 = mean(p[,1]), mean_p2 = mean(p[,2]), mean_p3 = mean(p[,3]),
-      mean_Pr = mean(Pr, na.rm = TRUE), var_Pr = var(Pr, na.rm = TRUE),
-      na_Pr = mean(is.na(Pr)),
+      na_Pr = mean(is.na(Pr)), mean_Pr = mean(Pr, na.rm = TRUE),
+      var_Pr = var(Pr, na.rm = TRUE),
+      Q2Var_Pr = Q2Var_Pr(Q, n), MW2Var_Pr = MW2Var_Pr(M, W, n),
       mean_q = mean(sapply(mu_list, q)),
       mean_dqdM = mean(sapply(mu_list, dqdM)),
       mean_dqdW = mean(sapply(mu_list, dqdW)),
@@ -805,7 +821,7 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
       mean_d2qdMW = mean(sapply(mu_list, d2qdMW)),
       delta_Var_Q = sum(sapply(seq_r, function(i){
 
-        mean(apply(Phat[seq_len(nq),,], 1, bcb:::Var_Q,
+        mean(apply(Phat[seq_len(nq),,], 1, Var_Q,
                    n = n, i = i, M_plus = 0, W_plus = 0) -
                var(Q[,i], na.rm = TRUE), na.rm = TRUE)
       })),
