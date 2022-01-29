@@ -777,7 +777,8 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
 
 
     ## compile and save results
-    mu_list <- lapply(seq_len(nrow(p)), function(i){
+    seq_r <- seq_len(nrow(p))
+    mu_list <- lapply(seq_r, function(i){
 
       c(mean(M[,i]), mean(W[,i]))
     })
@@ -797,10 +798,26 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
       mean_p1 = mean(p[,1]), mean_p2 = mean(p[,2]), mean_p3 = mean(p[,3]),
       mean_Pr = mean(Pr, na.rm = TRUE), var_Pr = var(Pr, na.rm = TRUE),
       na_Pr = mean(is.na(Pr)),
+      mean_q = mean(sapply(mu_list, q)),
       mean_dqdM = mean(sapply(mu_list, dqdM)),
       mean_dqdW = mean(sapply(mu_list, dqdW)),
       mean_d2qdW2 = mean(sapply(mu_list, d2qdW2)),
       mean_d2qdMW = mean(sapply(mu_list, d2qdMW)),
+      delta_Var_Q = sum(sapply(seq_r, function(i){
+
+        mean(apply(Phat[seq_len(nq),,], 1, bcb:::Var_Q,
+                   n = n, i = i, M_plus = 0, W_plus = 0) -
+               var(Q[,i], na.rm = TRUE), na.rm = TRUE)
+      })),
+      delta_Cov_Q = sum(sapply(seq_r, function(i){
+
+        sapply(seq_r[-i], function(j){
+
+          mean(apply(Phat[seq_len(nq),,], 1, Cov_Q,
+                     n = n, i = i, j = j, M_plus = 0, W_plus = 0) -
+                 cov(Q[,i], Q[,j], use = "complete.obs"), na.rm = TRUE)
+        })
+      })),
       mean_sampling = mean(estimates$sampling, na.rm = TRUE),
       sd_sampling = sd(estimates$sampling, na.rm = TRUE),
       method = names(estimates), results
