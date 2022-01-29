@@ -443,7 +443,6 @@ d2qdMW <- function(x, M_plus = 0, W_plus = 0){
 
 
 
-
 # E(Q_i)
 
 E_Q <- function(n, p, i, M_plus = 0, W_plus = 0){
@@ -502,6 +501,88 @@ Cov_Q <- function(n, p, i, j, M_plus = 0, W_plus = 0){
 
 
 
+# Compute Var(Pr) from a matrix of generated Q
+
+Q2Var_Pr <- function(Q, n){
+
+  seq_r <- seq_len(ncol(Q))
+  sum(sapply(seq_r, function(i){
+
+    var(Q[,i], na.rm = TRUE) +
+      2 * sum(unlist(sapply(seq_r[seq_r > i],
+                            function(j) cov(Q[,i], Q[,j],
+                                            use = "complete.obs"))))
+  })) / n^2
+}
+
+
+
+# Compute taylor approximation of Q using M and W
+
+MW2taylorQ <- function(M, W, i, M_plus = 0, W_plus = 0, order = 1){
+
+  mu <- c(mean(M[,i]), mean(W[,i]))
+
+  temp <- q(mu, M_plus, W_plus) +
+    (M[,i] - mu[1]) * dqdM(mu, M_plus, W_plus) +
+    (W[,i] - mu[2]) * dqdW(mu, M_plus, W_plus)
+
+  if (order > 1){
+
+    temp <- temp +
+      # (M[,i] - mu[1])^2 * d2qdM2(mu, M_plus, W_plus) / 2 +  # zero
+      (W[,i] - mu[2])^2 * d2qdW2(mu, M_plus, W_plus) / 2 +
+      (M[,i] - mu[1]) * (W[,i] - mu[2]) * d2qdMW(mu, M_plus, W_plus)
+  }
+  return(temp)
+}
+
+
+
+# Compute Var(Pr) from generated M and W with different order approximation
+
+MW2Var_Pr <- function(M, W, n, M_plus = 0, W_plus = 0){
+
+  seq_r <- seq_len(ncol(M))
+  covQ <- sapply(seq_r, function(i){
+
+    sapply(seq_r, function(j){
+
+      if (i == j){
+
+        mu <- c(mean(M[,i]), mean(W[,i]))
+
+        dqdM(mu, M_plus, W_plus)^2 * var(M[,i]) +
+          dqdW(mu, M_plus, W_plus)^2 * var(W[,i]) +
+          2 * dqdM(mu, M_plus, W_plus) * dqdW(mu, M_plus, W_plus) * cov(M[,i], W[,i])
+
+      } else{
+
+        mu_i <- c(mean(M[,i]), mean(W[,i]))
+        mu_j <- c(mean(M[,j]), mean(W[,j]))
+
+        dqdM(mu_i, M_plus, W_plus) * dqdM(mu_j, M_plus, W_plus) * cov(M[,i], M[,j]) +
+          ## using more complex approximation for E[Q_i]
+          # - (d2qdW2(mu_i, M_plus, W_plus) * var(W[,i]) / 2 +
+          #    d2qdMW(mu_i, M_plus, W_plus) * cov(M[,i], W[,i])) *
+          # (d2qdW2(mu_j, M_plus, W_plus) * var(W[,j]) / 2 +
+          #    d2qdMW(mu_j, M_plus, W_plus) * cov(M[,j], W[,j]))+
+          dqdM(mu_i, M_plus, W_plus) * dqdW(mu_j, M_plus, W_plus) * cov(M[,i], W[,j]) +
+          dqdW(mu_i, M_plus, W_plus) * dqdM(mu_j, M_plus, W_plus) * cov(M[,j], W[,i]) +
+          dqdW(mu_i, M_plus, W_plus) * dqdW(mu_j, M_plus, W_plus) * cov(W[,i], W[,j])
+      }
+    })
+  })
+  sum(sapply(seq_r, function(i){
+
+    covQ[i, i] +
+      2 * sum(unlist(sapply(seq_r[seq_r > i],
+                            function(j) covQ[i, j])))
+  })) / n^2
+}
+
+
+
 # Var(Pr)
 
 Var_Pr <- function(n,
@@ -540,69 +621,6 @@ boot_Var_Pr <- function(n,
     sum(x[,1] * rS / (rS - x[,3]) / n)
   })
   return(var(estimates, na.rm = TRUE))
-}
-
-
-
-# Compute Var(Pr) from a matrix of generated Q
-
-Q2Var_Pr <- function(Q, n){
-
-  seq_r <- seq_len(ncol(Q))
-  sum(sapply(seq_r, function(i){
-
-    var(Q[,i], na.rm = TRUE) +
-      2 * sum(unlist(sapply(seq_r[seq_r > i],
-                            function(j) cov(Q[,i], Q[,j],
-                                            use = "complete.obs"))))
-  })) / n^2
-}
-
-
-
-# Compute Var(Pr) from generated M and W
-
-MW2Var_Pr <- function(M, W, n){
-
-  M_plus <- 0
-  W_plus <- 0
-
-  seq_r <- seq_len(ncol(M))
-  covQ <- sapply(seq_r, function(i){
-
-    sapply(seq_r, function(j){
-
-      if (i == j){
-
-        mu <- c(mean(M[,i]), mean(W[,i]))
-
-        dqdM(mu, M_plus, W_plus)^2 * var(M[,i]) +
-          dqdW(mu, M_plus, W_plus)^2 * var(W[,i]) +
-          2 * dqdM(mu, M_plus, W_plus) * dqdW(mu, M_plus, W_plus) * cov(M[,i], W[,i])
-
-      } else{
-
-        mu_i <- c(mean(M[,i]), mean(W[,i]))
-        mu_j <- c(mean(M[,j]), mean(W[,j]))
-
-        dqdM(mu_i, M_plus, W_plus) * dqdM(mu_j, M_plus, W_plus) * cov(M[,i], M[,j]) +
-          ## using more complex approximation for E[Q_i]
-          # - (d2qdW2(mu_i, M_plus, W_plus) * var(W[,i]) / 2 +
-          #    d2qdMW(mu_i, M_plus, W_plus) * cov(M[,i], W[,i])) *
-          # (d2qdW2(mu_j, M_plus, W_plus) * var(W[,j]) / 2 +
-          #    d2qdMW(mu_j, M_plus, W_plus) * cov(M[,j], W[,j]))+
-          dqdM(mu_i, M_plus, W_plus) * dqdW(mu_j, M_plus, W_plus) * cov(M[,i], W[,j]) +
-          dqdW(mu_i, M_plus, W_plus) * dqdM(mu_j, M_plus, W_plus) * cov(M[,j], W[,i]) +
-          dqdW(mu_i, M_plus, W_plus) * dqdW(mu_j, M_plus, W_plus) * cov(W[,i], W[,j])
-      }
-    })
-  })
-  sum(sapply(seq_r, function(i){
-
-    covQ[i, i] +
-      2 * sum(unlist(sapply(seq_r[seq_r > i],
-                            function(j) covQ[i, j])))
-  })) / n^2
 }
 
 
@@ -797,6 +815,14 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
 
       c(mean(M[,i]), mean(W[,i]))
     })
+    taylor1Q00 <- sapply(seq_r, MW2taylorQ,
+                         M = M, W = W, M_plus = 0, W_plus = 0, order = 1)
+    taylor1Q01 <- sapply(seq_r, MW2taylorQ,
+                         M = M, W = W, M_plus = 0, W_plus = 1, order = 1)
+    taylor2Q00 <- sapply(seq_r, MW2taylorQ,
+                         M = M, W = W, M_plus = 0, W_plus = 0, order = 2)
+    taylor2Q01 <- sapply(seq_r, MW2taylorQ,
+                         M = M, W = W, M_plus = 0, W_plus = 1, order = 2)
     results <- do.call(rbind, lapply(estimates, function(x){
 
       len <- length(x)
@@ -813,7 +839,15 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
       mean_p1 = mean(p[,1]), mean_p2 = mean(p[,2]), mean_p3 = mean(p[,3]),
       na_Pr = mean(is.na(Pr)), mean_Pr = mean(Pr, na.rm = TRUE),
       var_Pr = var(Pr, na.rm = TRUE),
-      Q2Var_Pr = Q2Var_Pr(Q, n), MW2Var_Pr = MW2Var_Pr(M, W, n),
+      Q2Var_Pr = Q2Var_Pr(Q, n),
+      taylor1Q2Var_Pr00 = Q2Var_Pr(taylor1Q00, n),
+      taylor1Q2Var_Pr01 = Q2Var_Pr(taylor1Q01, n),
+      taylor2Q2Var_Pr00 = Q2Var_Pr(taylor2Q00, n),
+      taylor2Q2Var_Pr01 = Q2Var_Pr(taylor2Q01, n),
+      mse_taylor1Q00 = mean((taylor1Q00 - Q)^2, na.rm = TRUE),
+      mse_taylor1Q01 = mean((taylor1Q01 - Q)^2, na.rm = TRUE),
+      mse_taylor2Q00 = mean((taylor2Q00 - Q)^2, na.rm = TRUE),
+      mse_taylor2Q01 = mean((taylor2Q01 - Q)^2, na.rm = TRUE),
       mean_q = mean(sapply(mu_list, q)),
       mean_dqdM = mean(sapply(mu_list, dqdM)),
       mean_dqdW = mean(sapply(mu_list, dqdW)),
