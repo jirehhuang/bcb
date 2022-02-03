@@ -608,7 +608,7 @@ boot_Var_Pr <- function(n,
                         nrep = 1e3,
                         nprior = 0){
 
-  p <- (p + nprior / n)
+  p <- (p + nprior / (n * prod(dim(p))))
   p <- p / sum(p)
 
   samples <- rmultinom(n = nrep,
@@ -767,6 +767,7 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
     p <- runif(r * 3)
     p <- p / sum(p)
     dim(p) <- c(r, 3)
+    Pr_true <- sum(p[,1] * rowSums(p) / rowSums(p[,seq_len(2)]))
 
     X <- rmultinom(n = 1e6, size = n, prob = p)
     N <- t(X)
@@ -777,6 +778,20 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
     Q <- M / W
     Pr <- rowSums(Q) / n
     Phat <- N / n
+    Phat1 <- Phat + 1 / (3 * r * n)
+    Phat1 <- Phat1 / rowSums(Phat1)
+
+
+    ## for conciseness
+    coverage_fn <- function(se_vec){
+
+      mean(sapply(seq_len(length(se_vec)), function(i){
+
+        (Pr[i] - 2 * se_vec[i]) < Pr_true &&
+          Pr_true < (Pr[i] + 2 * se_vec[i])
+
+      }), na.rm = TRUE)
+    }
 
 
     ## compute estimates
@@ -784,8 +799,7 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
 
     ## simulated true sampling distribution
     estimates$sampling <- apply(aperm(replicate(n = nboot, p), c(3, 1, 2)), 1,
-                                boot_Var_Pr,
-                                n = n, nrep = nrep, nprior = 1)
+                                boot_Var_Pr, n = n, nrep = nrep, nprior = 0)
 
     ## proposed
     estimates$proposed00 <- apply(Phat[seq_len(nq),,], 1, Var_Pr,
@@ -796,6 +810,10 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
                                   n = n, M_plus = 1, W_plus = 1)
     estimates$proposed0_ <- ifelse(is.na(estimates$proposed00),
                                    estimates$proposed01, estimates$proposed00)
+    estimates$proposed1 <- apply(Phat1[seq_len(nq),,], 1, Var_Pr,
+                                 n = n, M_plus = 0, W_plus = 0)
+    estimates$proposed_ <- ifelse(is.na(estimates$proposed00),
+                                  estimates$proposed1, estimates$proposed00)
 
     ## bootstrap from p-hat estimates
     estimates$bootstrap0 <- apply(Phat[seq_len(nboot),,], 1, boot_Var_Pr,
@@ -829,7 +847,8 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
       x <- x[!is.na(x)]
       temp <- data.frame(matrix(quantile(x, probs = seq(0, 1, 0.25)), nrow = 1))
       names(temp) <- sprintf("quantile%s", c("000", "025", "050", "075", "100"))
-      temp <- cbind(data.frame(mean = mean(x), sd = sd(x)),
+      temp <- cbind(data.frame(mean = mean(x), sd = sd(x),
+                               coverage = coverage_fn(sqrt(x))),
                     temp, data.frame(na_method = (len - length(x)) / len))
       return(temp)
     }))
