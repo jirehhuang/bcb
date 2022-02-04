@@ -334,6 +334,50 @@ compiled2results <- function(path,
 
 
 
+# Modify df to give a head start to non-bcb methods
+#' @export
+
+headstart_df <- function(df,
+                         headstart = 0,
+                         trim = TRUE){
+
+  ## headstart is method_grid
+  if (is.data.frame(headstart)){
+
+    df$t <- df$t - (1 - grepl("bcb", df$method)) *
+      headstart$n_obs[as.numeric(gsub(".*?([0-9]+).*",
+                                      "\\1", df$method))]
+
+  } else if (is.numeric(headstart) && headstart > 0){
+
+    df$t <- df$t - headstart
+
+  } else{
+
+    return(df)
+  }
+  ## adjust cumulative ahd expected_cumulative
+  df$cumulative <-
+    df$cumulative - do.call(c, lapply(unique(df$method), function(method){
+
+      rep(sum(df[(bool_method <- df$method == method) &
+                   df$t == 0, "cumulative"]), sum(bool_method))
+    }))
+  df$expected_cumulative <-
+    df$expected_cumulative - do.call(c, lapply(unique(df$method), function(method){
+
+      rep(sum(df[(bool_method <- df$method == method) &
+                   df$t == 0, "expected_cumulative"]), sum(bool_method))
+    }))
+  if (trim){
+
+    df <- df[df$t > 0,]
+  }
+  return(df)
+}
+
+
+
 # Fixed theme for plots
 #' @export
 
