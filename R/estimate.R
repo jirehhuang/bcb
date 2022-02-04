@@ -124,6 +124,19 @@ compute_bda <- function(data,
               ejct <- do.call(table, sapply(nodes[c(ik, j)],
                                             function(x) Xy[, x, drop = FALSE],
                                             simplify = FALSE))
+              for (along in which(dim(ejct) == 1)){
+
+                ## add dimension with all zeroes
+                ejct <- abind::abind(ejct, ejct * 0, along = along)
+
+                ## arrange dimension based on names
+                dnm <- dimnames(settings$bn.fit[[nodes[c(ik, j)][along]]]$prob)[[1]]
+                dimnames(ejct)[[along]][2] <- setdiff(dnm,
+                                                      dimnames(ejct)[[along]])
+                ejct <- abind::asub(ejct, idx = match(dimnames(ejct)[[along]], dnm),
+                                    dims = along, drop = FALSE)
+              }
+              names(dimnames(ejct)) <- nodes[c(ik, j)]
 
               ## empirical joint probability table, with added uniform
               ## prior with effective sample size 1 for smoothness
@@ -145,6 +158,10 @@ compute_bda <- function(data,
                 temp[[j]][[sprintf("se%g_bda", b)]][l] <-
                   sqrt(Var_Pr(n = nrow(Xy) + n_prior, p = ep))
               }
+              temp[[j]][["beta_bda"]][l] <-
+                temp[[j]][["mu2_bda"]][l] - temp[[j]][["mu1_bda"]][l]
+              temp[[j]][["se_bda"]][l] <-
+                temp[[j]][["se1_bda"]][l]^2 + temp[[j]][["se2_bda"]][l]^2
             }
             temp[[j]]$t_bda[l] <- t
             temp[[j]]$n_bda[l] <- n
