@@ -264,6 +264,8 @@ get_progress <- function(path,
   methods <- list.files(path)
   methods <- methods[grepl(paste(avail_methods,
                                  collapse = "|"), methods)]
+  methods <- methods[!grepl("\\_",
+                            methods)]
   if (method != "all"){
 
     methods <- match.arg(method, methods)
@@ -341,6 +343,8 @@ clear_path <- function(path,
   methods <- list.files(path)
   methods <- methods[grepl(paste(avail_methods,
                                  collapse = "|"), methods)]
+  methods <- methods[!grepl("\\_",
+                            methods)]
   if (method != "all"){
 
     methods <- switch(match_type,
