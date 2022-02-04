@@ -291,6 +291,57 @@ update_arms <- function(t,
 
 
 
+# Perform Thompson sampling update
+
+update_ts <- function(t,
+                      settings,
+                      rounds){
+
+  list2env(settings[c("mu_0", "nu_0", "b_0", "a_0")],
+           envir = environment())
+
+  mu_int <- rounds$mu_int[t,]
+  params <- lapply(seq_len(length(rounds$arms)), function(a){
+
+    bool_int <- rounds$selected$interventions == rounds$arms[[a]]$node
+    x_int <- as.numeric(
+      sapply(rounds$selected$arm[bool_int], function(x){
+
+        rounds$arms[[x]]$value
+      })
+    ) * rounds$data[bool_int, settings$target]
+    x_int <- x_int * rounds$arms[[a]]$value
+    n_int <- length(x_int)
+
+    if (n_int == 0){
+
+      return(c(mu = mu_0, nu = nu_0, b = b_0, a = a_0))
+
+    } else{
+
+      ## posterior update
+      nu <- nu_0 + n_int
+      mu <- (mu_0 * nu_0 + n_int * rounds$mu_int[t, a]) / nu
+
+      a_ <- a_0 + n_int / 2
+      b <- b_0 + 1/2 * sum((x_int - rounds$mu_int[t, a])^2) +
+        n_int * nu_0 / nu * (rounds$mu_int[t, a] - mu_0)^2 / 2
+
+      return(c(mu = mu, nu = nu, b = b, a = a_))
+    }
+  })
+  rounds$mu_est[t,] <- sapply(params, `[[`, "mu")
+  rounds$se_est[t,] <- sapply(seq_len(length(rounds$arms)), function(a){
+
+    sqrt(params[[a]][["b"]] / params[[a]][["a"]] / params[[a]][["nu"]])
+  })
+  rounds$n_ess[t,] <- 2 * sapply(params,
+                                 `[[`, "a")
+  return(rounds)
+}
+
+
+
 # Average true effect of arm(s) with highest estimate(s)
 
 get_greedy_expected <- function(settings,
@@ -413,48 +464,11 @@ update_rounds <- function(t,
                   bma = NULL,
                   eg = bnlearn::amat(bnlearn::empty.graph(settings$nodes)),
                   rounds[[post]][t,])
+
     if (settings$method == "ts"){
 
-      list2env(settings[c("mu_0", "nu_0", "b_0", "a_0")],
-               envir = environment())
+      rounds <- update_ts(t = t, settings = settings, rounds = rounds)
 
-      mu_int <- rounds$mu_int[t,]
-      params <- lapply(seq_len(length(rounds$arms)), function(a){
-
-        bool_int <- rounds$selected$interventions == rounds$arms[[a]]$node
-        x_int <- as.numeric(
-          sapply(rounds$selected$arm[bool_int], function(x){
-
-            rounds$arms[[x]]$value
-          })
-        ) * rounds$data[bool_int, settings$target]
-        x_int <- x_int * rounds$arms[[a]]$value
-        n_int <- length(x_int)
-
-        if (n_int == 0){
-
-          return(c(mu = mu_0, nu = nu_0, b = b_0, a = a_0))
-
-        } else{
-
-          ## posterior update
-          nu <- nu_0 + n_int
-          mu <- (mu_0 * nu_0 + n_int * rounds$mu_int[t, a]) / nu
-
-          a_ <- a_0 + n_int / 2
-          b <- b_0 + 1/2 * sum((x_int - rounds$mu_int[t, a])^2) +
-            n_int * nu_0 / nu * (rounds$mu_int[t, a] - mu_0)^2 / 2
-
-          return(c(mu = mu, nu = nu, b = b, a = a_))
-        }
-      })
-      rounds$mu_est[t,] <- sapply(params, `[[`, "mu")
-      rounds$se_est[t,] <- sapply(seq_len(length(rounds$arms)), function(a){
-
-        sqrt(params[[a]][["b"]] / params[[a]][["a"]] / params[[a]][["nu"]])
-      })
-      rounds$n_ess[t,] <- 2 * sapply(params,
-                                     `[[`, "a")
     } else{  # else if (settings$method != "ts")
 
       if (t <= n_obs ||
