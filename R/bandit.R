@@ -34,7 +34,7 @@ bandit <- function(bn.fit,
 
   tt <- if (settings$method == "cache"){
 
-    seq_len(n_obs)
+    floor(seq(1, n_obs, length.out = min(n_obs, settings$max_cache)))
 
   } else{
 
@@ -1092,6 +1092,13 @@ check_settings <- function(settings,
     debug_cli(debug >= 3, "", "default n_t = {settings$n_t}")
   }
 
+  ## check max_cache
+  if (is.null(settings$max_cache) ||
+      settings$max_cache < 1){
+    settings$max_cache <- Inf
+    debug_cli(debug >= 3, "", "default max_cache = {settings$max_cache}")
+  }
+
   ## check int_parents
   if (is.null(settings$int_parents)){
     settings$int_parents <- TRUE
@@ -1352,8 +1359,8 @@ check_settings <- function(settings,
 
   ## sort settings
   nms <- c("method", "target", "run", "n_obs", "n_int",
-           "initial_n_ess", "n_t", "int_parents", "epsilon",
-           "c", "mu_0", "nu_0", "b_0", "a_0",
+           "initial_n_ess", "n_t", "max_cache", "int_parents",
+           "epsilon", "c", "mu_0", "nu_0", "b_0", "a_0",
            "bcb_combine", "bcb_criteria",
            "score", "restrict", "alpha", "max.sx",
            "max_parents", "threshold", "eta",
