@@ -106,11 +106,8 @@ compute_scores <- function(data,
 
     if (score %in% bnlearn:::available.discrete.scores){
 
-      browser()
-
       ## TODO: check discrete
     }
-
     data <- as.data.frame(data)
     network <- bnlearn::empty.graph(nodes = colnames(data))
     amat <- bnlearn::amat(network)
@@ -190,8 +187,7 @@ compute_ps <- function(data,
                        debug = 0){
 
   ## load relevant settings
-  list2env(settings[c("score", "max_parents", "blmat",
-                      "aps_dir", "nnodes")],
+  list2env(settings[c("aps_dir", "nnodes")],
            envir = environment())
   temp_file <- file.path(settings$temp_dir, settings$id)
 
@@ -251,8 +247,7 @@ compute_arp <- function(data,
                         debug = 0){
 
   ## load relevant settings
-  list2env(settings[c("score", "max_parents", "blmat",
-                      "aps_dir", "nnodes")],
+  list2env(settings[c("aps_dir", "nnodes")],
            envir = environment())
   temp_file <- file.path(settings$temp_dir, settings$id)
 
