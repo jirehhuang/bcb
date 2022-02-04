@@ -259,33 +259,23 @@ update_arms <- function(t,
   debug_cli(debug >= 2, cli::cli_alert_info,
             "updating {length(rounds$arms)} arms")
 
-  # if (t <= settings$n_obs) return(rounds$arms)
+  ## TODO: check again for int
+  for (a in seq_len(length(rounds$arms))){
 
-  if (settings$type == "bn.fit.gnet"){
+    if (t < settings$n_obs ||
+        settings$method == "cache" ||
+        grepl("bcb", settings$method)){
 
-    ## TODO: check again for int
+      rounds$arms[[a]]$estimate <- rounds$mu_est[t, a]
 
-    for (a in seq_len(length(rounds$arms))){
+    } else{
 
-      if (t < settings$n_obs ||
-          settings$method == "cache" ||
-          grepl("bcb", settings$method)){
-
-        rounds$arms[[a]]$estimate <- rounds$mu_est[t, a]
-
-      } else{
-
-        rounds$arms[[a]]$estimate <- rounds$mu_int[t, a]
-      }
-      rounds$arms[[a]]$criteria <- rounds$criteria[t, a]
-      rounds$arms[[a]]$N <- sum(rounds$selected$arm == a)
+      rounds$arms[[a]]$estimate <- rounds$mu_int[t, a]
     }
-  } else if (settings$type == "bn.fit.dnet"){
-
-    browser()
-
-    ## TODO: discrete implementation
+    rounds$arms[[a]]$criteria <- rounds$criteria[t, a]
+    rounds$arms[[a]]$N <- sum(rounds$selected$arm == a)
   }
+
   return(rounds$arms)
 }
 
@@ -347,23 +337,14 @@ update_ts <- function(t,
 get_greedy_expected <- function(settings,
                                 rounds){
 
-  if (settings$type == "bn.fit.gnet"){
+  ests <- sapply(rounds$arms, function(arm) arm$estimate)
+  chosen_arms <- which(ests == max(ests))
 
-    ests <- sapply(rounds$arms, function(arm) arm$estimate)
-    chosen_arms <- which(ests == max(ests))
+  greedy_expected <- mean(sapply(chosen_arms, function(a){
 
-    greedy_expected <- mean(sapply(chosen_arms, function(a){
-
-      rounds$mu_true[a]
-    }))
-    return(greedy_expected)
-
-  } else if (settings$type == "bn.fit.dnet"){
-
-    browser()
-
-    ## TODO: discrete implementation
-  }
+    rounds$mu_true[a]
+  }))
+  return(greedy_expected)
 }
 
 
@@ -439,73 +420,65 @@ update_rounds <- function(t,
                             target = target,  # focus on target
                             debug = debug)
 
-  if (settings$type == "bn.fit.gnet"){
+  ## posterior mean
+  for (post in avail_bda){
 
-    ## posterior mean
-    for (post in avail_bda){
-
-      dag <- switch(post,
-                    star = bnlearn::amat(settings$bn.fit),
-                    bma = NULL,
-                    eg = bnlearn::amat(bnlearn::empty.graph(settings$nodes)),
-                    rounds[[post]][t,])
-      ## betas
-      rounds[[sprintf("beta_%s", post)]][t,] <-
-        expect_post(rounds = rounds, metric = "beta_est", dag = dag)
-
-      ## mu and se
-      rounds <- compute_mu_se(t = t, rounds = rounds, target = target,
-                              dag = dag, type = "bda", post = post, est = post)
-    }
-    ## est
-    post <- method2post(method = settings$method)
     dag <- switch(post,
                   star = bnlearn::amat(settings$bn.fit),
                   bma = NULL,
                   eg = bnlearn::amat(bnlearn::empty.graph(settings$nodes)),
                   rounds[[post]][t,])
+    ## betas
+    rounds[[sprintf("beta_%s", post)]][t,] <-
+      expect_post(rounds = rounds, metric = "beta_est", dag = dag)
 
-    if (settings$method == "ts"){
+    ## mu and se
+    rounds <- compute_mu_se(t = t, rounds = rounds, target = target,
+                            dag = dag, type = "bda", post = post, est = post)
+  }
+  ## est
+  post <- method2post(method = settings$method)
+  dag <- switch(post,
+                star = bnlearn::amat(settings$bn.fit),
+                bma = NULL,
+                eg = bnlearn::amat(bnlearn::empty.graph(settings$nodes)),
+                rounds[[post]][t,])
 
-      rounds <- update_ts(t = t, settings = settings, rounds = rounds)
+  if (settings$method == "ts"){
 
-    } else{  # else if (settings$method != "ts")
+    rounds <- update_ts(t = t, settings = settings, rounds = rounds)
 
-      if (t <= n_obs ||
-               settings$method %in% c("cache")){
+  } else{  # else if (settings$method != "ts")
 
-        ## default bma; bda = est for obs
-        rounds$mu_est[t,] <- rounds$mu_bma[t,]
-        rounds$se_est[t,] <- rounds$se_bma[t,]
+    if (t <= n_obs ||
+        settings$method %in% c("cache")){
 
-      } else{  # t > n_obs
+      ## default bma; bda = est for obs
+      rounds$mu_est[t,] <- rounds$mu_bma[t,]
+      rounds$se_est[t,] <- rounds$se_bma[t,]
 
-        ## mu and se
-        rounds <- compute_mu_se(t = t, rounds = rounds, target = target,
-                                dag = dag, type = "est", post = post, est = "est")
-      }
-      rounds$n_ess[t,] <- sapply(rounds$arms, function(arm){
+    } else{  # t > n_obs
 
-        expect_post(rounds = rounds, dag = dag,
-                    from = arm$node, to = target,
-                    metric = "n_ess")
-      })
+      ## mu and se
+      rounds <- compute_mu_se(t = t, rounds = rounds, target = target,
+                              dag = dag, type = "est", post = post, est = "est")
     }
-    if (t <= n_obs){
+    rounds$n_ess[t,] <- sapply(rounds$arms, function(arm){
 
-      rounds$n_bda[t,] <- t
+      expect_post(rounds = rounds, dag = dag,
+                  from = arm$node, to = target,
+                  metric = "n_ess")
+    })
+  }
+  if (t <= n_obs){
 
-    } else{
+    rounds$n_bda[t,] <- t
 
-      rounds$n_bda[t,] <-
-        sapply(rounds$bda[sapply(rounds$arms, `[[`, "node")],
-               function(x) max(x[[target]]$n_bda, na.rm = TRUE))
-    }
-  } else if (settings$type == "bn.fit.dnet"){
+  } else{
 
-    browser()
-
-    ## TODO: discrete implementation; should be similar
+    rounds$n_bda[t,] <-
+      sapply(rounds$bda[sapply(rounds$arms, `[[`, "node")],
+             function(x) max(x[[target]]$n_bda, na.rm = TRUE))
   }
   rounds$arms <- update_arms(t = t, settings = settings,
                              rounds = rounds, debug = debug)
