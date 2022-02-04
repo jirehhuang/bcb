@@ -767,14 +767,16 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
     p <- runif(r * 3)
     p <- p / sum(p)
     dim(p) <- c(r, 3)
-    Pr_true <- sum(p[,1] * rowSums(p) / rowSums(p[,seq_len(2)]))
+    Pr_true <- sum(p[,1] * rowSums(p) /
+                     rowSums(p[,seq_len(2),drop=F]))
 
     X <- rmultinom(n = 1e6, size = n, prob = p)
     N <- t(X)
     dim(N) <- c(ncol(X), nrow(p), 3)
     Q <- M <- W <- matrix(0, nrow = ncol(X), ncol = nrow(p))
-    M <- N[,,1] * (N[,,1] + N[,,2] + N[,,3])
-    W <- N[,,1] + N[,,2]
+    M <- N[,,1,drop=F] * (N[,,1,drop=F] + N[,,2,drop=F] + N[,,3,drop=F])
+    W <- N[,,1,drop=F] + N[,,2,drop=F]
+    dim(M) <- dim(W) <- dim(M)[seq_len(2)]
     Q <- M / W
     Pr <- rowSums(Q) / n
     Phat <- N / n
@@ -802,23 +804,23 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
                                 boot_Var_Pr, n = n, nrep = nrep, nprior = 0)
 
     ## proposed
-    estimates$proposed00 <- apply(Phat[seq_len(nq),,], 1, Var_Pr,
+    estimates$proposed00 <- apply(Phat[seq_len(nq),,,drop=F], 1, Var_Pr,
                                   n = n, M_plus = 0, W_plus = 0)
-    estimates$proposed01 <- apply(Phat[seq_len(nq),,], 1, Var_Pr,
+    estimates$proposed01 <- apply(Phat[seq_len(nq),,,drop=F], 1, Var_Pr,
                                   n = n, M_plus = 0, W_plus = 1)
-    estimates$proposed11 <- apply(Phat[seq_len(nq),,], 1, Var_Pr,
+    estimates$proposed11 <- apply(Phat[seq_len(nq),,,drop=F], 1, Var_Pr,
                                   n = n, M_plus = 1, W_plus = 1)
     estimates$proposed0_ <- ifelse(is.na(estimates$proposed00),
                                    estimates$proposed01, estimates$proposed00)
-    estimates$proposed1 <- apply(Phat1[seq_len(nq),,], 1, Var_Pr,
+    estimates$proposed1 <- apply(Phat1[seq_len(nq),,,drop=F], 1, Var_Pr,
                                  n = n, M_plus = 0, W_plus = 0)
     estimates$proposed_ <- ifelse(is.na(estimates$proposed00),
                                   estimates$proposed1, estimates$proposed00)
 
     ## bootstrap from p-hat estimates
-    estimates$bootstrap0 <- apply(Phat[seq_len(nboot),,], 1, boot_Var_Pr,
+    estimates$bootstrap0 <- apply(Phat[seq_len(nboot),,,drop=F], 1, boot_Var_Pr,
                                   n = n, nrep = nrep, nprior = 0)
-    estimates$bootstrap1 <- apply(Phat[seq_len(nboot),,], 1, boot_Var_Pr,
+    estimates$bootstrap1 <- apply(Phat[seq_len(nboot),,,drop=F], 1, boot_Var_Pr,
                                   n = n, nrep = nrep, nprior = 1)
     estimates$bootstrap_ <- ifelse(is.na(estimates$bootstrap0),
                                    estimates$bootstrap1, estimates$bootstrap0)
@@ -874,11 +876,11 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
       mean_d2qdMW = mean(sapply(mu_list, d2qdMW)),
       delta_Var_Q = sum(sapply(seq_r, function(i){
 
-        mean(apply(Phat[seq_len(nq),,], 1, Var_Q,
+        mean(apply(Phat[seq_len(nq),,,drop=F], 1, Var_Q,
                    n = n, i = i, M_plus = 0, W_plus = 0) -
                var(Q[,i], na.rm = TRUE), na.rm = TRUE)
       })),
-      delta_Cov_Q = sum(sapply(seq_r, function(i){
+      delta_Cov_Q = sum(unlist(sapply(seq_r, function(i){
 
         sapply(seq_r[-i], function(j){
 
@@ -886,7 +888,7 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
                      n = n, i = i, j = j, M_plus = 0, W_plus = 0) -
                  cov(Q[,i], Q[,j], use = "complete.obs"), na.rm = TRUE)
         })
-      })),
+      }))),
       mean_sampling = mean(estimates$sampling, na.rm = TRUE),
       sd_sampling = sd(estimates$sampling, na.rm = TRUE),
       method = names(estimates), results
