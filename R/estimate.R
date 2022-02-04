@@ -25,83 +25,82 @@ compute_bda <- function(data,
                      "Gaussian linear model",
                      "discrete multinomial model")))
 
-  ## Gaussian implementation
-  if (settings$type == "bn.fit.gnet"){
+  ## initialize storage structure
+  if (length(rounds$bda) == 0 ||
+      !identical(sapply(rounds$ps, nrow),
+                 sapply(rounds$bda, function(x)
+                   unlist(sapply(x, nrow)))[1,])){
 
-    ## initialize storage structure
-    if (length(rounds$bda) == 0 ||
-        !identical(sapply(rounds$ps, nrow),
-                   sapply(rounds$bda, function(x)
-                     unlist(sapply(x, nrow)))[1,])){
+    debug_cli(debug >= 2, cli::cli_alert,
+              c("initializing bda",
+                ifelse(length(rounds$bda) == 0, "",
+                       " because dimensions changed")))
 
-      debug_cli(debug >= 2, cli::cli_alert,
-                c("initializing bda",
-                  ifelse(length(rounds$bda) == 0, "",
-                         " because dimensions changed")))
+    bda <- lapply(seq_p, function(i){
 
-      bda <- lapply(seq_p, function(i){
+      temp <- lapply(seq_p, function(j) if (j != i){
 
-        temp <- lapply(seq_p, function(j) if (j != i){
+        ## for bda estimate and joint estimate:
+        ## last t where bda updated, effect estimate, residual sum of squared
+        ## deviations, and mean estimates for each intervention value
+        i_values <- rounds$node_values[[i]]
+        as.data.frame(
+          sapply(c("t_bda", "t_int", "n_bda", "xtx", "rss", "n_ess",
+                   "beta_bda", "se_bda",
+                   sprintf("mu%g_bda", seq_len(length(i_values))),
+                   "beta_est", "se_est",
+                   sprintf("mu%g_est", seq_len(length(i_values)))),
+                 function(x) rep(NA, nrow(rounds$ps[[i]])),
+                 simplify = FALSE)
+        )
+      } else NULL)
+      names(temp) <- nodes
+      return(temp)
+    })
+    names(bda) <- nodes
 
-          ## for bda estimate and joint estimate:
-          ## last t where bda updated, effect estimate, residual sum of squared
-          ## deviations, and mean estimates for each intervention value
-          i_values <- rounds$node_values[[i]]
-          as.data.frame(
-            sapply(c("t_bda", "t_int", "n_bda", "xtx", "rss", "n_ess",
-                     "beta_bda", "se_bda",
-                     sprintf("mu%g_bda", seq_len(length(i_values))),
-                     "beta_est", "se_est",
-                     sprintf("mu%g_est", seq_len(length(i_values)))),
-                   function(x) rep(NA, nrow(rounds$ps[[i]])),
-                   simplify = FALSE)
-          )
-        } else NULL)
-        names(temp) <- nodes
-        return(temp)
-      })
-      names(bda) <- nodes
+  } else{
 
-    } else{
+    bda <- rounds$bda
+  }
+  for (i in if (is.null(target)) seq_p else seq_p[-match(target, nodes)]){
 
-      bda <- rounds$bda
-    }
-    for (i in if (is.null(target)) seq_p else seq_p[-match(target, nodes)]){
+    pars <- as.matrix(rounds$ps[[i]][, parents, drop = FALSE])
+    temp <- bda[[i]]
+    i_values <- rounds$node_values[[i]]
 
-      pars <- as.matrix(rounds$ps[[i]][, parents, drop = FALSE])
-      temp <- bda[[i]]
-      i_values <- rounds$node_values[[i]]
+    for (l in rounds$ps[[i]][, "ordering"]){
 
-      for (l in rounds$ps[[i]][, "ordering"]){
+      ## TODO: can be problematic when concentrating around a dag
+      ## TODO: update 12-29-21: circumvented by setting threshold = 1 for mds
+      if (rounds$ps[[i]][l, "prob"] == 0) break
 
-        ## TODO: can be problematic when concentrating around a dag
-        ## TODO: update 12-29-21: circumvented by setting threshold = 1 for mds
-        if (rounds$ps[[i]][l, "prob"] == 0) break
+      k <- pars[l, !is.na(pars[l, ])]  # indices of parents
+      n_parents <- length(k)  # number of parents
+      ik <- c(i, k)  # predictor and parent
 
-        k <- pars[l, !is.na(pars[l, ])]  # indices of parents
-        n_parents <- length(k)  # number of parents
-        ik <- c(i, k)  # predictor and parent
+      ## i -> j
+      for (j in if (is.null(target)) seq_p[-i] else match(target, nodes)){
 
-        ## i -> j
-        for (j in if (is.null(target)) seq_p[-i] else match(target, nodes)){
+        ## all observational data, and interventional data
+        ## on nodes a that do not block a path i -> a -> j
+        bool_data <- bool_bda(t = t, from = i, to = j,
+                              settings = settings, rounds = rounds)
+        n <- sum(bool_data)
+        Xy <- as.matrix(data[bool_data, , drop=FALSE])
 
-          ## all observational data, and interventional data
-          ## on nodes a that do not block a path i -> a -> j
-          bool_data <- bool_bda(t = t, from = i, to = j,
-                                settings = settings, rounds = rounds)
-          n <- sum(bool_data)
-          Xy <- as.matrix(data[bool_data, , drop=FALSE])
+        if (j %in% k){  # j -> i, so i -/-> j
 
-          if (j %in% k){  # j -> i, so i -/-> j
+          temp[[j]][l, seq_len(ncol(temp[[j]]))] <- numeric(ncol(temp[[j]]))
 
-            temp[[j]][l, seq_len(ncol(temp[[j]]))] <- numeric(ncol(temp[[j]]))
+        } else{
 
-          } else{
+          ## compute bda effect
+          if (is.na(temp[[j]][l, 1]) ||  # have not computed bda effect
+              any(bool_data[seq(temp[[j]][l, 1] + 1, t)]) ||  # have added bda-eligible data
+              sum(bool_data) != temp[[j]]$n_bda[l]){  ## have removed bda-eligible data
 
-            ## compute bda effect
-            if (is.na(temp[[j]][l, 1]) ||  # have not computed bda effect
-                any(bool_data[seq(temp[[j]][l, 1] + 1, t)]) ||  # have added bda-eligible data
-                sum(bool_data) != temp[[j]]$n_bda[l]){  ## have removed bda-eligible data
+            if (settings$type == "bn.fit.gnet"){
 
               values <- numeric(5)
               lm_cpp(X = Xy[, ik, drop = FALSE],
@@ -114,17 +113,39 @@ compute_bda <- function(data,
                 temp[[j]][[sprintf("mu%g_bda", b)]][l] <-
                   i_values[b] * temp[[j]]$beta_bda[l]
               }
-              temp[[j]]$t_bda[l] <- t
-              temp[[j]]$n_bda[l] <- n
-            }
-            ## compute joint estimate est
-            if ((rounds$selected$arm > 0 &&
-                 temp[[j]]$t_bda[l] == t) ||  # just updated bda with int data
-                rounds$selected$interventions[t] ==
-                nodes[i]){  # or most recent intervention is on i
+            } else if (settings$type == "bn.fit.dnet"){
 
-              a <- rounds$selected$arm[t]
-              value <- rounds$arms[[a]]$value
+              browser()
+
+              ## empirical joint probability table
+              ejpt <- do.call(table, sapply(nodes[c(ik, j)],
+                                            function(x) Xy[, x, drop = FALSE],
+                                            simplify = FALSE)) / nrow(Xy)
+
+              ## empirical conditional probability table
+              ecpt <- query_jpt(jpt = ejpt, target = nodes[j],
+                                given = nodes[i], adjust = nodes[k])
+
+              success <- 1  # TODO: generalize success criteria
+              for (b in seq_len(length(i_values))){
+
+                temp[[j]][[sprintf("mu%g_bda", b)]][l] <-
+                  ecpt[success, b]
+              }
+            }
+            temp[[j]]$t_bda[l] <- t
+            temp[[j]]$n_bda[l] <- n
+          }
+          ## compute joint estimate est
+          if ((rounds$selected$arm > 0 &&
+               temp[[j]]$t_bda[l] == t) ||  # just updated bda with int data
+              rounds$selected$interventions[t] ==
+              nodes[i]){  # or most recent intervention is on i
+
+            a <- rounds$selected$arm[t]
+            value <- rounds$arms[[a]]$value
+
+            if (settings$type == "bn.fit.gnet"){
 
               if (settings$bcb_combine == "average"){
 
@@ -137,7 +158,8 @@ compute_bda <- function(data,
                 beta_int <- rounds$mu_int[t, a] * value
                 se_int <- rounds$se_int[t, a]
                 se_int <- ifelse(!is.na(se_int), se_int,
-                                 2 * (beta_int - beta_bda)^2)  # or x_int^2?
+                                 ## prior with variacne 1 and ess 2
+                                 sqrt((2 + (beta_int - beta_bda)^2) / 3))
                 n_int <- sum(rounds$selected$interventions == nodes[i])
 
                 ## ess
@@ -170,10 +192,11 @@ compute_bda <- function(data,
                                 max(min(n_ess, n_int), 1),
                                 min(n_ess, settings$initial_n_ess))
                 nu_0 <- n_ess
-                a_0 <- max(1, n_ess / 2)
+                a_0 <- max(1, (n_bda - length(ik) - 1) / 2)
 
                 beta_0 <- temp[[j]]$beta_bda[l]
-                b_0 <- temp[[j]]$rss[l] * a_0 / (n_bda / 2)  # sum of squared residuals
+                b_0 <- ifelse(1 > (n_bda - length(ik) - 1) / 2,
+                              1, temp[[j]]$rss[l] / 2)
 
                 ## posterior update
                 nu <- nu_0 + n_int
@@ -193,31 +216,30 @@ compute_bda <- function(data,
                 temp[[j]][[sprintf("mu%g_est", b)]][l] <-
                   i_values[b] * temp[[j]]$beta_est[l]
               }
-              temp[[j]]$t_int[l] <- t
-            }
-            ## purely observational; no intervention yet
-            if (is.na(temp[[j]]$t_int[l])){
+            } else if (settings$type == "bn.fit.dnet"){
 
-              ## take est from bda, since no int
-              for (b in seq_len(length(i_values))){
+              browser()
 
-                temp[[j]][[sprintf("mu%g_est", b)]][l] <-
-                  temp[[j]][[sprintf("mu%g_bda", b)]][l]
-              }
-              temp[[j]]$beta_est[l] <- temp[[j]]$beta_bda[l]
-              temp[[j]]$se_est[l] <- temp[[j]]$se_bda[l]
+              ## TODO: discrete implementation
             }
+            temp[[j]]$t_int[l] <- t
+          }
+          ## purely observational; no intervention yet
+          if (is.na(temp[[j]]$t_int[l])){
+
+            ## take est from bda, since no int
+            for (b in seq_len(length(i_values))){
+
+              temp[[j]][[sprintf("mu%g_est", b)]][l] <-
+                temp[[j]][[sprintf("mu%g_bda", b)]][l]
+            }
+            temp[[j]]$beta_est[l] <- temp[[j]]$beta_bda[l]
+            temp[[j]]$se_est[l] <- temp[[j]]$se_bda[l]
           }
         }
       }
-      bda[[i]] <- temp
     }
-  } else if (settings$type == "bn.fit.dnet"){
-
-    browser()
-
-    ## TODO: discrete implementation
-
+    bda[[i]] <- temp
   }
   return(bda)
 }

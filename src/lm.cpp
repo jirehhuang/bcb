@@ -40,9 +40,9 @@ void lm_cpp(arma::mat& X,
   resid = y - X.col(0) * betas(0);
   resid = resid - arma::mean(resid);
   double values_2 = arma::dot(resid, resid);  // update to estimate interventional sd
-  values(4) = (values_2 / values(2)) *
-    (values(3) / arma::dot(X.col(0), X.col(0))) *
-    (X.n_rows - X.n_cols);
+  values(4) = (values_2 / (X.n_rows - X.n_cols - 1)) *  // 2b_0 / (2a_0)
+    (1 / values(2)) *  // 1 / RSS
+    (X.n_rows - X.n_cols) * values(3);  // (n - k) * (1 / inv_XtX)
   values(2) = values_2;
 }
 
