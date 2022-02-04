@@ -48,8 +48,10 @@ compute_bda <- function(data,
           sapply(c("t_bda", "t_int", "n_bda", "xtx", "rss", "n_ess",
                    "beta_bda", "se_bda",
                    sprintf("mu%g_bda", seq_len(length(i_values))),
+                   sprintf("se%g_bda", seq_len(length(i_values))),
                    "beta_est", "se_est",
-                   sprintf("mu%g_est", seq_len(length(i_values)))),
+                   sprintf("mu%g_est", seq_len(length(i_values))),
+                   sprintf("se%g_est", seq_len(length(i_values)))),
                  function(x) rep(NA, nrow(rounds$ps[[i]])),
                  simplify = FALSE)
         )
@@ -112,15 +114,21 @@ compute_bda <- function(data,
 
                 temp[[j]][[sprintf("mu%g_bda", b)]][l] <-
                   i_values[b] * temp[[j]]$beta_bda[l]
+
+                temp[[j]][[sprintf("se%g_bda", b)]][l] <-
+                  temp[[j]][["se_bda"]][l]
               }
             } else if (settings$type == "bn.fit.dnet"){
 
-              browser()
-
-              ## empirical joint probability table
-              ejpt <- do.call(table, sapply(nodes[c(ik, j)],
+              ## empirical joint count table
+              ejct <- do.call(table, sapply(nodes[c(ik, j)],
                                             function(x) Xy[, x, drop = FALSE],
-                                            simplify = FALSE)) / nrow(Xy)
+                                            simplify = FALSE))
+
+              ## empirical joint probability table, with added uniform
+              ## prior with effective sample size 1 for smoothness
+              n_prior <- 1
+              ejpt <- (ejct + n_prior / prod(dim(ejct))) / (nrow(Xy) + n_prior)
 
               ## empirical conditional probability table
               ecpt <- query_jpt(jpt = ejpt, target = nodes[j],
@@ -131,6 +139,11 @@ compute_bda <- function(data,
 
                 temp[[j]][[sprintf("mu%g_bda", b)]][l] <-
                   ecpt[success, b]
+
+                ep <- jpt2p(jpt = ejpt, nodes = nodes[c(j, ik)],
+                            levels = c(success, b))
+                temp[[j]][[sprintf("se%g_bda", b)]][l] <-
+                  sqrt(Var_Pr(n = nrow(Xy) + n_prior, p = ep))
               }
             }
             temp[[j]]$t_bda[l] <- t
@@ -215,6 +228,9 @@ compute_bda <- function(data,
 
                 temp[[j]][[sprintf("mu%g_est", b)]][l] <-
                   i_values[b] * temp[[j]]$beta_est[l]
+
+                temp[[j]][[sprintf("se%g_est", b)]][l] <-
+                  temp[[j]][["se_est"]][l]
               }
             } else if (settings$type == "bn.fit.dnet"){
 
@@ -232,6 +248,9 @@ compute_bda <- function(data,
 
               temp[[j]][[sprintf("mu%g_est", b)]][l] <-
                 temp[[j]][[sprintf("mu%g_bda", b)]][l]
+
+              temp[[j]][[sprintf("se%g_est", b)]][l] <-
+                temp[[j]][[sprintf("se%g_bda", b)]][l]
             }
             temp[[j]]$beta_est[l] <- temp[[j]]$beta_bda[l]
             temp[[j]]$se_est[l] <- temp[[j]]$se_bda[l]
@@ -424,7 +443,6 @@ compute_mu_se <- function(t,
 
   type <- match.arg(type)
   post <- match.arg(post)
-  # est <- match.arg(est)
 
   if (post == "bma")
     dag <- NULL
@@ -440,9 +458,10 @@ compute_mu_se <- function(t,
   ## E(Var(X))
   E_Var <- sapply(rounds$arms, function(arm){
 
+    int_index <- match(arm$value, rounds$node_values[[arm$node]])
     expect_post(rounds = rounds, dag = dag,
                 from = arm$node, to = target,
-                metric = sprintf("se_%s", type),
+                metric = sprintf("se%g_%s", int_index, type),
                 squared = TRUE)
   })
   ## Var(E(X)) = E(E(X)^2) - E(E(X))^2

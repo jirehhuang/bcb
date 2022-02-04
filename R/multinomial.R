@@ -663,7 +663,12 @@ jpt2p <- function(jpt,
 
   seq_nnodes <- seq_len(length(nodes))
   zmat <- expand.grid(lapply(dim(jpt)[-seq_len(length(levels))], seq_len))
+  if (!length(zmat)){
 
+    zmat <- data.frame(1)
+    dim(jpt) <- c(dim(jpt), 1)
+    seq_nnodes <- seq_len(length(nodes) + 1)
+  }
   p <- t(apply(zmat, 1, function(z){
 
     ## y, x, z
