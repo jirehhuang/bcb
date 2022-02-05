@@ -57,8 +57,8 @@ bandit <- function(bn.fit,
     rounds <- apply_method(t = t, bn.fit = bn.fit, settings = settings,
                            rounds = rounds, debug = debug)
   }
-  rounds <- summarize_rounds(bn.fit = bn.fit,
-                             settings = settings, rounds = rounds)
+  rounds <- summarize_rounds(bn.fit = bn.fit, settings = settings,
+                             rounds = rounds, debug = debug)
   return(rounds)
 }
 
@@ -358,6 +358,9 @@ update_rounds <- function(t,
                           rounds,
                           debug = 0){
 
+  debug_cli(debug >= 2, cli::cli_alert_info,
+            "updating rounds")
+
   ## load settings
   list2env(settings[c("target", "n_obs", "n_int")], envir = environment())
   data <- rounds$data[seq_len(t),,drop = FALSE]
@@ -500,7 +503,11 @@ update_rounds <- function(t,
 
 summarize_rounds <- function(bn.fit,
                              settings,
-                             rounds){
+                             rounds,
+                             debug = 0){
+
+  debug_cli(debug >= 2, cli::cli_alert_info,
+            "summarizing rounds")
 
   ## arms
   rounds$arms <- do.call(rbind, lapply(rounds$arms, as.data.frame))
@@ -598,21 +605,24 @@ summarize_rounds <- function(bn.fit,
       mat <- row2mat(row = row, nodes = settings$nodes)
 
       ## mse of effects
-      if (class(bn.fit)[2] == "bn.fit.gnet"){
+      if (settings$type == "bn.fit.gnet"){
 
         rounds$selected[[sprintf("beta_%s", est)]][t] <-
-          mean((mat - rounds$beta_true[,,1])[not_diag]^2)
+          mean((mat - rounds$beta_true[,,1])[not_diag]^2, na.rm = TRUE)
 
-      } else if (class(bn.fit)[2] == "bn.fit.dnet"){
+      } else if (settings$type == "bn.fit.dnet"){
 
-        browser()
+        beta_true <- rounds$beta_true[,,2] - rounds$beta_true[,,1]
+        rounds$selected[[sprintf("beta_%s", est)]][t] <-
+          mean((mat - beta_true)[not_diag]^2, na.rm = TRUE)
 
         ## TODO: discrete implementation
       }
     }
   }
   ## fill columns for all data.frames
-  rounds$bda <- convert_bda(bda = convert_bda(bda = rounds$bda, new_class = "data.frame"), "list")
+  rounds$bda <- convert_bda(bda = convert_bda(bda = rounds$bda,
+                                              new_class = "data.frame"), "list")
 
   ## summarize each arm in decreasing order of mu_true
   arms_ordering <- order(rounds$mu_true, decreasing = TRUE)

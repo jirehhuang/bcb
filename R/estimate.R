@@ -45,12 +45,12 @@ compute_bda <- function(data,
         ## deviations, and mean estimates for each intervention value
         i_values <- rounds$node_values[[i]]
         as.data.frame(
-          sapply(c("t_bda", "t_int", "n_bda", "xtx", "rss", # "n_ess",
+          sapply(c("t_bda", "t_int", "n_bda", "xtx", "rss",
                    sprintf("n_ess%g", seq_len(length(i_values))),
-                   "beta_bda", # "se_bda",
+                   "beta_bda",
                    sprintf("mu%g_bda", seq_len(length(i_values))),
                    sprintf("se%g_bda", seq_len(length(i_values))),
-                   "beta_est", # "se_est",
+                   "beta_est",
                    sprintf("mu%g_est", seq_len(length(i_values))),
                    sprintf("se%g_est", seq_len(length(i_values)))),
                  function(x) rep(NA, nrow(rounds$ps[[i]])),
@@ -118,6 +118,9 @@ compute_bda <- function(data,
 
                 temp[[j]][[sprintf("se%g_bda", b)]][l] <-
                   temp[[j]][["se1_bda"]][l]
+
+                temp[[j]][[sprintf("n_ess%g", b)]][l] <-
+                  temp[[j]][["n_ess1"]][l]
               }
             } else if (settings$type == "bn.fit.dnet"){
 
@@ -141,7 +144,7 @@ compute_bda <- function(data,
 
               ## empirical joint probability table, with added uniform
               ## prior with effective sample size 1 for smoothness
-              n_prior <- 1
+              n_prior <- 1  # TODO: include smoothness intput as parameter
               ejpt <- (ejct + n_prior / prod(dim(ejct))) / (nrow(Xy) + n_prior)
 
               ## empirical conditional probability table
