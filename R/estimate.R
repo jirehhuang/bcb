@@ -160,11 +160,14 @@ compute_bda <- function(data,
                             levels = c(settings$success, b))
                 temp[[j]][[sprintf("se%g_bda", b)]][l] <-
                   sqrt(Var_Pr(n = nrow(Xy) + n_prior, p = ep))
+
+                ## p(1-p) / (n+1) = se^2  =>  n = p(1-p) / se^2 - 1
+                ## TODO: not precise because varying prior
+                p <- temp[[j]][[sprintf("mu%g_bda", b)]][l]
+                temp[[j]][[sprintf("n_ess%g", b)]][l] <-
+                  min(nrow(Xy) + n_prior, p * (1 - p) /
+                        temp[[j]][[sprintf("se%g_bda", b)]][l]^2 - 1)
               }
-              temp[[j]][["beta_bda"]][l] <-
-                temp[[j]][["mu2_bda"]][l] - temp[[j]][["mu1_bda"]][l]
-              temp[[j]][["se_bda"]][l] <-
-                temp[[j]][["se1_bda"]][l]^2 + temp[[j]][["se2_bda"]][l]^2
             }
             temp[[j]]$t_bda[l] <- t
             temp[[j]]$n_bda[l] <- n
@@ -244,7 +247,6 @@ compute_bda <- function(data,
               }
               ## update
               temp[[j]]$beta_est[l] <- beta_est
-              # temp[[j]]$se_est[l] <- se_est
               for (b in seq_len(length(i_values))){
 
                 temp[[j]][[sprintf("mu%g_est", b)]][l] <-
@@ -254,9 +256,59 @@ compute_bda <- function(data,
               }
             } else if (settings$type == "bn.fit.dnet"){
 
-              browser()
+              ## only update corresponding level
+              b <- rounds$arms[[a]]$value
 
-              ## TODO: discrete implementation
+              if (settings$bcb_combine == "average"){
+
+                ## bda
+                mu_bda <- temp[[j]][[sprintf("mu%g_bda", b)]][l]
+                se_bda <- temp[[j]][[sprintf("se%g_bda", b)]][l]
+                n_bda <- temp[[j]]$n_bda[l]
+
+                ## int
+                mu_int <- rounds$mu_int[t, a]
+                se_int <- rounds$se_int[t, a]
+                n_int <- sum(rounds$selected$arm == a)
+
+                ## ess
+                n_bda <- ifelse(settings$initial_n_ess <= 0,
+                                max(min(n_bda, n_int), 1),
+                                min(n_bda, settings$initial_n_ess))
+
+                ## est
+                mu_est <- (mu_bda * n_bda + mu_int * n_int) / (n_bda +
+                                                                 n_int)
+                se_est <- sqrt((se_bda^2 * n_bda^2 + se_int^2 * n_int^2) /
+                                 (n_bda + n_int)^2)
+
+              } else if (settings$bcb_combine == "conjugate"){
+
+                ## int
+                mu_int <- rounds$mu_int[t, a]
+                n_int <- sum(rounds$selected$arm == a)
+
+                ## priors with bda
+                n_bda <- temp[[j]]$n_bda[l]
+                n_ess <- temp[[j]][[sprintf("n_ess%g", b)]][l]
+                n_ess <- ifelse(settings$initial_n_ess <= 0,
+                                max(min(n_ess, n_int), 1),
+                                min(n_ess, settings$initial_n_ess))
+
+                mu_0 <- temp[[j]][[sprintf("mu%g_bda", b)]][l]
+                alpha_0 <- mu_0 * n_ess
+                beta_0 <- n_ess - alpha_0
+
+                ## posterior update
+                alpha <- alpha_0 + n_int * mu_int
+                beta <- beta_0 + n_int * (1 - mu_int)
+
+                mu_est <- alpha / (alpha + beta)
+                se_est <- sqrt(alpha * beta / (alpha + beta)^3)
+              }
+              ## update
+              temp[[j]][[sprintf("mu%g_est", b)]][l] <- mu_est
+              temp[[j]][[sprintf("se%g_est", b)]][l] <- se_est
             }
             temp[[j]]$t_int[l] <- t
           }
@@ -273,7 +325,6 @@ compute_bda <- function(data,
                 temp[[j]][[sprintf("se%g_bda", b)]][l]
             }
             temp[[j]]$beta_est[l] <- temp[[j]]$beta_bda[l]
-            # temp[[j]]$se_est[l] <- temp[[j]]$se_bda[l]
           }
         }
       }
