@@ -367,10 +367,17 @@ update_rounds <- function(t,
 
     rounds$data[t,] <- data_t
     rounds$selected$arm[t] <- a
-    rounds$selected$reward[t] <- mean(data_t[[target]])
     rounds$selected$estimate[t] <- rounds$arms[[a]]$estimate
     rounds$selected$criteria[t] <- rounds$arms[[a]]$criteria
     rounds$selected$interventions[t] <- rounds$arms[[a]]$node
+    rounds$selected$reward[t] <- if (settings$type == "bn.fit.gnet"){
+
+      mean(data_t[[target]])
+
+    } else if (settings$type == "bn.fit.dnet"){
+
+      mean(data_t[[target]] == levels(data_t[[target]])[settings$success])
+    }
   }
   compute_scores(data = data, settings = settings, blmat = rounds$blmat[t,],
                  interventions = interventions, debug = debug)
@@ -1105,6 +1112,13 @@ check_settings <- function(settings,
     debug_cli(debug >= 3, "", "default int_parents = {settings$int_parents}")
   }
 
+  ## check success
+  if (is.null(settings$success) ||
+      !(settings$success %in% seq_len(2))){
+    settings$success <- 1
+    debug_cli(debug >= 3, "", "default success = {settings$success}")
+  }
+
   ## check score
   if (is.null(settings$score)){
     if (class(bn.fit)[2] == "bn.fit.gnet")
@@ -1148,7 +1162,8 @@ check_settings <- function(settings,
     settings$threshold <- ifelse(settings$method == "bcb-mds", 1, 0.999)
     debug_cli(debug >= 3, "", "default threshold = {settings$threshold} for method = {settings$method}")
   }
-  settings$threshold <- ifelse(settings$method == "bcb-mds", 1, 0.999)
+  settings$threshold <- ifelse(settings$method == "bcb-mds",
+                               1, settings$threshold)
 
   ## check eta
   if (is.null(settings$eta) ||
@@ -1360,12 +1375,10 @@ check_settings <- function(settings,
   ## sort settings
   nms <- c("method", "target", "run", "n_obs", "n_int",
            "initial_n_ess", "n_t", "max_cache", "int_parents",
-           "epsilon", "c", "mu_0", "nu_0", "b_0", "a_0",
-           "bcb_combine", "bcb_criteria",
-           "score", "restrict", "alpha", "max.sx",
-           "max_parents", "threshold", "eta",
-           "nodes", "nnodes", "type",
-           "temp_dir", "aps_dir", "mds_dir",
+           "success", "epsilon", "c", "mu_0", "nu_0", "b_0", "a_0",
+           "bcb_combine", "bcb_criteria", "score", "restrict",
+           "alpha", "max.sx", "max_parents", "threshold", "eta",
+           "nodes", "nnodes", "type", "temp_dir", "aps_dir", "mds_dir",
            "id", "rounds0", "data_obs")
   settings <- settings[union(nms, c("bn.fit"))]
 

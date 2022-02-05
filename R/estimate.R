@@ -147,14 +147,13 @@ compute_bda <- function(data,
               ecpt <- query_jpt(jpt = ejpt, target = nodes[j],
                                 given = nodes[i], adjust = nodes[k])
 
-              success <- 1  # TODO: generalize success criteria
               for (b in seq_len(length(i_values))){
 
                 temp[[j]][[sprintf("mu%g_bda", b)]][l] <-
-                  ecpt[success, b]
+                  ecpt[settings$success, b]
 
                 ep <- jpt2p(jpt = ejpt, nodes = nodes[c(j, ik)],
-                            levels = c(success, b))
+                            levels = c(settings$success, b))
                 temp[[j]][[sprintf("se%g_bda", b)]][l] <-
                   sqrt(Var_Pr(n = nrow(Xy) + n_prior, p = ep))
               }
@@ -239,6 +238,7 @@ compute_bda <- function(data,
                 beta_est <- beta
                 se_est <- sqrt(b_ / a_ / nu)
               }
+              ## update
               temp[[j]]$beta_est[l] <- beta_est
               temp[[j]]$se_est[l] <- se_est
               for (b in seq_len(length(i_values))){
@@ -300,12 +300,12 @@ compute_int <- function(t,
 
   rounds$mu_int[t,] <- rounds$mu_int[t-1,]
   rounds$se_int[t,] <- rounds$se_int[t-1,]
+  a <- rounds$selected$arm[t]
 
   if (settings$type == "bn.fit.gnet"){
 
     ## compute Gaussian effects
 
-    a <- rounds$selected$arm[t]
     bool_int <- rounds$selected$interventions == rounds$arms[[a]]$node
     x_int <- as.numeric(
       sapply(rounds$selected$arm[bool_int], function(x){
@@ -328,17 +328,30 @@ compute_int <- function(t,
       rounds$mu_int[t, aa] <- beta_int * rounds$arms[[aa]]$value
       rounds$se_int[t, aa] <- se_int
     }
-
-    ## TODO: optimistic
-
   } else if (settings$type == "bn.fit.dnet"){
 
     ## compute discrete effects
 
-    browser()
+    bool_int <- rounds$selected$arm == a
+    x_int <- rounds$data[bool_int, target]
+    n_int <- length(x_int)
 
-    ## TODO: discrete implementation
+    rounds$mu_int[t, a] <- mu_int <-
+      mean(x_int == (lvls <- levels(x_int))[settings$success])
+
+    if (mu_int %in% c(0, 1)){
+
+      p_int <- c(mu_int, 1 - mu_int)
+      p_int <- p_int + 1 / (2 * length(x_int))
+      p_int <- p_int / sum(p_int)
+
+      mu_int <- p_int[1]
+      n_int <- n_int + 1
+    }
+    rounds$se_int[t, a] <- sqrt(mu_int * (1 - mu_int) / n_int)
   }
+  ## TODO: optimistic
+
   return(rounds)
 }
 
