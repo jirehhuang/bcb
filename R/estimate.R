@@ -45,11 +45,12 @@ compute_bda <- function(data,
         ## deviations, and mean estimates for each intervention value
         i_values <- rounds$node_values[[i]]
         as.data.frame(
-          sapply(c("t_bda", "t_int", "n_bda", "xtx", "rss", "n_ess",
-                   "beta_bda", "se_bda",
+          sapply(c("t_bda", "t_int", "n_bda", "xtx", "rss", # "n_ess",
+                   sprintf("n_ess%g", seq_len(length(i_values))),
+                   "beta_bda", # "se_bda",
                    sprintf("mu%g_bda", seq_len(length(i_values))),
                    sprintf("se%g_bda", seq_len(length(i_values))),
-                   "beta_est", "se_est",
+                   "beta_est", # "se_est",
                    sprintf("mu%g_est", seq_len(length(i_values))),
                    sprintf("se%g_est", seq_len(length(i_values)))),
                  function(x) rep(NA, nrow(rounds$ps[[i]])),
@@ -107,8 +108,8 @@ compute_bda <- function(data,
               values <- numeric(5)
               lm_cpp(X = Xy[, ik, drop = FALSE],
                      y = Xy[, j], values = values)
-              temp[[j]][l, c("beta_bda", "se_bda",
-                             "rss", "xtx", "n_ess")] <- values
+              temp[[j]][l, c("beta_bda", "se1_bda",
+                             "rss", "xtx", "n_ess1")] <- values
 
               for (b in seq_len(length(i_values))){
 
@@ -116,7 +117,7 @@ compute_bda <- function(data,
                   i_values[b] * temp[[j]]$beta_bda[l]
 
                 temp[[j]][[sprintf("se%g_bda", b)]][l] <-
-                  temp[[j]][["se_bda"]][l]
+                  temp[[j]][["se1_bda"]][l]
               }
             } else if (settings$type == "bn.fit.dnet"){
 
@@ -180,7 +181,7 @@ compute_bda <- function(data,
 
                 ## bda
                 beta_bda <- temp[[j]]$beta_bda[l]
-                se_bda <- temp[[j]]$se_bda[l]
+                se_bda <- temp[[j]]$se1_bda[l]
                 n_bda <- temp[[j]]$n_bda[l]
 
                 ## int
@@ -216,7 +217,7 @@ compute_bda <- function(data,
 
                 ## priors with bda
                 n_bda <- temp[[j]]$n_bda[l]
-                n_ess <- temp[[j]]$n_ess[l]
+                n_ess <- temp[[j]]$n_ess1[l]
                 n_ess <- ifelse(settings$initial_n_ess <= 0,
                                 max(min(n_ess, n_int), 1),
                                 min(n_ess, settings$initial_n_ess))
@@ -240,14 +241,13 @@ compute_bda <- function(data,
               }
               ## update
               temp[[j]]$beta_est[l] <- beta_est
-              temp[[j]]$se_est[l] <- se_est
+              # temp[[j]]$se_est[l] <- se_est
               for (b in seq_len(length(i_values))){
 
                 temp[[j]][[sprintf("mu%g_est", b)]][l] <-
                   i_values[b] * temp[[j]]$beta_est[l]
 
-                temp[[j]][[sprintf("se%g_est", b)]][l] <-
-                  temp[[j]][["se_est"]][l]
+                temp[[j]][[sprintf("se%g_est", b)]][l] <- se_est
               }
             } else if (settings$type == "bn.fit.dnet"){
 
@@ -270,7 +270,7 @@ compute_bda <- function(data,
                 temp[[j]][[sprintf("se%g_bda", b)]][l]
             }
             temp[[j]]$beta_est[l] <- temp[[j]]$beta_bda[l]
-            temp[[j]]$se_est[l] <- temp[[j]]$se_bda[l]
+            # temp[[j]]$se_est[l] <- temp[[j]]$se_bda[l]
           }
         }
       }

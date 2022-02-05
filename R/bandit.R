@@ -57,8 +57,8 @@ bandit <- function(bn.fit,
     rounds <- apply_method(t = t, bn.fit = bn.fit, settings = settings,
                            rounds = rounds, debug = debug)
   }
-  rounds <- summarize_rounds(bn.fit = bn.fit, settings = settings, rounds = rounds)
-
+  rounds <- summarize_rounds(bn.fit = bn.fit,
+                             settings = settings, rounds = rounds)
   return(rounds)
 }
 
@@ -472,9 +472,10 @@ update_rounds <- function(t,
     }
     rounds$n_ess[t,] <- sapply(rounds$arms, function(arm){
 
+      int_index <- match(arm$value, rounds$node_values[[arm$node]])
       expect_post(rounds = rounds, dag = dag,
                   from = arm$node, to = target,
-                  metric = "n_ess")
+                  metric = sprintf("n_ess%g", int_index))
     })
   }
   if (t <= n_obs){
