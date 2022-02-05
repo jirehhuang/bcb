@@ -41,6 +41,8 @@ bandit <- function(bn.fit,
     seq(match(-1, rounds$selected$reward), n_obs + n_int)
   }
   tt <- tt[tt > settings$max_parents + 2 | tt > n_obs]
+  if (settings$max_cache <= 1)
+    tt <- tt[tt >= n_obs]
 
   debug_cli(debug, cli::cli_progress_bar,
             c("t = {stringr::str_pad(string = t, width = nchar(tt[length(tt)]), side = 'left')} ",
