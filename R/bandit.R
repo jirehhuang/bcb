@@ -86,6 +86,15 @@ apply_method <- function(t,
                             rounds = rounds, debug = debug)
   } else{
 
+    ## used by most methods
+    n_int <- sapply(seq_len(length(rounds$arms)), function(a){
+
+      switch(settings$type,
+             `bn.fit.gnet` = sum(rounds$selected$interventions ==
+                                   rounds$arms[[a]]$node),
+             `bn.fit.dnet` = sum(rounds$selected$arm == a),
+             sum(rounds$selected$arm == a))
+    })
     ## choose arm
     if (grepl("bcb", method)){
 
@@ -99,49 +108,50 @@ apply_method <- function(t,
 
       }  else if (settings$bcb_criteria == "ucb"){
 
-        n_int <- sapply(seq_len(length(rounds$arms)), function(a){
-
-          sum(rounds$selected$interventions == rounds$arms[[a]]$node)
-        })
         n_int <- pmax(1, n_int)
         criteria <-
           mu + settings$c * sqrt(log(t - settings$n_obs) / n_int)
 
       } else if (settings$bcb_criteria == "ts"){
 
-        mu <- rounds$mu_est[t-1,]
-        se <- rounds$se_est[t-1,]
         n_ess <- rounds$n_ess[t-1,]
-        n_int <- sapply(rounds$arms, function(arm){
 
-          sum(rounds$selected$interventions == arm$node)
-        })
-        t_ <- sapply(unique(sapply(rounds$arms, `[[`, "node")), function(node){
+        if (settings$type == "bn.fit.gnet"){
 
-          a <- match(node, sapply(rounds$arms, `[[`, "node"))
+          t_ <- sapply(unique(sapply(rounds$arms, `[[`, "node")), function(node){
 
-          ifelse(n_ess[a] == 0, 0,
-                 rt(n = 1, df = n_ess[a] + n_int[a]))
-        })
-        criteria <- sapply(seq_len(length(rounds$arms)), function(a){
+            a <- match(node, sapply(rounds$arms, `[[`, "node"))
 
-          mu[a] + t_[rounds$arms[[a]]$node] * se[a] * rounds$arms[[a]]$value
-        })
-        ## TODO: check whether symmetric (above) or indep (below) criteria
-        # t_ <- sapply(seq_len(length(rounds$arms)), function(a){
-        #
-        #   rt(n = 1, df = n_ess[a] + n_int[a])
-        # })
-        # criteria <- sapply(seq_len(length(rounds$arms)), function(a){
-        #
-        #   mu[a] + t_[a] * se[a]
-        # })
+            ifelse(n_ess[a] == 0, 0,
+                   rt(n = 1, df = n_ess[a] + n_int[a]))
+          })
+          criteria <- sapply(seq_len(length(rounds$arms)), function(a){
+
+            mu[a] + t_[rounds$arms[[a]]$node] * se[a] * rounds$arms[[a]]$value
+          })
+          ## TODO: check whether symmetric (above) or indep (below) criteria
+          # t_ <- sapply(seq_len(length(rounds$arms)), function(a){
+          #
+          #   rt(n = 1, df = n_ess[a] + n_int[a])
+          # })
+          # criteria <- sapply(seq_len(length(rounds$arms)), function(a){
+          #
+          #   mu[a] + t_[a] * se[a]
+          # })
+
+        } else if (settings$type == "bn.fit.dnet"){
+
+          ab <- n_int + n_ess
+          criteria <- sapply(seq_len(length(rounds$arms)), function(a){
+
+            rbeta(n = 1, shape1 = ab[a] * mu[a], shape2 = ab[a] * (1 - mu[a]))
+          })
+        }
       } else if (settings$bcb_criteria == "uq"){
 
         criteria <-
           mu + se * settings$c
       }
-
     } else if (method == "random"){
 
       criteria <- rep(0, length(rounds$arms))
@@ -159,32 +169,24 @@ apply_method <- function(t,
     } else if (method == "ucb"){
 
       mu <- rounds$mu_int[t-1,]
-      n_int <- sapply(seq_len(length(rounds$arms)), function(a){
-
-        sum(rounds$selected$interventions == rounds$arms[[a]]$node)
-      })
       n_int <- pmax(1, n_int)
       criteria <-
         mu + settings$c * sqrt(log(t - settings$n_obs) / n_int)
 
     } else if (method == "ts"){
 
+      list2env(settings[c("mu_0", "nu_0", "b_0", "a_0")],
+               envir = environment())
+      mu <- rounds$mu_est[t-1,]
+
       if (settings$type == "bn.fit.gnet"){
 
-        list2env(settings[c("mu_0", "nu_0", "b_0", "a_0")],
-                 envir = environment())
-
-        mu <- rounds$mu_est[t-1,]
         se <- rounds$se_est[t-1,]
         n_ess <- rounds$n_ess[t-1,]
 
         if (mu_0 == 0){
 
           ## symmetric criteria
-          n_int <- sapply(rounds$arms, function(arm){
-
-            sum(rounds$selected$interventions == arm$node)
-          })
           t_ <- sapply(unique(sapply(rounds$arms, `[[`, "node")), function(node){
 
             a <- match(node, sapply(rounds$arms, `[[`, "node"))
@@ -197,10 +199,6 @@ apply_method <- function(t,
         } else{
 
           ## independent criteria
-          n_int <- sapply(seq_len(length(rounds$arms)), function(a){
-
-            sum(rounds$selected$arm == rounds$arms[[a]]$node)
-          })
           t_ <- sapply(seq_len(length(rounds$arms)), function(a){
 
             rt(n = 1, df = n_ess[a] + n_int[a])
@@ -212,9 +210,11 @@ apply_method <- function(t,
         }
       } else if (settings$type == "bn.fit.dnet"){
 
-        browser()
+        ab <- n_int + a_0 + b_0
+        criteria <- sapply(seq_len(length(rounds$arms)), function(a){
 
-        ## TODO: discrete implementation
+          rbeta(n = 1, shape1 = ab[a] * mu[a], shape2 = ab[a] * (1 - mu[a]))
+        })
       }
     }
     a <- random_which.max(criteria)
@@ -289,44 +289,66 @@ update_ts <- function(t,
 
   list2env(settings[c("mu_0", "nu_0", "b_0", "a_0")],
            envir = environment())
-
   mu_int <- rounds$mu_int[t,]
-  params <- lapply(seq_len(length(rounds$arms)), function(a){
 
-    bool_int <- rounds$selected$interventions == rounds$arms[[a]]$node
-    x_int <- as.numeric(
-      sapply(rounds$selected$arm[bool_int], function(x){
+  if (settings$type == "bn.fit.gnet"){
 
-        rounds$arms[[x]]$value
-      })
-    ) * rounds$data[bool_int, settings$target]
-    x_int <- x_int * rounds$arms[[a]]$value
-    n_int <- length(x_int)
+    params <- lapply(seq_len(length(rounds$arms)), function(a){
 
-    if (n_int == 0){
+      bool_int <- rounds$selected$interventions == rounds$arms[[a]]$node
+      x_int <- as.numeric(
+        sapply(rounds$selected$arm[bool_int], function(x){
 
-      return(c(mu = mu_0, nu = nu_0, b = b_0, a = a_0))
+          rounds$arms[[x]]$value
+        })
+      ) * rounds$data[bool_int, settings$target]
+      x_int <- x_int * rounds$arms[[a]]$value
+      n_int <- length(x_int)
 
-    } else{
+      if (n_int == 0){
 
-      ## posterior update
-      nu <- nu_0 + n_int
-      mu <- (mu_0 * nu_0 + n_int * rounds$mu_int[t, a]) / nu
+        return(c(mu = mu_0, nu = nu_0, b = b_0, a = a_0))
 
-      a_ <- a_0 + n_int / 2
-      b <- b_0 + 1/2 * sum((x_int - rounds$mu_int[t, a])^2) +
-        n_int * nu_0 / nu * (rounds$mu_int[t, a] - mu_0)^2 / 2
+      } else{
 
-      return(c(mu = mu, nu = nu, b = b, a = a_))
-    }
-  })
-  rounds$mu_est[t,] <- sapply(params, `[[`, "mu")
-  rounds$se_est[t,] <- sapply(seq_len(length(rounds$arms)), function(a){
+        ## posterior update
+        nu <- nu_0 + n_int
+        mu <- (mu_0 * nu_0 + n_int * rounds$mu_int[t, a]) / nu
 
-    sqrt(params[[a]][["b"]] / params[[a]][["a"]] / params[[a]][["nu"]])
-  })
-  rounds$n_ess[t,] <- 2 * sapply(params,
-                                 `[[`, "a")
+        a_ <- a_0 + n_int / 2
+        b <- b_0 + 1/2 * sum((x_int - rounds$mu_int[t, a])^2) +
+          n_int * nu_0 / nu * (rounds$mu_int[t, a] - mu_0)^2 / 2
+
+        return(c(mu = mu, nu = nu, b = b, a = a_))
+      }
+    })
+    rounds$mu_est[t,] <- sapply(params, `[[`, "mu")
+    rounds$se_est[t,] <- sapply(seq_len(length(rounds$arms)), function(a){
+
+      sqrt(params[[a]][["b"]] / params[[a]][["a"]] / params[[a]][["nu"]])
+    })
+    rounds$n_ess[t,] <- 2 * sapply(params,
+                                   `[[`, "a")
+
+  } else if (settings$type == "bn.fit.dnet"){
+
+    n_int <- sapply(seq_len(length(rounds$arms)), function(a){
+
+      sum(rounds$selected$arm == a)
+    })
+    params <- lapply(seq_len(length(rounds$arms)), function(a){
+
+      alpha <- a_0 + n_int[a] * mu_int[a]
+      beta <- b_0 + n_int[a] * (1 - mu_int[a])
+
+      return(c(alpha = alpha, beta = beta))
+    })
+    rounds$mu_est[t,] <- sapply(params, function(x) x[["alpha"]] / sum(x))
+    rounds$se_est[t,] <- sapply(params, function(x){
+
+      x[["alpha"]] * x[["beta"]] / sum(x)^2 / (sum(x) + 1)
+    })
+  }
   return(rounds)
 }
 
