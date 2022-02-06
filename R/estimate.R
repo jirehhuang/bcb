@@ -89,8 +89,8 @@ compute_bda <- function(data,
         ## on nodes a that do not block a path i -> a -> j
         bool_data <- bool_bda(t = t, from = i, to = j,
                               settings = settings, rounds = rounds)
-        n <- sum(bool_data)
         Xy <- as.matrix(data[bool_data, , drop=FALSE])
+        n <- nrow(Xy)
 
         if (j %in% k){  # j -> i, so i -/-> j
 
@@ -145,7 +145,7 @@ compute_bda <- function(data,
               ## empirical joint probability table, with added uniform
               ## prior with effective sample size 1 for smoothness
               n_prior <- 1  # TODO: include smoothness intput as parameter
-              ejpt <- (ejct + n_prior / prod(dim(ejct))) / (nrow(Xy) + n_prior)
+              ejpt <- (ejct + n_prior / prod(dim(ejct))) / (n + n_prior)
 
               ## empirical conditional probability table
               ecpt <- query_jpt(jpt = ejpt, target = nodes[j],
@@ -159,14 +159,19 @@ compute_bda <- function(data,
                 ep <- jpt2p(jpt = ejpt, nodes = nodes[c(j, ik)],
                             levels = c(settings$success, b))
                 temp[[j]][[sprintf("se%g_bda", b)]][l] <-
-                  sqrt(Var_Pr(n = nrow(Xy) + n_prior, p = ep))
+                  sqrt(Var_Pr(n = n + n_prior, p = ep))
 
                 ## p(1-p) / (n+1) = se^2  =>  n = p(1-p) / se^2 - 1
                 ## TODO: not precise because varying prior
                 p <- temp[[j]][[sprintf("mu%g_bda", b)]][l]
                 temp[[j]][[sprintf("n_ess%g", b)]][l] <-
-                  min(nrow(Xy) + n_prior, p * (1 - p) /
-                        temp[[j]][[sprintf("se%g_bda", b)]][l]^2 - 1)
+                  p * (1 - p) /
+                  temp[[j]][[sprintf("se%g_bda", b)]][l]^2 - 1
+
+                ## at least 1 and at most n + n_prior
+                temp[[j]][[sprintf("n_ess%g", b)]][l] <-
+                  min(n + n_prior, max(1,
+                                       temp[[j]][[sprintf("n_ess%g", b)]][l]))
               }
             }
             temp[[j]]$t_bda[l] <- t
