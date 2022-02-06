@@ -228,8 +228,29 @@ compute_ps <- function(data,
   ps <- read_ps(settings = settings)
 
   ## threshold low probability parent sets
-  ps <- threshold_ps(ps = ps, threshold = settings$threshold, debug = debug)
+  ps_ <- threshold_ps(ps = ps, threshold = settings$threshold, debug = debug)
+  if (grepl("star", settings$method)){
 
+    ## only threshold if non-zero probability
+    valid_ps <- all(sapply(settings$bn.fit, function(node){
+
+      parents <- match(node$parents, settings$nodes)
+
+      index <-
+        ifelse(length(parents) == 0, 1,
+               which(apply(ps_[[node$node]][,seq_len(length(parents)), drop = FALSE],
+                           1, paste, collapse = "") == paste(parents, collapse = "")))
+
+      ps_[[node$node]][index, "prob"] > 0
+    }))
+    if (valid_ps){
+
+      ps <- ps_
+    }
+  } else{
+
+    ps <- ps_
+  }
   debug_cli(debug >= 2, cli::cli_alert_success,
             "computed parent set probabilities for {nnodes} nodes")
 
