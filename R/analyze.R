@@ -22,6 +22,8 @@ compile_path <- function(path,
   methods <- list.files(path)
   methods <- methods[grepl(paste(avail_methods,
                                  collapse = "|"), methods)]
+  methods <- methods[!grepl("\\_",
+                            methods)]
 
   ## set up parallel execution
   if (n_cores < 1)
