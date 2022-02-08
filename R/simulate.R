@@ -270,7 +270,7 @@ get_progress <- function(path,
 
     methods <- match.arg(method, methods)
   }
-  progress <- sapply(methods, function(method){
+  progress <- lapply(methods, function(method){
 
     temp <- lapply(seq_len(nrow(data_grid)), function(i){
 
@@ -287,6 +287,9 @@ get_progress <- function(path,
                     temp)
     return(temp)
   })
+  progress <- do.call(cbind, progress)
+  colnames(progress) <- methods
+
   ## add average progress for each method (Total)
   progress <- rbind(progress, colMeans(progress))
 
