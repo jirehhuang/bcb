@@ -1323,26 +1323,22 @@ process_dnet <- function(bn.fit,
     }
   }
   ## minimum conditional probability
-  small <- which(sapply(bn.fit, function(node){
+  small <- names(bn.fit)[which(sapply(bn.fit, function(node){
 
     sum(node$prob < min_cp) > 0
-  }))
+  }))]
   if (length(small)){
 
-    bn_list <- bn.fit[seq_len(length(bn.fit))]
-    bn_list[small] <- lapply(bn_list[small], function(node){
+    ordering <- bnlearn:::topological.ordering(bn.fit)
+    ordered <- identical(ordering, bnlearn::nodes(bn.fit))
+    for (node in small){
 
-      while (any(node$prob < min_cp)){
-
-        node$prob[] <- runif(length(node$prob))
-        node$prob <- validate_cpt(cpt = node$prob,
-                                  given = node$parents)
-      }
-      return(node)
-    })
-    bn.fit <- bn_list2bn.fit(bn_list)
+      bn.fit <- solve_cpt_dnet(bn.fit = bn.fit, target = node,
+                               parents = bnlearn::parents(x = bn, node = node),
+                               ordered = ordered, n_attempts = 100,
+                               time_limit = 60, debug = debug)
+    }
   }
-
   ## rename categorical levels of bn.fit
   if (rename)
     bn.fit <- rename_bn.fit(bn.fit = bn.fit, nodes = names(bn.fit), categories = TRUE)
