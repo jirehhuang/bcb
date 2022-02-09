@@ -82,9 +82,50 @@ gen_data_grid <- function(data_grid = build_data_grid(),
                   .envir = environment())
 
         ## load bn structure
-        bn.fit <- load_bn.fit(x = data_row$network,
-                              reorder = TRUE, rename = TRUE)
+        if (grepl("random", data_row$network)){
 
+          set.seed(data_row$seed)
+          repeat{
+
+            ## generate random graph
+            bn.fit <- load_bn.fit(x = data_row$network,
+                                  reorder = TRUE, rename = TRUE)
+
+            ## too many parents
+            if (any(sapply(lapply(bn.fit, `[[`, "parents"),
+                           length) > data_row$max_in_deg)){
+
+              debug_cli(debug, "",
+                        "random structure has too many parents",
+                        .envir = environment())
+              next
+            }
+            ## too many children
+            if (any(sapply(lapply(bn.fit, `[[`, "children"),
+                           length) > data_row$max_out_deg)){
+
+              debug_cli(debug, "",
+                        "random structure has too many parents",
+                        .envir = environment())
+              next
+            }
+            ## incorrect number of disconnected components
+            ig <- igraph::graph.adjacency(bnlearn::amat(bn.fit))
+            if (length(igraph::decompose.graph(ig)) != data_row$k){
+
+              debug_cli(debug, "",
+                        "random structure has too many disconnected components",
+                        .envir = environment())
+              next
+            }
+            ## success
+            break
+          }
+        } else{
+
+          bn.fit <- load_bn.fit(x = data_row$network,
+                                reorder = TRUE, rename = TRUE)
+        }
         if (data_row$data_type == "gaussian"){
 
           attempt <- 1
@@ -120,7 +161,8 @@ gen_data_grid <- function(data_grid = build_data_grid(),
           }
         } else if (data_row$data_type == "discrete"){
 
-          if (data_row$normalize){
+          if (data_row$normalize ||
+              grepl("parallel|chain|random", data_row$network)){
 
             bn.fit <- process_dnet(bn.fit,
                                    min_levels = 1,
@@ -493,6 +535,8 @@ build_data_grid <- function(network = "survey",
                             data_type = "gaussian",
                             n_dat = 0,
                             n_obs = 0,
+                            max_in_deg = Inf,
+                            max_out_deg = Inf,
                             target = "",
                             reg_lb = 0,  # regret prop lower bound
                             reg_ub = 1,  # regret prop upper bound
@@ -518,8 +562,6 @@ build_data_grid <- function(network = "survey",
   ## dormant parameters
   k <- 1
   avg_deg <- 4
-  max_in_deg <- Inf
-  max_out_deg <- Inf
 
   data_grid <- expand.grid(normalize = normalize,
                            coef_ub = coef_ub,
@@ -530,7 +572,7 @@ build_data_grid <- function(network = "survey",
                            reg_lb = reg_lb,
                            target = target,
                            max_out_deg = max_out_deg,
-                           max_in_deg = max_out_deg,
+                           max_in_deg = max_in_deg,
                            avg_deg = avg_deg,
                            n_obs = n_obs,
                            n_dat = n_dat,
