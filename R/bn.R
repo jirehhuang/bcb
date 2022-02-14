@@ -391,6 +391,8 @@ bn.fit2data_row <- function(bn.fit,
     effects_array <- bn.fit2effects(bn.fit = bn.fit)
     effects <- effects_array[setdiff(names(bn.fit), data_row$target),
                              data_row$target, 1]
+    effects <- sort(abs(effects[effects != 0]), decreasing = TRUE)
+    effects <- effects / effects[1]
 
   } else if ("bn.fit.dnet" %in% class(bn.fit)){
 
@@ -405,10 +407,8 @@ bn.fit2data_row <- function(bn.fit,
     effects_array <- bn.fit2effects(bn.fit = bn.fit)
     effects <- effects_array[setdiff(names(bn.fit), data_row$target),
                              data_row$target, ]
+    effects <- sort(abs(effects[effects != 0]), decreasing = TRUE)
   }
-  ## regret bounds
-  effects <- sort(abs(effects[effects != 0]), decreasing = TRUE)
-  effects <- effects / effects[1]
   data_row$reg_lb <- 1 - effects[2]
 
   return(data_row)
