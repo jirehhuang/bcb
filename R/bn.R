@@ -381,13 +381,13 @@ bn.fit2data_row <- function(bn.fit,
     betas <- abs(wamat(bn.fit)[bnlearn::amat(bn.fit) > 0])
     vars <- sapply(bn.fit, `[[`, "sd")^2
 
+    data_row$ce_lb <- min(betas)
     data_row$coef_lb <- min(betas)
     data_row$coef_ub <- max(betas)
     data_row$var_lb <- min(vars)
     data_row$var_ub <- max(vars)
 
     ## effects on target
-    node_values <- bn.fit2values(bn.fit = zero_bn.fit(bn.fit = bn.fit))  # TODO: zero_bn.fit() not needed?
     effects_array <- bn.fit2effects(bn.fit = bn.fit)
     effects <- effects_array[setdiff(names(bn.fit), data_row$target),
                              data_row$target, 1]
@@ -399,17 +399,30 @@ bn.fit2data_row <- function(bn.fit,
     n_lev <- sapply(bn.fit,
                     function(node) dim(node$prob)[1])
 
+    jpt <- get_jpt(bn.fit = bn.fit)
+    bn_list <- add_j_m_pt(bn.fit = bn.fit)
+    marginals <- sapply(bn_list, `[[`, "mpt")
+    data_row$ce_lb <- min(do.call(c, lapply(bn_list, function(node){
+
+      unlist(lapply(node$parents, function(x){
+
+        cpt <- query_jpt(jpt = jpt, target = node$node,
+                         given = x, adjust = bn_list[[x]]$parents)
+
+        max(abs(cpt - reshape_dim(pt = node$mpt,
+                                  new_dimnames = dimnames(cpt))))
+      }))
+    })))
     data_row$var_lb <- min(n_lev)
     data_row$var_ub <- max(n_lev)
 
     ## effects on target
-    node_values <- bn.fit2values(bn.fit = bn.fit)
     effects_array <- bn.fit2effects(bn.fit = bn.fit)
     effects <- effects_array[setdiff(names(bn.fit), data_row$target),
                              data_row$target, ]
     effects <- sort(abs(effects[effects != 0]), decreasing = TRUE)
   }
-  data_row$reg_lb <- 1 - effects[2]
+  data_row$reg_lb <- effects[1] - effects[2]
 
   return(data_row)
 }
@@ -1329,7 +1342,7 @@ process_dnet <- function(bn.fit,
     for (node in small){
 
       bn.fit <- solve_cpt_dnet(bn.fit = bn.fit, target = node,
-                               parents = bnlearn::parents(x = bn, node = node),
+                               parents = bn.fit[[node]]$parents,
                                ordered = ordered, n_attempts = 100,
                                time_limit = 60, debug = debug)
     }

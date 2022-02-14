@@ -534,6 +534,7 @@ build_data_grid <- function(network = "survey",
                             max_in_deg = Inf,
                             max_out_deg = Inf,
                             target = "",
+                            ce_lb = 0.01,  # causal effect lower bound
                             reg_lb = 0,  # regret prop lower bound
                             var_lb = 0.1,
                             var_ub = 0.2,
@@ -564,6 +565,7 @@ build_data_grid <- function(network = "survey",
                            var_ub = var_ub,
                            var_lb = var_lb,
                            reg_lb = reg_lb,
+                           ce_lb = ce_lb,
                            target = target,
                            max_out_deg = max_out_deg,
                            max_in_deg = max_in_deg,
@@ -590,7 +592,7 @@ check_data_grid <- function(data_grid){
   ## column names
   nms <- c("index", "id", "seed", "network", "data_type", "k",
            "n_dat", "n_obs", "avg_deg", "max_in_deg", "max_out_deg",
-           "target", "reg_lb", "var_lb", "var_ub",
+           "target", "ce_lb", "reg_lb", "var_lb", "var_ub",
            "coef_lb", "coef_ub", "normalize", "n_node", "n_edge", "n_within",
            "n_between", "n_compelled", "n_reversible", "n_params")
 
@@ -608,6 +610,11 @@ check_data_grid <- function(data_grid){
   if (is.null(data_grid$id))
     data_grid$id <- 1
   data_grid[setdiff(nms, names(data_grid))] <- 0
+
+  ## gaussian coefficients must be at least ce_lb
+  data_grid$coef_lb <- ifelse(data_grid$data_type == "gaussian",
+                              pmax(data_grid$ce_lb, data_grid$coef_lb),
+                              data_grid$coef_lb)
 
   ## rearrange columns
   data_grid <- data_grid[, nms, drop = FALSE]
