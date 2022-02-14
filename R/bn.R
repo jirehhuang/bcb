@@ -428,39 +428,54 @@ bn.fit2effects <- function(bn.fit){
 
   nodes <- bnlearn::nodes(bn.fit)
   effects <- array(0, dim = c(length(nodes), length(nodes), 2))
-  dimnames(effects) <- list(nodes, nodes, c(1,   # effect: beta; E(Y | do(X = 1)) - E(Y | do(X = 0))
-                                            0))  # intercept: beta0; E(Y | do(X = 0))
 
   if ("bn.fit.gnet" %in% class(bn.fit)){
 
-    bn_list0 <- bn.fit[seq_len(length(bn.fit))]
+    Beta <- wamat(bn.fit = bn.fit)
+    effects_list <- vector(mode = "list",
+                           length = length(bn.fit))
 
-    ## zero sds
-    for (node in nodes){
+    for (i in seq_len(length(bn.fit))){
 
-      bn_list0[[node]]$sd <- 0
+      effects_list[[i]] <- expm::`%^%`(Beta, i)
+
+      if (!any(effects_list[[i]] != 0)) break
     }
-    bn.fit0 <- bn_list2bn.fit(bn_list0)
+    effects[,,1] <- Reduce(`+`, effects_list[seq_len(i)])
 
-    ## initialize interventions
-    intervene <- do.call(c, lapply(nodes, function(node){
+    intercepts <- unname(sapply(bn.fit, function(x) x$coefficients[1]))
+    if (any(intercepts != 0)){
 
-      ints <- lapply(c(0, 1),
-                     function(value) list(value, 1))
-      names(ints[[1]]) <-
-        names(ints[[2]]) <- c(node, "n")
+      ## TODO: scalable E(Y | do(X = 0))
 
-      return(ints)
-    }))
-    for (int in intervene){
+      bn_list0 <- bn.fit[seq_len(length(bn.fit))]
 
-      data <- ribn(x = bn.fit0, fix = TRUE,
-                   intervene = list(int), debug = 0)
-      node <- intersect(names(int), nodes)
-      others <- -match(node, nodes)
-      effects[node, others, 2 - int[[node]]] <- unlist(data[others])
+      ## zero sds
+      for (node in nodes){
+
+        bn_list0[[node]]$sd <- 0
+      }
+      bn.fit0 <- bn_list2bn.fit(bn_list0)
+
+      ## initialize interventions
+      intervene <- lapply(nodes, function(node){
+
+        int <- list(node = 0, n = 1)
+        names(int) <- c(node, "n")
+
+        return(int)
+      })
+      for (int in intervene){
+
+        data <- ribn(x = bn.fit0, fix = TRUE,
+                     intervene = list(int), debug = 0)
+        node <- intersect(names(int), nodes)
+        others <- -match(node, nodes)
+        effects[node, others, 2] <- unlist(data[others])
+      }
     }
-    effects[,,1] <- effects[,,1] - effects[,,2]
+    dimnames(effects) <- list(nodes, nodes, c(1,   # effect: beta; E(Y | do(X = 1)) - E(Y | do(X = 0))
+                                              0))  # intercept: beta0; E(Y | do(X = 0))
 
   } else if ("bn.fit.dnet" %in% class(bn.fit)){
 
@@ -520,29 +535,10 @@ bn.fit2effects <- function(bn.fit){
         ## TODO: remove above; temporary for checking
       }
     }
+    dimnames(effects) <- list(nodes, nodes, c(1,   # E(Y | do(X = 1))
+                                              2))  # E(Y | do(X = 2))
   }
   return(effects)
-}
-
-
-
-# Extract pairwise causal effects for a gnet
-# TODO: fold into bn.fit2effects
-
-gnet2effects <- function(gnet){
-
-  Beta <- wamat(bn.fit = gnet)
-  # Reduce(`+`, lapply(seq_len(ncol(Beta)),
-  #                    function(i) expm::`%^%`(Beta, i)))  # slow for large p
-  effects_list <- vector(mode = "list", length = length(gnet))
-
-  for (i in seq_len(length(gnet))){
-
-    effects_list[[i]] <- expm::`%^%`(Beta, i)
-
-    if (!any(effects_list[[i]] != 0)) break
-  }
-  return(Reduce(`+`, effects_list[seq_len(i)]))
 }
 
 
