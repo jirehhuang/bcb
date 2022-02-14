@@ -141,14 +141,12 @@ gen_data_grid <- function(data_grid = build_data_grid(),
 
             ## check if invalid
             temp_row <- bn.fit2data_row(gnet, data_row)
-            invalid <- temp_row$reg_lb < data_row$reg_lb ||
-              temp_row$reg_ub > data_row$reg_ub
+            invalid <- temp_row$reg_lb < data_row$reg_lb
 
             debug_cli(debug, ifelse(invalid, cli::cli_alert_danger, cli::cli_alert_success),
-                      c("gnet {ifelse(invalid, 'violates', 'satisfies')} regret constraints ",
+                      c("gnet {ifelse(invalid, 'violates', 'satisfies')} constraints ",
                         "on attempt {attempt} with (",
-                        "{format(temp_row$reg_lb, digits = 3, nsmall = 3)}, ",
-                        "{format(temp_row$reg_ub, digits = 3, nsmall = 3)})"),
+                        "{format(temp_row$reg_lb, digits = 3, nsmall = 3)})"),
                       .envir = environment())
 
             if (! invalid){
@@ -189,14 +187,12 @@ gen_data_grid <- function(data_grid = build_data_grid(),
 
               ## check if invalid
               temp_row <- bn.fit2data_row(dnet, data_row)
-              invalid <- temp_row$reg_lb < data_row$reg_lb ||
-                temp_row$reg_ub > data_row$reg_ub
+              invalid <- temp_row$reg_lb < data_row$reg_lb
 
               debug_cli(debug, ifelse(invalid, cli::cli_alert_danger, cli::cli_alert_success),
-                        c("dnet {ifelse(invalid, 'violates', 'satisfies')} regret constraints ",
+                        c("dnet {ifelse(invalid, 'violates', 'satisfies')} constraints ",
                           "on attempt {attempt} with (",
-                          "{format(temp_row$reg_lb, digits = 3, nsmall = 3)}, ",
-                          "{format(temp_row$reg_ub, digits = 3, nsmall = 3)})"),
+                          "{format(temp_row$reg_lb, digits = 3, nsmall = 3)})"),
                         .envir = environment())
 
               if (! invalid){
@@ -539,7 +535,6 @@ build_data_grid <- function(network = "survey",
                             max_out_deg = Inf,
                             target = "",
                             reg_lb = 0,  # regret prop lower bound
-                            reg_ub = 1,  # regret prop upper bound
                             var_lb = 0.1,
                             var_ub = 0.2,
                             coef_lb = 0.5,
@@ -568,7 +563,6 @@ build_data_grid <- function(network = "survey",
                            coef_lb = coef_lb,
                            var_ub = var_ub,
                            var_lb = var_lb,
-                           reg_ub = reg_ub,
                            reg_lb = reg_lb,
                            target = target,
                            max_out_deg = max_out_deg,
@@ -596,7 +590,7 @@ check_data_grid <- function(data_grid){
   ## column names
   nms <- c("index", "id", "seed", "network", "data_type", "k",
            "n_dat", "n_obs", "avg_deg", "max_in_deg", "max_out_deg",
-           "target", "reg_lb", "reg_ub", "var_lb", "var_ub",
+           "target", "reg_lb", "var_lb", "var_ub",
            "coef_lb", "coef_ub", "normalize", "n_node", "n_edge", "n_within",
            "n_between", "n_compelled", "n_reversible", "n_params")
 
