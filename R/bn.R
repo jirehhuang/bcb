@@ -409,7 +409,7 @@ bn.fit2data_row <- function(bn.fit,
   ## regret bounds
   effects <- sort(abs(effects[effects != 0]), decreasing = TRUE)
   effects <- effects / effects[1]
-  data_row$reg_lb <- 1 - effects[2]
+  data_row$delta <- 1 - effects[2]
   data_row$reg_ub <- 1 - effects[length(effects)]
 
   return(data_row)
