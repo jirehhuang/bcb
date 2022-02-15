@@ -285,6 +285,29 @@ random_bn <- function(p,
 
 
 
+# Create sink graph structure
+
+sink_bn <- function(p,   # number of parents
+                    d){  # number of parents per parent
+
+  nodes <- sprintf("V%s", seq_len(1 + p * (1 + d)))
+  sink <- length(nodes)
+  ancestors <- seq_len(p * d)
+  parents <- setdiff(seq_len(length(nodes)), c(sink,
+                                               ancestors))
+
+  bn <- bnlearn::empty.graph(nodes = nodes)
+
+  a <- bnlearn::amat(bn)
+  a[parents, sink] <- 1L
+  a[cbind(ancestors, rep(parents, each = d))] <- 1L
+  bnlearn::amat(bn) <- a
+
+  return(bn)
+}
+
+
+
 # Load bn.fit
 # An extension of phsl::bnrepository() that includes
 # functionality for reordering and renaming, as well
@@ -316,6 +339,12 @@ load_bn.fit <- function(x,
     bn <- chain_bn(p = p)
     bn.fit <- bn2gnet(bn = bn, ...)
 
+  } else if (grepl("sink", x)){
+
+    p_d <- as.numeric(strsplit(x, "_")[[1]][seq_len(2) + 1])
+    bn <- sink_bn(p = p_d[1], d = p_d[2])
+    bn.fit <- bn2gnet(bn = bn, ...)
+
   } else if (grepl("random", x)){
 
     p_d_seed <- as.numeric(strsplit(x, "_")[[1]][seq_len(3) + 1])
@@ -330,7 +359,6 @@ load_bn.fit <- function(x,
 
     # TODO: default structures in globals.R
   }
-
   if (reorder)
     bn.fit <- reorder_bn.fit(bn.fit = bn.fit, ordering = TRUE)
 
