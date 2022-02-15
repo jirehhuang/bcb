@@ -406,11 +406,11 @@ bn.fit2data_row <- function(bn.fit,
 
       unlist(lapply(node$parents, function(x){
 
-        cpt <- query_jpt(jpt = jpt, target = node$node,
+        pt <- query_jpt(jpt = jpt, target = node$node,
                          given = x, adjust = bn_list[[x]]$parents)
 
-        max(abs(cpt - reshape_dim(pt = node$mpt,
-                                  new_dimnames = dimnames(cpt))))
+        max(abs(pt - reshape_dim(pt = node$mpt,
+                                 new_dimnames = dimnames(pt))))
       }))
     })))
     data_row$var_lb <- min(n_lev)
@@ -1113,7 +1113,8 @@ process_dnet <- function(bn.fit,
                          max_in_deg = max(sapply(bn.fit, function(x) length(x$parents))),
                          max_out_deg = max(sapply(bn.fit, function(x) length(x$children))),
                          remove_order = c("decreasing", "random"),
-                         min_cp = -1,  # minimum conditional probability
+                         min_cp = 0,  # minimum conditional probability
+                         ce_lb = 1e-2,
                          rename = TRUE,
                          debug = 3){
 
@@ -1343,8 +1344,9 @@ process_dnet <- function(bn.fit,
 
       bn.fit <- solve_cpt_dnet(bn.fit = bn.fit, target = node,
                                parents = bn.fit[[node]]$parents,
-                               ordered = ordered, n_attempts = 100,
-                               time_limit = 60, debug = debug)
+                               ce_lb = ce_lb, ordered = ordered,
+                               n_attempts = 100, time_limit = 60,
+                               debug = debug)
     }
   }
   ## rename categorical levels of bn.fit
@@ -1362,6 +1364,7 @@ process_dnet <- function(bn.fit,
 solve_cpt_dnet <- function(bn.fit,
                            target,
                            parents,
+                           ce_lb = 1e-2,
                            ordered = FALSE,
                            n_attempts = 100,
                            time_limit = 60,
@@ -1419,10 +1422,42 @@ solve_cpt_dnet <- function(bn.fit,
   con <- function(par){
     return(lapply(con_cpp(par, dim_tp, x_tp_, b_t), c))
   }
+  par2cpt <- function(par){
 
+    par <- c(par)
+    r_t <- par[seq_len(dim_tp[1])]
+    c_p <- par[-seq_len(dim_tp[1])]
+
+    x_tp <- x_tp_ * (as.matrix(r_t) %*% t(c_p))
+    dimnames(x_tp) <- temp_dimnames
+    x_tp <- validate_cpt(cpt = x_tp,
+                         given = names(temp_dimnames)[-1])
+
+    dim(x_tp) <- sapply(new_dimnames, length)
+    dimnames(x_tp) <- new_dimnames
+
+    return(x_tp)
+  }
+  par2ce_lb <- function(par){
+
+    bn_list <- bn.fit[seq_len(length(bn.fit))]
+    bn_list[[target]]$parents <- parents
+    bn_list[[target]]$prob <- par2cpt(par)
+
+    for (parent in bn_list[[target]]$parents){
+
+      bn_list[[parent]]$children <- union(bn_list[[parent]]$children,
+                                          target)
+    }
+    bn.fit <- bn_list2bn.fit(bn_list)
+
+    ## return ce_lb
+    bn.fit2data_row(bn.fit,
+                    data_row = data.frame(target = node))$ce_lb
+  }
   ## initialize parameters
   par0 <- rep(1, sum(dim_tp))
-  best <- list(par = par0, fn = Inf)  # obj(par0))
+  best <- list(par = par0, fn = Inf, ce = 0)  # obj(par0))
   tolX <- 1e-8
 
   ## begin attempts
@@ -1442,11 +1477,20 @@ solve_cpt_dnet <- function(bn.fit,
 
       soln <- NlcOptim::solnl(par0, obj, con,
                               tolX = tolX, maxIter = 100)
-      if (soln$fn < best$fn){
+      if (ce_lb <= 0 &&
+          soln$fn < best$fn){
+
+        best <- soln
+
+      } else if (ce_lb > 0 &&
+                 ((soln$ce <- par2ce_lb(soln$par)) >= ce_lb ||
+                  is.null(best$grad) ||
+                  soln$ce > best$ce)){
 
         best <- soln
       }
-      if (best$fn < 1e-6){
+      if (best$fn < 1e-6 &&
+          (ce_lb <= 0 || best$ce >= ce_lb)){
 
         debug_cli(debug >= 2, cli::cli_alert_success,
                   c("achieved desired tolerance on attempt {i} with value {best$fn} ",
@@ -1466,21 +1510,11 @@ solve_cpt_dnet <- function(bn.fit,
   debug_cli(!success, cli::cli_abort,
             "failed to add parent(s) {paste(parents, collapse = ',')}
             ({dim_tp[2]} configurations) to target {target} ({dim_tp[1]} levels)
-            after {n_attempts} attempts with {best$fn} < {tol} achieved",
+            after {n_attempts} attempts with {best$fn} achieved",
             .envir = environment())
 
   ## create cpt
-  par <- c(best$par)
-  r_t <- par[seq_len(dim_tp[1])]
-  c_p <- par[-seq_len(dim_tp[1])]
-
-  x_tp <- x_tp_ * (as.matrix(r_t) %*% t(c_p))
-  dimnames(x_tp) <- temp_dimnames
-  x_tp <- validate_cpt(cpt = x_tp,
-                       given = names(temp_dimnames)[-1])
-
-  dim(x_tp) <- sapply(new_dimnames, length)
-  dimnames(x_tp) <- new_dimnames
+  x_tp <- par2cpt(best$par)
 
   ## prepare bn.fit
   bn_list <- bn.fit[seq_len(length(bn.fit))]
@@ -1511,6 +1545,7 @@ bn2dnet <- function(bn,
                     min_levels = 2,
                     max_levels = 2,
                     min_marginal = 1e-2,
+                    ce_lb = 1e-2,
                     n_attempts = 100,
                     time_limit = 60,
                     debug = 3){
@@ -1562,8 +1597,9 @@ bn2dnet <- function(bn,
       for (node in ordering){
 
         dnet <- solve_cpt_dnet(bn.fit = dnet, target = node,
-                               parents = bnlearn::parents(x = bn, node = node),
-                               ordered = ordered, n_attempts = n_attempts,
+                               parents = bn[[node]]$parents,
+                               ce_lb = ce_lb, ordered = ordered,
+                               n_attempts = n_attempts,
                                time_limit = time_limit, debug = debug)
       }
       ## if successfully reached this point, successful

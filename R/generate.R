@@ -168,7 +168,8 @@ gen_data_grid <- function(data_grid = build_data_grid(),
                                    max_in_deg = data_row$max_in_deg,
                                    max_out_deg = data_row$max_out_deg,
                                    remove_order = "decreasing",
-                                   min_cp = -1,
+                                   min_cp = 0,
+                                   ce_lb = data_row$ce_lb,
                                    rename = TRUE,
                                    debug = debug)
             ## generate cpts
@@ -181,6 +182,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
                               min_levels = data_row$var_lb,
                               max_levels = data_row$var_ub,
                               min_marginal = data_row$coef_lb,
+                              ce_lb = data_row$ce_lb,
                               n_attempts = 100,
                               time_limit = 60,
                               debug = debug)
@@ -213,6 +215,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
                                    max_out_deg = data_row$max_out_deg,
                                    remove_order = "decreasing",
                                    min_cp = .Machine$double.eps,
+                                   ce_lb = data_row$ce_lb,
                                    rename = TRUE,
                                    debug = debug)
           }  # end if else normalize
@@ -233,7 +236,6 @@ gen_data_grid <- function(data_grid = build_data_grid(),
             sample(seq_len(data_row$n_node))
           })
         )
-
         ## update data_row
         data_row <- bn.fit2data_row(bn.fit, data_row)
 
@@ -534,7 +536,7 @@ build_data_grid <- function(network = "survey",
                             max_in_deg = Inf,
                             max_out_deg = Inf,
                             target = "",
-                            ce_lb = 0.01,  # causal effect lower bound
+                            ce_lb = 1e-2,  # causal effect lower bound
                             reg_lb = 0,  # regret prop lower bound
                             var_lb = 0.1,
                             var_ub = 0.2,
