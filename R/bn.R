@@ -370,6 +370,28 @@ load_bn.fit <- function(x,
 
 
 
+# Get causal effect lower bound from dnet
+
+dnet2ce_lb <- function(dnet){
+
+  jpt <- get_jpt(bn.fit = dnet)
+  bn_list <- add_j_m_pt(bn.fit = dnet)
+  marginals <- sapply(bn_list, `[[`, "mpt")
+  min(do.call(c, lapply(bn_list, function(node){
+
+    unlist(lapply(node$parents, function(x){
+
+      pt <- query_jpt(jpt = jpt, target = node$node,
+                      given = x, adjust = bn_list[[x]]$parents)
+
+      max(abs(pt - reshape_dim(pt = node$mpt,
+                               new_dimnames = dimnames(pt))))
+    }))
+  })))
+}
+
+
+
 # Extract information from bn.fit for data_row
 
 bn.fit2data_row <- function(bn.fit,
@@ -426,23 +448,9 @@ bn.fit2data_row <- function(bn.fit,
 
     n_lev <- sapply(bn.fit,
                     function(node) dim(node$prob)[1])
-
-    jpt <- get_jpt(bn.fit = bn.fit)
-    bn_list <- add_j_m_pt(bn.fit = bn.fit)
-    marginals <- sapply(bn_list, `[[`, "mpt")
-    data_row$ce_lb <- min(do.call(c, lapply(bn_list, function(node){
-
-      unlist(lapply(node$parents, function(x){
-
-        pt <- query_jpt(jpt = jpt, target = node$node,
-                         given = x, adjust = bn_list[[x]]$parents)
-
-        max(abs(pt - reshape_dim(pt = node$mpt,
-                                 new_dimnames = dimnames(pt))))
-      }))
-    })))
     data_row$var_lb <- min(n_lev)
     data_row$var_ub <- max(n_lev)
+    data_row$ce_lb <- dnet2ce_lb(dnet = bn.fit)
 
     ## effects on target
     effects_array <- bn.fit2effects(bn.fit = bn.fit)
@@ -531,9 +539,10 @@ bn.fit2effects <- function(bn.fit){
 
         if (length(bn.fit[[node]]$parents)){
 
-          bn.fit0 <- remove_arcs(bn.fit = bn.fit,
-                                 arcs = as.matrix(data.frame(bn.fit[[node]]$parents,
-                                                             node)))
+          bn.fit0 <-
+            remove_arcs(bn.fit = bn.fit,
+                        arcs = as.matrix(data.frame(from = bn.fit[[node]]$parents,
+                                                    to = node)))
         } else{
 
           bn.fit0 <- bn.fit
@@ -901,11 +910,10 @@ nodes_along_path <- function(from,
 # WARNING: not guaranteed to be correct in every case; use with care
 
 get_jpt <- function(bn.fit,
-                    nodes = bnlearn::nodes(bn.fit)){
+                    nodes = names(bn.fit)){
 
   ## initialize joint probability table (jpt)
-  parents <- Reduce(union, sapply(nodes, bnlearn::parents,
-                                  x = bn.fit, simplify = FALSE))
+  parents <- Reduce(union, sapply(bn.fit[nodes], `[[`, "parents"))
   between <- Reduce(union, lapply(parents, function(from){
 
     Reduce(union, lapply(setdiff(parents, from), function(to){
@@ -1466,7 +1474,7 @@ solve_cpt_dnet <- function(bn.fit,
 
     return(x_tp)
   }
-  par2ce_lb <- function(par){
+  par2dnet <- function(par){
 
     bn_list <- bn.fit[seq_len(length(bn.fit))]
     bn_list[[target]]$parents <- parents
@@ -1479,9 +1487,7 @@ solve_cpt_dnet <- function(bn.fit,
     }
     bn.fit <- bn_list2bn.fit(bn_list)
 
-    ## return ce_lb
-    bn.fit2data_row(bn.fit,
-                    data_row = data.frame(target = node))$ce_lb
+    return(bn.fit)
   }
   ## initialize parameters
   par0 <- rep(1, sum(dim_tp))
@@ -1510,12 +1516,21 @@ solve_cpt_dnet <- function(bn.fit,
 
         best <- soln
 
-      } else if (ce_lb > 0 &&
-                 ((soln$ce <- par2ce_lb(soln$par)) >= ce_lb ||
-                  is.null(best$grad) ||
-                  soln$ce > best$ce)){
+      } else if (ce_lb > 0){
 
-        best <- soln
+        if ((soln$ce <- dnet2ce_lb(par2dnet(soln$par))) >= ce_lb ||
+            is.null(best$grad) ||
+            soln$ce > best$ce){
+
+          debug_cli(debug >=2 && !is.null(best$grad), cli::cli_alert,
+                    "accepted attempt with ce = {soln$ce}")
+          best <- soln
+
+        } else{
+
+          debug_cli(debug >=2, cli::cli_alert,
+                    "failed attempt with ce = {soln$ce}")
+        }
       }
       if (best$fn < 1e-6 &&
           (ce_lb <= 0 || best$ce >= ce_lb)){
@@ -1541,20 +1556,8 @@ solve_cpt_dnet <- function(bn.fit,
             after {n_attempts} attempts with {best$fn} achieved",
             .envir = environment())
 
-  ## create cpt
-  x_tp <- par2cpt(best$par)
-
   ## prepare bn.fit
-  bn_list <- bn.fit[seq_len(length(bn.fit))]
-  bn_list[[target]]$parents <- parents
-  bn_list[[target]]$prob <- x_tp
-
-  for (parent in bn_list[[target]]$parents){
-
-    bn_list[[parent]]$children <- union(bn_list[[parent]]$children,
-                                        target)
-  }
-  bn.fit <- bn_list2bn.fit(bn_list)
+  bn.fit <- par2dnet(best$par)
 
   ## reverse ordering, if not supplied as ordered
   if (!ordered){
@@ -1572,7 +1575,7 @@ bn2dnet <- function(bn,
                     seed,
                     min_levels = 2,
                     max_levels = 2,
-                    min_marginal = 1e-2,
+                    marginal_lb = 1e-2,
                     ce_lb = 1e-2,
                     n_attempts = 100,
                     time_limit = 60,
@@ -1599,11 +1602,11 @@ bn2dnet <- function(bn,
                 .envir = environment())
 
       ## initialize with empty graph with random marginal probabilities
-      dnet <- bnlearn::empty.graph(nodes = bnlearn::nodes(bn))
+      dnet_i <- bnlearn::empty.graph(nodes = bnlearn::nodes(bn))
       dist <- sapply(bnlearn::nodes(bn), function(node){
 
         prob <- -1
-        while (any(prob < min_marginal)){
+        while (any(prob < marginal_lb)){
 
           n_levels <- floor(runif(1, min = min_levels,
                                   max = max_levels + 1 - .Machine$double.eps))
@@ -1617,27 +1620,51 @@ bn2dnet <- function(bn,
         return(prob)
 
       }, simplify = FALSE)
-      dnet <- bnlearn::custom.fit(bnlearn::empty.graph(nodes = bnlearn::nodes(bn)), dist)
+      dnet_i <- bnlearn::custom.fit(bnlearn::empty.graph(nodes = bnlearn::nodes(bn)), dist)
 
-      ## add parents for each node
-      ordering <- bnlearn:::topological.ordering(bn)
-      ordered <- identical(ordering, bnlearn::nodes(bn))
-      for (node in ordering){
+      ## add parents and generate cpts
+      bn_list <- lapply(dnet_i[seq_len(length(dnet_i))], function(node){
 
-        dnet <- solve_cpt_dnet(bn.fit = dnet, target = node,
-                               parents = bn[[node]]$parents,
-                               ce_lb = ce_lb, ordered = ordered,
-                               n_attempts = n_attempts,
-                               time_limit = time_limit, debug = debug)
+        node$children <- bn[[node$node]]$children
+        if (length(bn[[node$node]]$parents)){
+
+          node$parents <- bn[[node$node]]$parents
+          new_dimnames <- c(dimnames(node$prob),
+                            do.call(c, lapply(node$parents, function(x)
+                              dimnames(dnet_i[[x]]$prob)[1])))
+          node$prob <- reshape_dim(pt = node$prob,
+                                   new_dimnames = new_dimnames)
+
+          node$prob[] <- runif(length(node$prob))
+          node$prob <- validate_cpt(cpt = node$prob,
+                                    given = node$parents)
+        }
+        return(node)
+      })
+      bn_list <- add_j_m_pt(bn_list)
+
+      dnet_i <- bn_list2bn.fit(bn_list = bn_list)
+      attr(dnet_i, "marginal_lb") <- min(sapply(bn_list, `[[`, "mpt"))
+      attr(dnet_i, "ce_lb") <- dnet2ce_lb(dnet = dnet_i)
+
+      if (i == 1 ||
+          (attr(dnet_i, "marginal_lb") >= marginal_lb &&
+           attr(dnet_i, "ce_lb") > attr(dnet, "ce_lb"))){
+
+        dnet <- dnet_i
       }
-      ## if successfully reached this point, successful
-      debug_cli(debug >= 2, cli::cli_alert_success,
-                c("successfully generated dnet on attempt {i} ",
-                  "after {prettyunits::pretty_sec(as.numeric(Sys.time() - start_time, unit = 'secs'))}"),
-                .envir = environment())
+      if (attr(dnet, "marginal_lb") >= marginal_lb &&
+          attr(dnet, "ce_lb") >= ce_lb){
 
-      success <- TRUE
-      break
+        ## successfully generated dnet satisfying constraints
+        debug_cli(debug >= 2, cli::cli_alert_success,
+                  c("successfully generated dnet on attempt {i} ",
+                    "after {prettyunits::pretty_sec(as.numeric(Sys.time() - start_time, unit = 'secs'))}"),
+                  .envir = environment())
+
+        success <- TRUE
+        break
+      }
     },
     error = function(err){
 
@@ -1646,10 +1673,14 @@ bn2dnet <- function(bn,
                 .envir = environment())
     })
   }
-  debug_cli(!success, cli::cli_abort,
-            "failed to generate dnet with {length(bnlearn::nodes(bn))} and
-            {sum(bnlearn::amat(bn))} edges after {n_attempts} attempts",
+  debug_cli(!success && debug >= 2, cli::cli_alert_danger,
+            c("failed to generate dnet with {length(bn)} nodes and ",
+            "{sum(bnlearn::amat(bn))} edges after {n_attempts} attempts, ",
+            "resulting in marginal_lb = {attr(dnet, 'marginal_lb')} ",
+            "and ce_lb = {attr(dnet, 'ce_lb')}"),
             .envir = environment())
 
+  attr(dnet, "marginal_lb") <- attr(dnet,
+                                    "ce_lb") <- NULL
   return(dnet)
 }

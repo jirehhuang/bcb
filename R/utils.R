@@ -256,7 +256,7 @@ load_example <- function(eg = c("gnet", "dnet"),
       bn.fit <- rename_bn.fit(bn.fit)
       bn.fit <- bn2dnet(bn = bn.fit, seed = 2,
                         min_levels = 2, max_levels = 2,
-                        min_marginal = 1e-2)
+                        marginal_lb = 1e-2)
 
       score <- "bde"
       intervene <- c(
