@@ -141,7 +141,8 @@ gen_data_grid <- function(data_grid = build_data_grid(),
 
             ## check if invalid
             temp_row <- bn.fit2data_row(gnet, data_row)
-            invalid <- temp_row$reg_lb < data_row$reg_lb
+            invalid <- temp_row$reg_lb < data_row$reg_lb &&
+              temp_row$ri_lb > data_row$ri_lb
 
             debug_cli(debug, ifelse(invalid, cli::cli_alert_danger, cli::cli_alert_success),
                       c("gnet {ifelse(invalid, 'violates', 'satisfies')} regret  ",
@@ -537,7 +538,8 @@ build_data_grid <- function(network = "survey",
                             max_out_deg = Inf,
                             target = "",
                             ce_lb = 1e-2,  # causal effect lower bound
-                            reg_lb = 0,  # regret prop lower bound
+                            ri_lb = 1e-2,  # reward identifiability lower bound
+                            reg_lb = 0,  # regret difference lower bound
                             var_lb = 0.1,
                             var_ub = 0.2,
                             coef_lb = 0.5,
@@ -567,6 +569,7 @@ build_data_grid <- function(network = "survey",
                            var_ub = var_ub,
                            var_lb = var_lb,
                            reg_lb = reg_lb,
+                           ri_lb = ri_lb,
                            ce_lb = ce_lb,
                            target = target,
                            max_out_deg = max_out_deg,
@@ -587,6 +590,8 @@ build_data_grid <- function(network = "survey",
 
 
 
+# Check data grid
+
 check_data_grid <- function(data_grid){
 
   ## TODO: check values
@@ -594,7 +599,7 @@ check_data_grid <- function(data_grid){
   ## column names
   nms <- c("index", "id", "seed", "network", "data_type", "k",
            "n_dat", "n_obs", "avg_deg", "max_in_deg", "max_out_deg",
-           "target", "ce_lb", "reg_lb", "var_lb", "var_ub",
+           "target", "ce_lb", "ri_lb", "reg_lb", "var_lb", "var_ub",
            "coef_lb", "coef_ub", "normalize", "n_node", "n_edge", "n_within",
            "n_between", "n_compelled", "n_reversible", "n_params")
 

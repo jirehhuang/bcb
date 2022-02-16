@@ -428,35 +428,37 @@ bn.fit2data_row <- function(bn.fit,
   }
   if ("bn.fit.gnet" %in% class(bn.fit)){
 
-    betas <- abs(wamat(bn.fit)[bnlearn::amat(bn.fit) > 0])
-    vars <- sapply(bn.fit, `[[`, "sd")^2
-
-    data_row$ce_lb <- min(betas)
-    data_row$coef_lb <- min(betas)
-    data_row$coef_ub <- max(betas)
-    data_row$var_lb <- min(vars)
-    data_row$var_ub <- max(vars)
-
     ## effects on target
     effects_array <- bn.fit2effects(bn.fit = bn.fit)
     effects <- effects_array[setdiff(names(bn.fit), data_row$target),
                              data_row$target, 1]
     effects <- sort(abs(effects[effects != 0]), decreasing = TRUE)
+
+    betas <- abs(wamat(bn.fit)[bnlearn::amat(bn.fit) > 0])
+    vars <- sapply(bn.fit, `[[`, "sd")^2
+
+    data_row$ce_lb <- min(betas)
+    data_row$ri_lb <- effects[1]
+    data_row$coef_lb <- min(betas)
+    data_row$coef_ub <- max(betas)
+    data_row$var_lb <- min(vars)
+    data_row$var_ub <- max(vars)
+
     effects <- effects / effects[1]
 
   } else if ("bn.fit.dnet" %in% class(bn.fit)){
-
-    n_lev <- sapply(bn.fit,
-                    function(node) dim(node$prob)[1])
-    data_row$var_lb <- min(n_lev)
-    data_row$var_ub <- max(n_lev)
-    data_row$ce_lb <- dnet2ce_lb(dnet = bn.fit)
 
     ## effects on target
     effects_array <- bn.fit2effects(bn.fit = bn.fit)
     effects <- effects_array[setdiff(names(bn.fit), data_row$target),
                              data_row$target, ]
     effects <- sort(abs(effects[effects != 0]), decreasing = TRUE)
+
+    n_lev <- sapply(bn.fit,
+                    function(node) dim(node$prob)[1])
+    data_row$var_lb <- min(n_lev)
+    data_row$var_ub <- max(n_lev)
+    data_row$ce_lb <- dnet2ce_lb(dnet = bn.fit)
   }
   data_row$reg_lb <- effects[1] - effects[2]
 
