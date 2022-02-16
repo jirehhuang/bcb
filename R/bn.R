@@ -449,16 +449,20 @@ bn.fit2data_row <- function(bn.fit,
   } else if ("bn.fit.dnet" %in% class(bn.fit)){
 
     ## effects on target
+    success <- 1  # TODO: generalize
     effects_array <- bn.fit2effects(bn.fit = bn.fit)
     effects <- effects_array[setdiff(names(bn.fit), data_row$target),
-                             data_row$target, ]
+                             data_row$target, success]
     effects <- sort(abs(effects[effects != 0]), decreasing = TRUE)
 
     n_lev <- sapply(bn.fit,
                     function(node) dim(node$prob)[1])
+
+    data_row$ce_lb <- dnet2ce_lb(dnet = bn.fit)
+    data_row$ri_lb <- max(effects - get_jpt(bn.fit = bn.fit,
+                                            nodes = data_row$target)[success])
     data_row$var_lb <- min(n_lev)
     data_row$var_ub <- max(n_lev)
-    data_row$ce_lb <- dnet2ce_lb(dnet = bn.fit)
   }
   data_row$reg_lb <- effects[1] - effects[2]
 

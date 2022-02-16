@@ -145,9 +145,10 @@ gen_data_grid <- function(data_grid = build_data_grid(),
               temp_row$ri_lb > data_row$ri_lb
 
             debug_cli(debug, ifelse(invalid, cli::cli_alert_danger, cli::cli_alert_success),
-                      c("gnet {ifelse(invalid, 'violates', 'satisfies')} regret  ",
-                        "constraint on attempt {attempt} with (",
-                        "{format(temp_row$reg_lb, digits = 3, nsmall = 3)})"),
+                      c("gnet {ifelse(invalid, 'violates', 'satisfies')} ",
+                        "constraints on attempt {attempt} with ",
+                        "ri_lb = {format(temp_row$ri_lb, digits = 3, nsmall = 3)}, ",
+                        "reg_lb = {format(temp_row$reg_lb, digits = 3, nsmall = 3)}"),
                       .envir = environment())
 
             if (! invalid){
@@ -190,12 +191,14 @@ gen_data_grid <- function(data_grid = build_data_grid(),
 
               ## check if invalid
               temp_row <- bn.fit2data_row(dnet, data_row)
-              invalid <- temp_row$reg_lb < data_row$reg_lb
+              invalid <- temp_row$reg_lb < data_row$reg_lb &&
+                temp_row$ri_lb > data_row$ri_lb
 
               debug_cli(debug, ifelse(invalid, cli::cli_alert_danger, cli::cli_alert_success),
-                        c("dnet {ifelse(invalid, 'violates', 'satisfies')} regret  ",
-                          "constraint on attempt {attempt} with (",
-                          "{format(temp_row$reg_lb, digits = 3, nsmall = 3)})"),
+                        c("dnet {ifelse(invalid, 'violates', 'satisfies')} ",
+                          "constraints on attempt {attempt} with ",
+                          "ri_lb = {format(temp_row$ri_lb, digits = 3, nsmall = 3)}, ",
+                          "reg_lb = {format(temp_row$reg_lb, digits = 3, nsmall = 3)}"),
                         .envir = environment())
 
               if (! invalid){
