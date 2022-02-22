@@ -236,7 +236,6 @@ apply_method <- function(t,
     rounds <- update_rounds(t = t, a = a, data_t = data_t, settings = settings,
                             rounds = rounds, debug = debug)
   }
-
   end_time <- Sys.time()
   rounds$selected$time[t] <- as.numeric(end_time - start_time, unit = "secs")
 
@@ -1021,11 +1020,16 @@ build_arms <- function(bn.fit, settings, debug = 0){
 
     ## exclude target
     ex <- which(settings$nodes == settings$target)
+    if (settings$int_parents == 0){
 
-    ## exclude parents if not intervening on parents
-    if (!is.null(settings$int_parents) &&
-        !settings$int_parents){
+      ## exclude parents
       ex <- union(ex, which(settings$nodes %in%
+                              bn.fit[[settings$target]]$parents))
+
+    } else if (settings$int_parents == 2){
+
+      ## exclude all but parents
+      ex <- union(ex, which(!settings$nodes %in%
                               bn.fit[[settings$target]]$parents))
     }
     node_values <- bn.fit2values(bn.fit = bn.fit)
@@ -1142,8 +1146,9 @@ check_settings <- function(settings,
   }
 
   ## check int_parents
-  if (is.null(settings$int_parents)){
-    settings$int_parents <- TRUE
+  if (is.null(settings$int_parents) ||
+      !settings$int_parents %in% c(0, 1, 2)){
+    settings$int_parents <- 1
     debug_cli(debug >= 3, "", "default int_parents = {settings$int_parents}")
   }
 
