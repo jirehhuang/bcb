@@ -998,6 +998,19 @@ initialize_rounds <- function(settings,
                                                                   n_blank),]
     rounds$node_values <- bn.fit2values(bn.fit =
                                           bn.fit)  # used in estimate.R
+    if (length(rounds$arms) < nrow(settings$rounds0$arms)){
+
+      bool_arms <- Reduce(`|`, lapply(rounds$arms, function(arm){
+
+        settings$rounds0$arms$node == arm$node &
+          settings$rounds0$arms$value == arm$value
+      }))
+      nms <- nms[grepl("se_|mu_|n_|criteria", nms)]
+      rounds[nms] <-lapply(rounds[nms], function(x){
+
+        x[, bool_arms, drop = FALSE]
+      })
+    }
     rounds <- update_rounds(t = n_cache,
                             a = 0,
                             data_t = rounds$data[n_cache,],
