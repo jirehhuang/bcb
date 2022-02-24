@@ -465,7 +465,7 @@ update_rounds <- function(t,
   }
   rounds <- compute_int(t = t, settings = settings,
                         rounds = rounds, debug = debug)
-  if (bool_ps)
+  if (length(rounds$ps))
     rounds$bda <- compute_bda(data = data, settings = settings, rounds = rounds,
                               # target = NULL,  # to estimate pairwise effects
                               target = target,  # focus on target
