@@ -11,9 +11,11 @@ execute_mds <- function(ps,
                         seed = 1,
                         debug = 0){
 
-  debug_cli(debug >= 2, cli::cli_alert_info,
-            "sampling DAG with {.pkg mds}")
+  ## if minimal, return empty graph
+  if (settings$minimal && settings$method != "bcb-mds"){
 
+    return(bnlearn::amat(bnlearn::empty.graph(nodes = settings$nodes)))
+  }
   ## TODO: remove; temporary because mds not working for hoffman2
   if (Sys.info()["user"] == "jirehhua" || length(ps) > 12){
 
@@ -23,6 +25,8 @@ execute_mds <- function(ps,
     ## return empty graph
     return(bnlearn::amat(bnlearn::empty.graph(nodes = settings$nodes)))
   }
+  debug_cli(debug >= 2, cli::cli_alert_info,
+            "sampling DAG with {.pkg mds}")
 
   temp_file <- file.path(settings$temp_dir, settings$id)
   gob <- ps2gobnilp(ps = ps, settings = settings, debug = debug)

@@ -13,10 +13,15 @@ estimate_gies <- function(rounds,
                           dag = FALSE,
                           debug = 0){
 
+  ## if minimal, return empty graph
+  nodes <- settings$nodes
+  if (settings$minimal && settings$method != "bcb-gies"){
+
+    return(bnlearn::amat(bnlearn::empty.graph(nodes = nodes)))
+  }
   debug_cli(debug >= 2, cli::cli_alert_info,
             "estimating graph with gies")
 
-  nodes <- settings$nodes
   if (is.null(blmat)){
 
     blmat <- 1 - diag(settings$nnodes)

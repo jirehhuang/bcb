@@ -79,8 +79,7 @@ apply_method <- function(t,
 
   start_time <- Sys.time()
 
-  if (t <= settings$n_obs || (method != "bcb" &&
-                              rounds$selected$arm[t] > 0)){
+  if (t <= settings$n_obs){
 
     ## update observational
     rounds <- update_rounds(t = t, a = rounds$selected$arm[t],
@@ -237,8 +236,8 @@ apply_method <- function(t,
                             rounds = rounds, debug = debug)
   }
   end_time <- Sys.time()
-  rounds$selected$time[t] <- as.numeric(end_time - start_time, unit = "secs")
-
+  rounds$selected$time[t] <- as.numeric(end_time - start_time,
+                                        unit = "secs")
   return(rounds)
 }
 
@@ -385,7 +384,9 @@ update_rounds <- function(t,
             "updating rounds")
 
   ## load settings
-  list2env(settings[c("target", "n_obs", "n_int")], envir = environment())
+  list2env(settings[c("n_obs", "n_int", "method",
+                      "target", "minimal")],
+           envir = environment())
   data <- rounds$data[seq_len(t),,drop = FALSE]
   interventions <- rounds$selected$interventions[seq_len(t)]
 
@@ -405,23 +406,35 @@ update_rounds <- function(t,
       mean(data_t[[target]] == levels(data_t[[target]])[settings$success])
     }
   }
-  compute_scores(data = data, settings = settings, blmat = rounds$blmat[t,],
-                 interventions = interventions, debug = debug)
-  rounds$ps <- compute_ps(data = data,
-                          settings = settings,
-                          interventions = interventions,
-                          debug = debug)
-  rounds$bma[t,] <- ps2es(ps = rounds$ps, settings = settings)
-  rounds$mpg[t,] <- es2mpg(es = rounds$bma[t,], prob = 0.5)
+  if (bool_ps <- !minimal ||  # not minimal, or
+      method %in% c("bcb-bma", "bcb-mpg",  # need ps updates, or
+                    "bcb-mds", "bcb-gies") ||
+      (grepl("bcb", method) &&  # need initial ps
+       length(rounds$ps) == 0)){
+
+    compute_scores(data = data, settings = settings, blmat = rounds$blmat[t,],
+                   interventions = interventions, debug = debug)
+    rounds$ps <- compute_ps(data = data,
+                            settings = settings,
+                            interventions = interventions,
+                            debug = debug)
+    rounds$bma[t,] <- ps2es(ps = rounds$ps, settings = settings)
+    rounds$mpg[t,] <- es2mpg(es = rounds$bma[t,], prob = 0.5)
+  }
   rounds$mds[t,] <- execute_mds(ps = rounds$ps, settings = settings,
                                 seed = sample(t, size = 1), debug = debug)
   rounds$gies[t,] <- estimate_gies(rounds = rounds, blmat = rounds$blmat[t,],
                                    settings = settings,
                                    interventions = interventions,
                                    dag = FALSE, debug = debug)
+  if (bool_ps)
+    rounds$ps <- threshold_ps(t = t,
+                              rounds = rounds,
+                              settings = settings,
+                              debug = debug)
   if (t > n_obs){
 
-    post <- method2post(method = settings$method)
+    post <- method2post(method = method)
     dag <- switch(post,
                   star = bnlearn::amat(settings$bn.fit),
                   bma = NULL,
@@ -437,6 +450,10 @@ update_rounds <- function(t,
 
       rounds$arp <- dag2arp(dag = dag, nodes = settings$nodes)
 
+    } else if (minimal && !grepl("bcb", method)){
+
+      rounds$arp <- dag2arp(dag = row2mat(row = 0, nodes = settings$nodes),
+                            nodes = settings$nodes)
     } else{
 
       ## compute arp probabilities
@@ -448,13 +465,16 @@ update_rounds <- function(t,
   }
   rounds <- compute_int(t = t, settings = settings,
                         rounds = rounds, debug = debug)
-  rounds$bda <- compute_bda(data = data, settings = settings, rounds = rounds,
-                            # target = NULL,  # to estimate pairwise effects
-                            target = target,  # focus on target
-                            debug = debug)
-
+  if (bool_ps)
+    rounds$bda <- compute_bda(data = data, settings = settings, rounds = rounds,
+                              # target = NULL,  # to estimate pairwise effects
+                              target = target,  # focus on target
+                              debug = debug)
   ## posterior mean
   for (post in avail_bda){
+
+    if (minimal &&
+        !grepl(post, method)) next
 
     dag <- switch(post,
                   star = bnlearn::amat(settings$bn.fit),
@@ -470,21 +490,21 @@ update_rounds <- function(t,
                             dag = dag, type = "bda", post = post, est = post)
   }
   ## est
-  post <- method2post(method = settings$method)
+  post <- method2post(method = method)
   dag <- switch(post,
                 star = bnlearn::amat(settings$bn.fit),
                 bma = NULL,
                 eg = bnlearn::amat(bnlearn::empty.graph(settings$nodes)),
                 rounds[[post]][t,])
 
-  if (settings$method == "ts"){
+  if (method == "ts"){
 
     rounds <- update_ts(t = t, settings = settings, rounds = rounds)
 
-  } else{  # else if (settings$method != "ts")
+  } else{  # else if (method != "ts")
 
     if (t <= n_obs ||
-        settings$method %in% c("cache")){
+        method %in% c("cache")){
 
       ## default bma; bda = est for obs
       rounds$mu_est[t,] <- rounds$mu_bma[t,]
@@ -493,22 +513,24 @@ update_rounds <- function(t,
     } else{  # t > n_obs
 
       ## mu and se
-      rounds <- compute_mu_se(t = t, rounds = rounds, target = target,
-                              dag = dag, type = "est", post = post, est = "est")
+      if (bool_ps)
+        rounds <- compute_mu_se(t = t, rounds = rounds, target = target,
+                                dag = dag, type = "est", post = post, est = "est")
     }
-    rounds$n_ess[t,] <- sapply(rounds$arms, function(arm){
+    if (bool_ps)
+      rounds$n_ess[t,] <- sapply(rounds$arms, function(arm){
 
-      int_index <- match(arm$value, rounds$node_values[[arm$node]])
-      expect_post(rounds = rounds, dag = dag,
-                  from = arm$node, to = target,
-                  metric = sprintf("n_ess%g", int_index))
-    })
+        int_index <- match(arm$value, rounds$node_values[[arm$node]])
+        expect_post(rounds = rounds, dag = dag,
+                    from = arm$node, to = target,
+                    metric = sprintf("n_ess%g", int_index))
+      })
   }
   if (t <= n_obs){
 
     rounds$n_bda[t,] <- t
 
-  } else{
+  } else if (bool_ps){
 
     rounds$n_bda[t,] <-
       sapply(rounds$bda[sapply(rounds$arms, `[[`, "node")],
@@ -516,7 +538,8 @@ update_rounds <- function(t,
   }
   rounds$arms <- update_arms(t = t, settings = settings,
                              rounds = rounds, debug = debug)
-  rounds$selected$greedy_expected[t] <- get_greedy_expected(settings, rounds)
+  rounds$selected$greedy_expected[t] <- get_greedy_expected(settings,
+                                                            rounds)
   return(rounds)
 }
 
@@ -1010,6 +1033,7 @@ initialize_rounds <- function(settings,
 
         x[, bool_arms, drop = FALSE]
       })
+      rounds$mu_true <- rounds$mu_true[bool_arms]
     }
     rounds <- update_rounds(t = n_cache,
                             a = 0,
@@ -1328,6 +1352,13 @@ check_settings <- function(settings,
     debug_cli(debug >= 3, "", "generated id = {settings$id}")
   }
 
+  ## check minimal
+  if (is.null(settings$minimal) ||
+      is.na(as.logical(settings$minimal))){
+    settings$minimal <- TRUE
+    debug_cli(debug >= 3, "", "default minimal = {settings$minimal}")
+  }
+
   ## check unique_make
   if (is.null(settings$unique_make) ||
       is.na(as.logical(settings$unique_make))){
@@ -1430,7 +1461,7 @@ check_settings <- function(settings,
            "initial_n_ess", "n_t", "max_cache", "int_parents",
            "success", "epsilon", "c", "mu_0", "nu_0", "b_0", "a_0",
            "bcb_combine", "bcb_criteria", "score", "restrict",
-           "alpha", "max.sx", "max_parents", "threshold", "eta",
+           "alpha", "max.sx", "max_parents", "threshold", "eta", "minimal",
            "nodes", "nnodes", "type", "temp_dir", "aps_dir", "mds_dir",
            "id", "rounds0", "data_obs")
   settings <- settings[union(nms, c("bn.fit"))]

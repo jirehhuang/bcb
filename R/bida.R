@@ -143,14 +143,19 @@ compute_scores <- function(data,
                                                   data = data, extra.args = extra.args)
 
           ## compute and store score
-          scr <- local_score(network = network, data = data, score = score,
-                             targets = settings$nodes[i], extra.args = extra.args,
-                             interventions = interventions, debug = debug >= 4)
+          if (settings$minimal &&
+              !settings$method %in% c("bcb-bma", "bcb-mpg",
+                                      "bcb-mds", "bcb-gies")){
+            scr <- -1
 
-          ## TODO: can I increase nsmall
+          } else{
 
+            scr <- local_score(network = network, data = data, score = score,
+                               targets = settings$nodes[i], extra.args = extra.args,
+                               interventions = interventions, debug = debug >= 4)
+          }
           lines[[len + j]] <- sprintf("%s %g %s",
-                                      trimws(format(round(scr, 6), nsmall=6)),
+                                      trimws(format(round(scr, 12), nsmall = 12)),
                                       k, paste(par, collapse = " "))
 
           ## disconnect parents -> i in network
@@ -227,33 +232,8 @@ compute_ps <- function(data,
   ## read in calculated parent support from file
   ps <- read_ps(settings = settings)
 
-  ## threshold low probability parent sets
-  ps_ <- threshold_ps(ps = ps, threshold = settings$threshold, debug = debug)
-  if (grepl("star", settings$method)){
-
-    ## only threshold if non-zero probability
-    valid_ps <- all(sapply(settings$bn.fit, function(node){
-
-      parents <- match(node$parents, settings$nodes)
-
-      index <-
-        ifelse(length(parents) == 0, 1,
-               which(apply(ps_[[node$node]][,seq_len(length(parents)), drop = FALSE],
-                           1, paste, collapse = "") == paste(parents, collapse = "")))
-
-      ps_[[node$node]][index, "prob"] > 0
-    }))
-    if (valid_ps){
-
-      ps <- ps_
-    }
-  } else{
-
-    ps <- ps_
-  }
   debug_cli(debug >= 2, cli::cli_alert_success,
             "computed parent set probabilities for {nnodes} nodes")
-
   return(ps)
 }
 
@@ -469,13 +449,16 @@ read_ps <- function(settings){
 # Function to threshold parent configurations with low support
 # Modification of calc_bida_post()
 
-threshold_ps <- function(ps,
-                         threshold = 0.999,
+threshold_ps <- function(t,
+                         rounds,
+                         settings,
                          debug = 0){
 
   ## remove lowest probability parent sets
   ## beyond some cumulative support threshold
 
+  threshold <- settings$threshold
+  ps <- rounds$ps
   if (threshold >= 1){
 
     debug_cli(debug >= 3, cli::cli_alert_info,
@@ -500,6 +483,45 @@ threshold_ps <- function(ps,
     ## normalize probabilities
     ps[[i]][, "prob"] <- ps[[i]][, "prob"] / sum(ps[[i]][, "prob"])
   }
+  ## if minimal, concentrate around dag
+  ## otherwise, threshold in a manner consistent with the dag
+  post <- method2post(method = settings$method)
+  dag <- switch(post,
+                star = bnlearn::amat(settings$bn.fit),
+                bma = NULL,  # do nothing
+                eg = bnlearn::amat(bnlearn::empty.graph(settings$nodes)),
+                row2mat(row = rounds[[post]][t,],
+                        nodes = settings$nodes))
+  if (settings$minimal){
+
+    ## if minimal, concentrate around dag
+    ps <- concentrate_ps(ps = ps,
+                         amat = dag,
+                         exact = TRUE)
+  } else{
+
+    ## otherwise, threshold in a manner consistent with the dag
+    if (!is.null(dag) && grepl("bcb",
+                               settings$method)){
+
+      ## only threshold if non-zero probability in dag
+      bool_valid <- all(sapply(settings$nodes, function(node){
+
+        parents <- which(dag[,node] > 0)
+
+        index <-
+          ifelse(length(parents) == 0, 1,
+                 which(apply(ps[[node]][,seq_len(length(parents)), drop = FALSE],
+                             1, paste, collapse = "") == paste(parents, collapse = "")))
+        ps[[node]][index,
+                   "prob"] > 0
+      }))
+      if (!bool_valid){
+
+        ps <- rounds$ps
+      }
+    }
+  }
   return(ps)
 }
 
@@ -516,6 +538,11 @@ ps2es <- function(ps,
 
   es <- bnlearn::amat(bnlearn::empty.graph(settings$nodes))
 
+  ## if minimal, return empty graph
+  if (length(ps) == 0){
+
+    return(es)
+  }
   for (i in seq_len(nnodes - 1)){
 
     for (j in seq(i + 1, nnodes)){

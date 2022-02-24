@@ -66,6 +66,11 @@ compute_bda <- function(data,
 
     bda <- rounds$bda
   }
+  ## if minimal, skip
+  if (settings$minimal && !grepl("bcb", settings$method)){
+
+    return(bda)
+  }
   for (i in if (is.null(target)) seq_p else seq_p[-match(target, nodes)]){
 
     pars <- as.matrix(rounds$ps[[i]][, parents, drop = FALSE])
@@ -442,7 +447,8 @@ expect_post <- function(rounds,
     ## concentrate posterior around pdag or skel structure
     ## does nothing if dag = NULL
     rounds$ps <- concentrate_ps(ps = rounds$ps,
-                                amat = dag)
+                                amat = dag,
+                                exact = FALSE)
 
     ## expectation over posterior distribution
     for (i in if (is.null(from)) seq_p else from){
@@ -588,7 +594,8 @@ compute_mu_se <- function(t,
 # Concentrate ps around a dag, pdag, or skel
 
 concentrate_ps <- function(ps,
-                           amat = NULL){
+                           amat = NULL,
+                           exact = FALSE){
 
   if (is.null(amat))
     return(ps)
@@ -602,19 +609,34 @@ concentrate_ps <- function(ps,
   ps <- lapply(seq_len(length(ps)), function(i){
 
     max_parents <- ncol(ps[[i]]) - 3
-    for (l in ps[[i]][, "ordering"]){
+    if (exact && !any(amat & t(amat))){  # exact dag
 
-      if (ps[[i]][l, "prob"] == 0) break
+      l <- which(apply(ps[[i]][, seq_len(max_parents)], 1, function(x){
 
-      ps[[i]][l, seq_len(max_parents)]
-      if (any(amat[ps[[i]][l, seq_len(max_parents)],
-                   i] == 0, na.rm = TRUE)){
+        all(amat[x[!is.na(x)], i], na.rm = TRUE)
+      }))
+      ps[[i]][,
+              "prob"] <- 0
+      ps[[i]][l[length(l)],
+              "prob"] <- 1
+      ps[[i]][,
+              "ordering"] <- order(ps[[i]][, "prob"], decreasing = TRUE)
+    } else{
 
-        ps[[i]][l, "prob"] <- 0
+      for (l in ps[[i]][, "ordering"]){
+
+        if (ps[[i]][l, "prob"] == 0) break
+
+        ps[[i]][l, seq_len(max_parents)]
+        if (any(amat[ps[[i]][l, seq_len(max_parents)],
+                     i] == 0, na.rm = TRUE)){
+
+          ps[[i]][l, "prob"] <- 0
+        }
       }
+      ps[[i]][, "prob"] <- ps[[i]][,
+                                   "prob"] / sum(ps[[i]][, "prob"])
     }
-    ps[[i]][, "prob"] <- ps[[i]][,
-                                 "prob"] / sum(ps[[i]][, "prob"])
     return(ps[[i]])
   })
   names(ps) <- nodes

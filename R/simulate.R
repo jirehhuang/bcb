@@ -430,7 +430,7 @@ check_method_grid <- function(method_grid){
            "n_t", "max_cache", "int_parents", "success", "epsilon", "c",
            "mu_0", "nu_0", "b_0", "a_0", "bcb_combine", "bcb_criteria",
            "score", "restrict", "alpha", "max.sx", "max_parents", "threshold",
-           "eta", "unique_make")
+           "eta", "minimal", "unique_make")
 
   ## remove extra columns
   method_grid <- method_grid[, intersect(names(method_grid), nms)]
@@ -453,6 +453,8 @@ check_method_grid <- function(method_grid){
     method_grid$score <- ""
   if (is.null(method_grid$max_parents))
     method_grid$max_parents <- 5
+  if (is.null(method_grid$minimal))
+    method_grid$minimal <- TRUE
   method_grid[setdiff(nms, names(method_grid))] <- 0
 
   ## rearrange columns
