@@ -323,10 +323,11 @@ compiled2results <- function(path,
   }
   if (as_df){
 
+    nms <- Reduce(intersect, lapply(results, names))
     results <- do.call(rbind, lapply(names(results), function(method){
 
       cbind(data.frame(method = method),
-            results[[method]])
+            results[[method]][nms])
     }))
     write.table(results, file = file.path(compiled_path, sprintf("df_%s.txt", format)))
   }
