@@ -99,8 +99,27 @@ compute_bda <- function(data,
 
         if (j %in% k){  # j -> i, so i -/-> j
 
-          temp[[j]][l, seq_len(ncol(temp[[j]]))] <- numeric(ncol(temp[[j]]))
+          ## have not computed bda effect
+          if (is.na(temp[[j]][l, 1])){
 
+            temp[[j]][l, seq_len(ncol(temp[[j]]))] <- numeric(ncol(temp[[j]]))
+            temp[[j]]$t_bda[l] <- t
+            temp[[j]][l, c("n_bda", "n_ess1", "n_ess2")] <- n
+
+            if (settings$type == "bn.fit.gnet"){
+
+              # temp[[j]][l, sprintf("se%g_bda",
+              #                      seq_len(length(i_values)))] <- sqrt(sum(Xy[,j]^2) / n)
+
+            } else if (settings$type == "bn.fit.dnet"){
+
+              mu_bda <- table(Xy[,j])[settings$success] / n
+              temp[[j]][l, sprintf("mu%g_bda",
+                                   seq_len(length(i_values)))] <- mu_bda
+              temp[[j]][l, sprintf("se%g_bda",
+                                   seq_len(length(i_values)))] <- sqrt(mu_bda * (1 - mu_bda) / n)
+            }
+          }
         } else{
 
           ## compute bda effect
@@ -182,160 +201,163 @@ compute_bda <- function(data,
             temp[[j]]$t_bda[l] <- t
             temp[[j]]$n_bda[l] <- n
           }
-          ## compute joint estimate est
-          if ((rounds$selected$arm > 0 &&
-               temp[[j]]$t_bda[l] == t) ||  # just updated bda with int data
-              rounds$selected$interventions[t] ==
-              nodes[i]){  # or most recent intervention is on i
+        }  # END IF j -> i ELSE
 
-            a <- rounds$selected$arm[t]
-            value <- rounds$arms[[a]]$value
+        ## TODO: compute int quantities before looping through various k; bool_int
 
-            if (settings$type == "bn.fit.gnet"){
+        ## compute joint estimate est
+        if ((rounds$selected$arm[t] > 0 &&
+             temp[[j]]$t_bda[l] == t) ||  # just updated bda with int data
+            rounds$selected$interventions[t] ==
+            nodes[i]){  # or most recent intervention is on i
 
-              if (settings$bcb_combine == "average"){
+          a <- rounds$selected$arm[t]
+          value <- rounds$arms[[a]]$value
 
-                ## bda
-                beta_bda <- temp[[j]]$beta_bda[l]
-                se_bda <- temp[[j]]$se1_bda[l]
-                n_bda <- temp[[j]]$n_bda[l]
+          if (settings$type == "bn.fit.gnet"){
 
-                ## int
-                beta_int <- rounds$mu_int[t, a] * value
-                se_int <- rounds$se_int[t, a]
-                se_int <- ifelse(!is.na(se_int), se_int,
-                                 ## prior with variacne 1 and ess 2
-                                 sqrt((2 + (beta_int - beta_bda)^2) / 3))
-                n_int <- sum(rounds$selected$interventions == nodes[i])
+            if (settings$bcb_combine == "average"){
 
-                ## ess
-                n_bda <- ifelse(settings$initial_n_ess <= 0,
-                                max(min(n_bda, n_int), 1),
-                                min(n_bda, settings$initial_n_ess))
-                ## est
-                beta_est <- (beta_bda * n_bda + beta_int * n_int) / (n_bda +
-                                                                       n_int)
-                se_est <- sqrt((se_bda^2 * n_bda^2 + se_int^2 * n_int^2) /
-                                 (n_bda + n_int)^2)
+              ## bda
+              beta_bda <- temp[[j]]$beta_bda[l]
+              se_bda <- temp[[j]]$se1_bda[l]
+              n_bda <- temp[[j]]$n_bda[l]
 
-              } else if (settings$bcb_combine == "conjugate"){
+              ## int
+              beta_int <- rounds$mu_int[t, a] * value
+              se_int <- rounds$se_int[t, a]
+              se_int <- ifelse(!is.na(se_int), se_int,
+                               ## prior with variacne 1 and ess 2
+                               sqrt((2 + (beta_int - beta_bda)^2) / 3))
+              n_int <- sum(rounds$selected$interventions == nodes[i])
 
-                ## int
-                beta_int <- rounds$mu_int[t, a] * value
-                bool_int <- rounds$selected$interventions == nodes[i]
-                x_int <- as.numeric(
-                  sapply(rounds$selected$arm[bool_int], function(x){
+              ## ess
+              n_bda <- ifelse(settings$initial_n_ess <= 0,
+                              max(min(n_bda, n_int), 1),
+                              min(n_bda, settings$initial_n_ess))
+              ## est
+              beta_est <- (beta_bda * n_bda + beta_int * n_int) / (n_bda +
+                                                                     n_int)
+              se_est <- sqrt((se_bda^2 * n_bda^2 + se_int^2 * n_int^2) /
+                               (n_bda + n_int)^2)
 
-                    rounds$arms[[x]]$value
-                  })
-                ) * rounds$data[bool_int, settings$target]
-                n_int <- length(x_int)
+            } else if (settings$bcb_combine == "conjugate"){
 
-                ## priors with bda
-                n_bda <- temp[[j]]$n_bda[l]
-                n_ess <- temp[[j]]$n_ess1[l]
-                n_ess <- ifelse(settings$initial_n_ess <= 0,
-                                max(min(n_ess, n_int), 1),
-                                min(n_ess, settings$initial_n_ess))
-                nu_0 <- n_ess
-                a_0 <- max(1, (n_bda - length(ik) - 1) / 2)
+              ## int
+              beta_int <- rounds$mu_int[t, a] * value
+              bool_int <- rounds$selected$interventions == nodes[i]
+              x_int <- as.numeric(
+                sapply(rounds$selected$arm[bool_int], function(x){
 
-                beta_0 <- temp[[j]]$beta_bda[l]
-                b_0 <- ifelse(1 > (n_bda - length(ik) - 1) / 2,
-                              1, temp[[j]]$rss[l] / 2)
+                  rounds$arms[[x]]$value
+                })
+              ) * rounds$data[bool_int, settings$target]
+              n_int <- length(x_int)
 
-                ## posterior update
-                nu <- nu_0 + n_int
-                beta <- (nu_0 * beta_0 + n_int * beta_int) / nu
+              ## priors with bda
+              n_bda <- temp[[j]]$n_bda[l]
+              n_ess <- temp[[j]]$n_ess1[l]
+              n_ess <- ifelse(settings$initial_n_ess <= 0,
+                              max(min(n_ess, n_int), 1),
+                              min(n_ess, settings$initial_n_ess))
+              nu_0 <- n_ess
+              a_0 <- max(1, (n_bda - length(ik) - 1) / 2)
 
-                a_ <- a_0 + n_int / 2
-                b_ <- b_0 + 1/2 * sum((x_int - beta_int)^2) +
-                  n_int * nu_0 / nu * (beta_int - beta_0)^2 / 2
+              beta_0 <- temp[[j]]$beta_bda[l]
+              b_0 <- ifelse(1 > (n_bda - length(ik) - 1) / 2,
+                            1, temp[[j]]$rss[l] / 2)
 
-                beta_est <- beta
-                se_est <- sqrt(b_ / a_ / nu)
-              }
-              ## update
-              temp[[j]]$beta_est[l] <- beta_est
-              for (b in seq_len(length(i_values))){
+              ## posterior update
+              nu <- nu_0 + n_int
+              beta <- (nu_0 * beta_0 + n_int * beta_int) / nu
 
-                temp[[j]][[sprintf("mu%g_est", b)]][l] <-
-                  i_values[b] * temp[[j]]$beta_est[l]
+              a_ <- a_0 + n_int / 2
+              b_ <- b_0 + 1/2 * sum((x_int - beta_int)^2) +
+                n_int * nu_0 / nu * (beta_int - beta_0)^2 / 2
 
-                temp[[j]][[sprintf("se%g_est", b)]][l] <- se_est
-              }
-            } else if (settings$type == "bn.fit.dnet"){
-
-              ## only update corresponding level
-              b <- rounds$arms[[a]]$value
-
-              if (settings$bcb_combine == "average"){
-
-                ## bda
-                mu_bda <- temp[[j]][[sprintf("mu%g_bda", b)]][l]
-                se_bda <- temp[[j]][[sprintf("se%g_bda", b)]][l]
-                n_bda <- temp[[j]]$n_bda[l]
-
-                ## int
-                mu_int <- rounds$mu_int[t, a]
-                se_int <- rounds$se_int[t, a]
-                n_int <- sum(rounds$selected$arm == a)
-
-                ## ess
-                n_bda <- ifelse(settings$initial_n_ess <= 0,
-                                max(min(n_bda, n_int), 1),
-                                min(n_bda, settings$initial_n_ess))
-
-                ## est
-                mu_est <- (mu_bda * n_bda + mu_int * n_int) / (n_bda +
-                                                                 n_int)
-                se_est <- sqrt((se_bda^2 * n_bda^2 + se_int^2 * n_int^2) /
-                                 (n_bda + n_int)^2)
-
-              } else if (settings$bcb_combine == "conjugate"){
-
-                ## int
-                mu_int <- rounds$mu_int[t, a]
-                n_int <- sum(rounds$selected$arm == a)
-
-                ## priors with bda
-                n_bda <- temp[[j]]$n_bda[l]
-                n_ess <- temp[[j]][[sprintf("n_ess%g", b)]][l]
-                n_ess <- ifelse(settings$initial_n_ess <= 0,
-                                max(min(n_ess, n_int), 1),
-                                min(n_ess, settings$initial_n_ess))
-
-                mu_0 <- temp[[j]][[sprintf("mu%g_bda", b)]][l]
-                alpha_0 <- mu_0 * n_ess
-                beta_0 <- n_ess - alpha_0
-
-                ## posterior update
-                alpha <- alpha_0 + n_int * mu_int
-                beta <- beta_0 + n_int * (1 - mu_int)
-
-                mu_est <- alpha / (alpha + beta)
-                se_est <- sqrt(alpha * beta / (alpha + beta)^3)
-              }
-              ## update
-              temp[[j]][[sprintf("mu%g_est", b)]][l] <- mu_est
-              temp[[j]][[sprintf("se%g_est", b)]][l] <- se_est
+              beta_est <- beta
+              se_est <- sqrt(b_ / a_ / nu)
             }
-            temp[[j]]$t_int[l] <- t
-          }
-          ## purely observational; no intervention yet
-          if (is.na(temp[[j]]$t_int[l])){
-
-            ## take est from bda, since no int
+            ## update
+            temp[[j]]$beta_est[l] <- beta_est
             for (b in seq_len(length(i_values))){
 
               temp[[j]][[sprintf("mu%g_est", b)]][l] <-
-                temp[[j]][[sprintf("mu%g_bda", b)]][l]
+                i_values[b] * temp[[j]]$beta_est[l]
 
-              temp[[j]][[sprintf("se%g_est", b)]][l] <-
-                temp[[j]][[sprintf("se%g_bda", b)]][l]
+              temp[[j]][[sprintf("se%g_est", b)]][l] <- se_est
             }
-            temp[[j]]$beta_est[l] <- temp[[j]]$beta_bda[l]
+          } else if (settings$type == "bn.fit.dnet"){
+
+            ## only update corresponding level
+            b <- rounds$arms[[a]]$value
+
+            if (settings$bcb_combine == "average"){
+
+              ## bda
+              mu_bda <- temp[[j]][[sprintf("mu%g_bda", b)]][l]
+              se_bda <- temp[[j]][[sprintf("se%g_bda", b)]][l]
+              n_bda <- temp[[j]]$n_bda[l]
+
+              ## int
+              mu_int <- rounds$mu_int[t, a]
+              se_int <- rounds$se_int[t, a]
+              n_int <- sum(rounds$selected$arm == a)
+
+              ## ess
+              n_bda <- ifelse(settings$initial_n_ess <= 0,
+                              max(min(n_bda, n_int), 1),
+                              min(n_bda, settings$initial_n_ess))
+
+              ## est
+              mu_est <- (mu_bda * n_bda + mu_int * n_int) / (n_bda +
+                                                               n_int)
+              se_est <- sqrt((se_bda^2 * n_bda^2 + se_int^2 * n_int^2) /
+                               (n_bda + n_int)^2)
+
+            } else if (settings$bcb_combine == "conjugate"){
+
+              ## int
+              mu_int <- rounds$mu_int[t, a]
+              n_int <- sum(rounds$selected$arm == a)
+
+              ## priors with bda
+              n_bda <- temp[[j]]$n_bda[l]
+              n_ess <- temp[[j]][[sprintf("n_ess%g", b)]][l]
+              n_ess <- ifelse(settings$initial_n_ess <= 0,
+                              max(min(n_ess, n_int), 1),
+                              min(n_ess, settings$initial_n_ess))
+
+              mu_0 <- temp[[j]][[sprintf("mu%g_bda", b)]][l]
+              alpha_0 <- mu_0 * n_ess
+              beta_0 <- n_ess - alpha_0
+
+              ## posterior update
+              alpha <- alpha_0 + n_int * mu_int
+              beta <- beta_0 + n_int * (1 - mu_int)
+
+              mu_est <- alpha / (alpha + beta)
+              se_est <- sqrt(alpha * beta / (alpha + beta)^3)
+            }
+            ## update
+            temp[[j]][[sprintf("mu%g_est", b)]][l] <- mu_est
+            temp[[j]][[sprintf("se%g_est", b)]][l] <- se_est
           }
+          temp[[j]]$t_int[l] <- t
+        }
+        ## purely observational; no intervention yet
+        if (is.na(temp[[j]]$t_int[l])){
+
+          ## take est from bda, since no int
+          for (b in seq_len(length(i_values))){
+
+            temp[[j]][[sprintf("mu%g_est", b)]][l] <-
+              temp[[j]][[sprintf("mu%g_bda", b)]][l]
+
+            temp[[j]][[sprintf("se%g_est", b)]][l] <-
+              temp[[j]][[sprintf("se%g_bda", b)]][l]
+          }
+          temp[[j]]$beta_est[l] <- temp[[j]]$beta_bda[l]
         }
       }
     }
