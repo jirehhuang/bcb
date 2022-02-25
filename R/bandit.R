@@ -16,7 +16,6 @@ bandit <- function(bn.fit,
   ## check arguments and initialize
   bnlearn:::check.bn.or.fit(bn.fit)
   bn.fit <- zero_bn.fit(bn.fit = bn.fit)
-
   settings <- check_settings(settings = settings,
                              bn.fit = bn.fit, debug = debug)
   set.seed(seed0 + sum(settings$run))
@@ -513,11 +512,11 @@ update_rounds <- function(t,
     } else{  # t > n_obs
 
       ## mu and se
-      if (bool_ps)
+      if (length(rounds$ps))
         rounds <- compute_mu_se(t = t, rounds = rounds, target = target,
                                 dag = dag, type = "est", post = post, est = "est")
     }
-    if (bool_ps)
+    if (length(rounds$ps))
       rounds$n_ess[t,] <- sapply(rounds$arms, function(arm){
 
         int_index <- match(arm$value, rounds$node_values[[arm$node]])
@@ -530,7 +529,7 @@ update_rounds <- function(t,
 
     rounds$n_bda[t,] <- t
 
-  } else if (bool_ps){
+  } else if (length(rounds$ps)){
 
     rounds$n_bda[t,] <-
       sapply(rounds$bda[sapply(rounds$arms, `[[`, "node")],
