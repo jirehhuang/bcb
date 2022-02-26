@@ -203,7 +203,7 @@ compute_bda <- function(data,
           }
         }  # END IF j -> i ELSE
 
-        ## TODO: compute int quantities before looping through various k; bool_int
+        ## TODO: compute int quantities before looping through various k
 
         ## compute joint estimate est
         if ((rounds$selected$arm[t] > 0 &&
@@ -679,7 +679,8 @@ bool_bda <- function(t,
 
   bool_data <- rep(TRUE, t)
 
-  if (t > settings$n_obs){
+  if (t > settings$n_obs &&
+      settings$type == "bn.fit.gnet"){
 
     ## add interventional data with node j such that either
     ## Pr(i -> j) or Pr(j -> target) is low; i.e. j does not
