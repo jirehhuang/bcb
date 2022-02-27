@@ -82,7 +82,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
                   .envir = environment())
 
         ## load bn structure
-        if (grepl("random", data_row$network)){
+        if (grepl("rand", data_row$network)){
 
           set.seed(data_row$seed)
           repeat{
@@ -90,9 +90,13 @@ gen_data_grid <- function(data_grid = build_data_grid(),
             ## generate random graph
             bn.fit <- load_bn.fit(x = data_row$network,
                                   reorder = TRUE, rename = TRUE)
+            nodes <- names(bn.fit)
+            if (grepl("randpar", data_row$network)){
 
+              nodes <- nodes[-length(nodes)]
+            }
             ## too many parents
-            if (any(sapply(lapply(bn.fit, `[[`, "parents"),
+            if (any(sapply(lapply(bn.fit[nodes], `[[`, "parents"),
                            length) > data_row$max_in_deg)){
 
               debug_cli(debug, "",
@@ -101,7 +105,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
               next
             }
             ## too many children
-            if (any(sapply(lapply(bn.fit, `[[`, "children"),
+            if (any(sapply(lapply(bn.fit[nodes], `[[`, "children"),
                            length) > data_row$max_out_deg)){
 
               debug_cli(debug, "",
@@ -141,8 +145,8 @@ gen_data_grid <- function(data_grid = build_data_grid(),
 
             ## check if invalid
             temp_row <- bn.fit2data_row(gnet, data_row)
-            invalid <- temp_row$reg_lb < data_row$reg_lb &&
-              temp_row$ri_lb > data_row$ri_lb
+            invalid <- temp_row$reg_lb < data_row$reg_lb ||
+              temp_row$ri_lb < data_row$ri_lb
 
             debug_cli(debug, ifelse(invalid, cli::cli_alert_danger, cli::cli_alert_success),
                       c("gnet {ifelse(invalid, 'violates', 'satisfies')} ",
@@ -185,14 +189,14 @@ gen_data_grid <- function(data_grid = build_data_grid(),
                               max_levels = data_row$var_ub,
                               marginal_lb = data_row$coef_lb,
                               ce_lb = data_row$ce_lb,
-                              n_attempts = 1000,
-                              time_limit = 60,
+                              n_attempts = 10000,
+                              time_limit = 120,
                               debug = debug)
 
               ## check if invalid
               temp_row <- bn.fit2data_row(dnet, data_row)
-              invalid <- temp_row$reg_lb < data_row$reg_lb &&
-                temp_row$ri_lb > data_row$ri_lb
+              invalid <- temp_row$reg_lb < data_row$reg_lb ||
+                temp_row$ri_lb < data_row$ri_lb
 
               debug_cli(debug, ifelse(invalid, cli::cli_alert_danger, cli::cli_alert_success),
                         c("dnet {ifelse(invalid, 'violates', 'satisfies')} ",

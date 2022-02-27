@@ -287,7 +287,7 @@ random_bn <- function(p,
 
 # Create sink graph structure
 
-sink_bn <- function(p,   # number of parents
+sink_bn <- function(p,   # number of parents of target node
                     d){  # number of parents per parent
 
   nodes <- sprintf("V%s", seq_len(1 + p * (1 + d)))
@@ -295,7 +295,6 @@ sink_bn <- function(p,   # number of parents
   ancestors <- seq_len(p * d)
   parents <- setdiff(seq_len(length(nodes)), c(sink,
                                                ancestors))
-
   bn <- bnlearn::empty.graph(nodes = nodes)
 
   a <- bnlearn::amat(bn)
@@ -303,6 +302,28 @@ sink_bn <- function(p,   # number of parents
   a[cbind(ancestors, rep(parents, each = d))] <- 1L
   bnlearn::amat(bn) <- a
 
+  return(bn)
+}
+
+
+
+# Create random graph structure terminating in a parallel structure
+
+randpar_bn <- function(p1,   # number of parents of target node
+                       p2,   # number of additional nodes
+                       d,    # expected degree
+                       seed){
+
+  nodes <- sprintf("V%s", seq_len(p1 + p2 + 1))
+  sink <- length(nodes)
+  bn <- bnlearn::empty.graph(nodes = nodes)
+
+  rand_bn <- bcb:::random_bn(p = p1 + p2, d = d,
+                             seed = seed)
+
+  bnlearn::amat(bn)[-sink, -sink] <- bnlearn::amat(rand_bn)
+  bnlearn::amat(bn)[tail(bnlearn::node.ordering(rand_bn), d),
+                    sink] <- 1L
   return(bn)
 }
 
@@ -351,6 +372,15 @@ load_bn.fit <- function(x,
     bn <- random_bn(p = p_d_seed[1],
                     d = p_d_seed[2],
                     seed = p_d_seed[3])
+    bn.fit <- bn2gnet(bn = bn, ...)
+
+  } else if (grepl("randpar", x)){
+
+    p1_p2_d_seed <- as.numeric(strsplit(x, "_")[[1]][seq_len(4) + 1])
+    bn <- randpar_bn(p1 = p1_p2_d_seed[1],
+                     p2 = p1_p2_d_seed[2],
+                     d = p1_p2_d_seed[3],
+                     seed = p1_p2_d_seed[4])
     bn.fit <- bn2gnet(bn = bn, ...)
 
   } else{
@@ -1528,13 +1558,13 @@ solve_cpt_dnet <- function(bn.fit,
             is.null(best$grad) ||
             soln$ce > best$ce){
 
-          debug_cli(debug >=2 && !is.null(best$grad), cli::cli_alert,
+          debug_cli(debug >= 2 && !is.null(best$grad), cli::cli_alert,
                     "accepted attempt with ce = {soln$ce}")
           best <- soln
 
         } else{
 
-          debug_cli(debug >=2, cli::cli_alert,
+          debug_cli(debug >= 2, cli::cli_alert,
                     "failed attempt with ce = {soln$ce}")
         }
       }
