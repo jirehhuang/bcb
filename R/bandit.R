@@ -502,12 +502,10 @@ update_rounds <- function(t,
 
   } else{  # else if (method != "ts")
 
-    if (t <= n_obs ||
-        method %in% c("cache")){
+    if (t <= n_obs){
 
-      ## default bma; bda = est for obs
-      rounds$mu_est[t,] <- rounds$mu_bma[t,]
-      rounds$se_est[t,] <- rounds$se_bma[t,]
+      rounds$mu_est[t,] <- rounds[[sprintf("mu_%s", post)]][t,]
+      rounds$se_est[t,] <- rounds[[sprintf("se_%s", post)]][t,]
 
     } else{  # t > n_obs
 
