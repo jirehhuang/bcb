@@ -679,25 +679,31 @@ bool_bda <- function(t,
 
   bool_data <- rep(TRUE, t)
 
-  if (t > settings$n_obs &&
-      settings$type == "bn.fit.gnet"){
+  if (t > settings$n_obs){
 
-    ## add interventional data with node j such that either
-    ## Pr(i -> j) or Pr(j -> target) is low; i.e. j does not
-    ## block a directed path from i to target
-    bool_arms <- sapply(rounds$arms, function(arm){
+    if (settings$type == "bn.fit.gnet"){
 
-      ## Pr(i -> j -> target) <= min(Pr(i -> j), Pr(j -> target))
-      settings$eta > 0 &&
-        min(rounds$arp[from, arm$node],
-            rounds$arp[arm$node, to]) < settings$eta
-    })
-    bool_data[rounds$selected$arm[seq_len(t)] > 0] <-
-      bool_arms[rounds$selected$arm[seq_len(t)]]
+      ## add interventional data with node j such that either
+      ## Pr(i -> j) or Pr(j -> target) is low; i.e. j does not
+      ## block a directed path from i to target
+      bool_arms <- sapply(rounds$arms, function(arm){
 
-    debug_cli(debug >= 3 && sum(bool_data) > settings$n_obs, "",
-              c("using {sum(bool_data) - settings$n_obs} rows of ",
-                "experimental data for back-door adjustment"))
+        ## Pr(i -> j -> target) <= min(Pr(i -> j), Pr(j -> target))
+        settings$eta > 0 &&
+          min(rounds$arp[from, arm$node],
+              rounds$arp[arm$node, to]) < settings$eta
+      })
+      bool_data[rounds$selected$arm[seq_len(t)] > 0] <-
+        bool_arms[rounds$selected$arm[seq_len(t)]]
+
+      debug_cli(debug >= 3 && sum(bool_data) > settings$n_obs, "",
+                c("using {sum(bool_data) - settings$n_obs} rows of ",
+                  "experimental data for back-door adjustment"))
+
+    } else if (settings$type == "bn.fit.dnet"){
+
+      bool_data[seq(settings$n_obs + 1, t)] <- FALSE
+    }
   }
   return(bool_data)
 }
