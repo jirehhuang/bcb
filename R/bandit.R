@@ -394,7 +394,7 @@ update_rounds <- function(t,
     rounds$data[t,] <- data_t
     rounds$selected$arm[t] <- a
     rounds$selected$estimate[t] <- rounds$arms[[a]]$estimate
-    rounds$selected$criteria[t] <- rounds$arms[[a]]$criteria
+    rounds$selected$criteria[t] <- rounds$criteria[t, a]
     rounds$selected$interventions[t] <- rounds$arms[[a]]$node
     rounds$selected$reward[t] <- if (settings$type == "bn.fit.gnet"){
 
