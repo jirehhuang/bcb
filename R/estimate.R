@@ -346,7 +346,9 @@ compute_bda <- function(data,
           temp[[j]]$t_int[l] <- t
         }
         ## purely observational; no intervention yet
-        if (is.na(temp[[j]]$t_int[l])){
+        if (is.na(temp[[j]]$t_int[l]) ||
+            any(is.na(temp[[j]][l, sprintf("mu%g_est",
+                                           seq_len(length(i_values)))]))){
 
           ## take est from bda, since no int
           for (b in seq_len(length(i_values))){
@@ -635,7 +637,7 @@ concentrate_ps <- function(ps,
 
       l <- which(apply(ps[[i]][, seq_len(max_parents)], 1, function(x){
 
-        all(amat[x[!is.na(x)], i], na.rm = TRUE)
+        all(amat[x[!is.na(x)], i] > 0, na.rm = TRUE)
       }))
       ps[[i]][,
               "prob"] <- 0
