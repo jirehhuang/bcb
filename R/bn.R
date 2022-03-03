@@ -322,7 +322,7 @@ randpar_bn <- function(p1,   # number of parents of target node
                              seed = seed)
 
   bnlearn::amat(bn)[-sink, -sink] <- bnlearn::amat(rand_bn)
-  bnlearn::amat(bn)[tail(bnlearn::node.ordering(rand_bn), d),
+  bnlearn::amat(bn)[tail(bnlearn::node.ordering(rand_bn), p1),
                     sink] <- 1L
   return(bn)
 }
