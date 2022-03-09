@@ -1424,10 +1424,6 @@ check_settings <- function(settings,
         file.exists(fp <- settings$data_obs)){
 
       settings$data_obs <- read.table(fp)[seq_len(settings$n_obs),]
-
-      if (settings$type == "bn.fit.dnet")
-        settings$data_obs <- as.data.frame(lapply(settings$data_obs,
-                                                  function(x) as.factor(x)))
     }
   } else if (is.null(settings$data_obs)){
 
@@ -1436,7 +1432,7 @@ check_settings <- function(settings,
   if (is.data.frame(settings$data_obs)){
 
     obs_means <- attr(bn.fit, "obs_means")
-    if (!is.null(obs_means)){
+    if (!is.null(obs_means)){  # only for gnet
 
       cM <- colMeans(settings$data_obs)
       settings$data_obs <- as.data.frame(
@@ -1445,6 +1441,15 @@ check_settings <- function(settings,
           settings$data_obs[[node]] - obs_means[node]
         })
       )
+    }
+    if (settings$type == "bn.fit.dnet"){
+
+      settings$data_obs <- as.data.frame(lapply(settings$data_obs,
+                                                function(x) as.factor(x)))
+      for (node in bn.fit){
+
+        levels(settings$data_obs[[node$node]]) <- dimnames(node$prob)[[1]]
+      }
     }
   }
   debug_cli(!is.null(settings$data_obs) && !is.data.frame(settings$data_obs),
