@@ -110,16 +110,25 @@ apply_method <- function(t,
 
         } else if (settings$type == "bn.fit.dnet"){
 
-          post <- method2post(method = method)
-          dag <- switch(post,
-                        star = bnlearn::amat(settings$bn.fit),
-                        eg = bnlearn::amat(bnlearn::empty.graph(settings$nodes)),
-                        rounds[[post]][t-1,])
-          dag <- row2mat(row = dag, nodes = settings$nodes)
+          # post <- method2post(method = method)
+          # dag <- switch(post,
+          #               star = bnlearn::amat(settings$bn.fit),
+          #               eg = bnlearn::amat(bnlearn::empty.graph(settings$nodes)),
+          #               rounds[[post]][t-1,])
+          # dag <- row2mat(row = dag, nodes = settings$nodes)
 
+          ## TODO: implement for other methods
+          if (grepl("bma|mpg", method)){
+
+            dag <- row2mat(row = rounds$bma[t-1,], nodes = settings$nodes)
+            mult <- unname(dag[sapply(rounds$arms, `[[`,
+                                      "node"), settings$target])
+          } else{
+
+            mult <- rep(1, length(mu))
+          }
           criteria <- mu +
-            se * settings$c * sqrt(log(t - settings$n_obs)) *
-            unname(dag[sapply(rounds$arms, `[[`, "node"), settings$target])
+            se * settings$c * sqrt(log(t - settings$n_obs)) * mult
         }
       } else if (settings$bcb_criteria == "ucb"){
 
