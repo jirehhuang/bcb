@@ -103,10 +103,25 @@ apply_method <- function(t,
 
       if (settings$bcb_criteria == "bcb"){
 
-        criteria <-
-          mu + se * settings$c * sqrt(log(t - settings$n_obs))
+        if (settings$type == "bn.fit.gnet"){
 
-      }  else if (settings$bcb_criteria == "ucb"){
+          criteria <-
+            mu + se * settings$c * sqrt(log(t - settings$n_obs))
+
+        } else if (settings$type == "bn.fit.dnet"){
+
+          post <- method2post(method = method)
+          dag <- switch(post,
+                        star = bnlearn::amat(settings$bn.fit),
+                        eg = bnlearn::amat(bnlearn::empty.graph(settings$nodes)),
+                        rounds[[post]][t-1,])
+          dag <- row2mat(row = dag, nodes = settings$nodes)
+
+          criteria <- mu +
+            se * settings$c * sqrt(log(t - settings$n_obs)) *
+            unname(dag[sapply(rounds$arms, `[[`, "node"), settings$target])
+        }
+      } else if (settings$bcb_criteria == "ucb"){
 
         n_int <- pmax(1, n_int)
         criteria <-
