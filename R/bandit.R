@@ -117,8 +117,8 @@ apply_method <- function(t,
           #               rounds[[post]][t-1,])
           # dag <- row2mat(row = dag, nodes = settings$nodes)
 
-          ## TODO: implement for other methods
-          if (grepl("bma|mpg", method)){
+          if (FALSE &&  # TODO: not always applicable for atomic interventions
+              grepl("bma|mpg", method)){  # TODO: implement for other methods
 
             dag <- row2mat(row = rounds$bma[t-1,], nodes = settings$nodes)
             mult <- unname(dag[sapply(rounds$arms, `[[`,
