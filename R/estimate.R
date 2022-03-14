@@ -635,7 +635,8 @@ concentrate_ps <- function(ps,
     max_parents <- ncol(ps[[i]]) - 3
     if (exact && !any(amat & t(amat))){  # exact dag
 
-      l <- which(apply(ps[[i]][, seq_len(max_parents)], 1, function(x){
+      l <- which(apply(ps[[i]][, seq_len(max_parents),
+                               drop = FALSE], 1, function(x){
 
         all(amat[x[!is.na(x)], i] > 0, na.rm = TRUE)
       }))
