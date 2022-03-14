@@ -435,9 +435,10 @@ update_rounds <- function(t,
       (grepl("bcb", method) &&  # need initial ps
        length(rounds$ps) == 0)){
 
-    if (settings$restrict == "gies"){
+    if (method == "bcb-gies" ||
+        settings$restrict == "gies"){
 
-      rounds$gies[t,] <- estimate_gies(rounds = rounds, blmat = NULL,
+      rounds$gies[t,] <- estimate_gies(rounds = rounds,
                                        settings = settings,
                                        interventions = interventions,
                                        dag = FALSE, debug = debug)
@@ -454,13 +455,6 @@ update_rounds <- function(t,
   }
   rounds$mds[t,] <- execute_mds(ps = rounds$ps, settings = settings,
                                 seed = sample(t, size = 1), debug = debug)
-  if (settings$restrict != "gies"){
-
-    rounds$gies[t,] <- estimate_gies(rounds = rounds, blmat = rounds$blmat[t,],
-                                     settings = settings,
-                                     interventions = interventions,
-                                     dag = FALSE, debug = debug)
-  }
   if (bool_ps)
     rounds$ps <- threshold_ps(t = t,
                               rounds = rounds,
@@ -1239,7 +1233,8 @@ check_settings <- function(settings,
 
   ## check restrict
   if (is.null(settings$restrict) ||
-      !settings$restrict %in% avail_restrict){
+      !settings$restrict %in% avail_restrict ||
+      settings$method == "bcb-gies"){
     settings$restrict <- "none"
     debug_cli(debug >= 3, "", "default restrict = {settings$restrict}")
   }

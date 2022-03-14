@@ -7,7 +7,7 @@
 # Estimate adjacency matrix using gies
 
 estimate_gies <- function(rounds,
-                          blmat,
+                          # blmat,
                           settings,
                           interventions,
                           dag = FALSE,
@@ -24,36 +24,25 @@ estimate_gies <- function(rounds,
   debug_cli(debug >= 2, cli::cli_alert_info,
             "estimating graph with gies")
 
-  if (is.null(blmat)){
-
-    blmat <- 1 - diag(settings$nnodes)
-
-  } else if (is.null(dim(blmat))){
-
-    blmat <- row2mat(row = blmat, nodes = nodes)
-  }
-  if (settings$restrict == "gies" ||
-      any(blmat[!diag(settings$nnodes)] == 1)){
-
-    data <- rounds$data[seq_len(settings$n_obs),]
-    score <- new("bnlearn_score", data = data, interventions = interventions,
-                 nodes = nodes, score = settings$score, extra.args =
-                   bnlearn:::check.score.args(score = settings$score,
-                                              network = settings$bn.fit,
-                                              data = data, extra.args = list()))
-  } else{
-
-    score <- new("lookup_score", ps = rounds$ps,
-                 interventions = interventions,
-                 nodes = nodes)
-  }
-  ## TODO: score that tries to lookup and uses bnlearn if failed
+  # if (is.null(blmat)){
+  #
+  #   blmat <- 1 - diag(settings$nnodes)
+  #
+  # } else if (is.null(dim(blmat))){
+  #
+  #   blmat <- row2mat(row = blmat, nodes = nodes)
+  # }
+  data <- rounds$data[seq_len(length(interventions)),]
+  score <- new("bnlearn_score", data = data, interventions = interventions,
+               nodes = nodes, score = settings$score, extra.args =
+                 bnlearn:::check.score.args(score = settings$score,
+                                            network = settings$bn.fit,
+                                            data = data, extra.args = list()))
 
   gies <- pcalg::gies(score = score, maxDegree = settings$max_parents,
-                      fixedGaps = blmat, iterate = TRUE,
-                      adaptive = ifelse(any(blmat == 1),
-                                        "vstructures", "none"),
-                      phase = c("forward", "backward", "turning"),
+                      # fixedGaps = blmat, adaptive = ifelse(any(blmat == 1),
+                      #                                      "vstructures", "none"),
+                      iterate = TRUE, phase = c("forward", "backward", "turning"),
                       verbose = max(0, debug - 2))
 
   amat <- 1 * as(gies$essgraph, "matrix")
