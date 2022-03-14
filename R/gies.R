@@ -15,7 +15,9 @@ estimate_gies <- function(rounds,
 
   ## if minimal, return empty graph
   nodes <- settings$nodes
-  if (settings$minimal && settings$method != "bcb-gies"){
+  if (settings$minimal &&
+      settings$method != "bcb-gies" &&
+      settings$restrict != "gies"){
 
     return(bnlearn::amat(bnlearn::empty.graph(nodes = nodes)))
   }
@@ -30,7 +32,8 @@ estimate_gies <- function(rounds,
 
     blmat <- row2mat(row = blmat, nodes = nodes)
   }
-  if (any(blmat[!diag(settings$nnodes)] == 1)){
+  if (settings$restrict == "gies" ||
+      any(blmat[!diag(settings$nnodes)] == 1)){
 
     data <- rounds$data[seq_len(settings$n_obs),]
     score <- new("bnlearn_score", data = data, interventions = interventions,

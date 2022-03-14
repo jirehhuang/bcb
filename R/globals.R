@@ -50,6 +50,7 @@ avail_restrict <- c("none",  # no restriction
                     "star",  # skeleton of true underlying skeleton
                     "pc",    # phsl::ppc(max_groups = 1)
                     "ppc",   # phsl::ppc()
+                    "gies",  # pcalg::gies()
                     bnlearn:::constraint.based.algorithms)
 
 

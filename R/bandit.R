@@ -435,6 +435,14 @@ update_rounds <- function(t,
       (grepl("bcb", method) &&  # need initial ps
        length(rounds$ps) == 0)){
 
+    if (settings$restrict == "gies"){
+
+      rounds$gies[t,] <- estimate_gies(rounds = rounds, blmat = NULL,
+                                       settings = settings,
+                                       interventions = interventions,
+                                       dag = FALSE, debug = debug)
+      rounds$blmat[t,] <- 1 - rounds$gies[t,]
+    }
     compute_scores(data = data, settings = settings, blmat = rounds$blmat[t,],
                    interventions = interventions, debug = debug)
     rounds$ps <- compute_ps(data = data,
@@ -446,10 +454,13 @@ update_rounds <- function(t,
   }
   rounds$mds[t,] <- execute_mds(ps = rounds$ps, settings = settings,
                                 seed = sample(t, size = 1), debug = debug)
-  rounds$gies[t,] <- estimate_gies(rounds = rounds, blmat = rounds$blmat[t,],
-                                   settings = settings,
-                                   interventions = interventions,
-                                   dag = FALSE, debug = debug)
+  if (settings$restrict != "gies"){
+
+    rounds$gies[t,] <- estimate_gies(rounds = rounds, blmat = rounds$blmat[t,],
+                                     settings = settings,
+                                     interventions = interventions,
+                                     dag = FALSE, debug = debug)
+  }
   if (bool_ps)
     rounds$ps <- threshold_ps(t = t,
                               rounds = rounds,
@@ -954,7 +965,7 @@ initialize_rounds <- function(settings,
              simplify = FALSE, USE.NAMES = TRUE)
     )
     ## build blacklist
-    if (settings$restrict == "none"){
+    if (settings$restrict %in% c("none", "gies")){
 
       rounds$blmat <- matrix(diag(settings$nnodes), ncol = ncol(rounds$beta_bma),
                              nrow = nrow(rounds$beta_bma), byrow = TRUE)
