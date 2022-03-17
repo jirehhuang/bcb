@@ -2,7 +2,7 @@
 #' @export
 
 compile_path <- function(path,
-                         concise = TRUE,
+                         concise = 2,
                          n_cores = -1,
                          debug = 1){
 
@@ -57,13 +57,8 @@ compile_path <- function(path,
         if (!file.exists(file.path(method_data_dir, "rds", x)))
           return(NULL)
 
-        roundsj <- readRDS(file.path(method_data_dir, "rds", x))
-
-        ## TODO: remove this quick patch fix because of a previous typo
-        if (any(is.na(roundsj$selected$expected_cumulative))){
-
-          roundsj$selected$expected_cumulative <- cumsum(roundsj$selected$expected_regret)
-        }
+        roundsj <- readRDS(file.path(method_data_dir,
+                                     "rds", x))
         if (concise){
 
           cp_dag <- unlist(lapply(setdiff(avail_bda, c("star", "bma", "eg")),
@@ -77,16 +72,22 @@ compile_path <- function(path,
                                          "criteria", "expected_reward", "expected_regret",
                                          "greedy_expected", "greedy_regret", "cumulative",
                                          "expected_cumulative", "mu_est"))]
-          ## TODO: only save a few arms
-          which_arms <- which(sapply(seq_len(nrow(roundsj$arms)), function(i){
-            roundsj$arms$N[roundsj[[sprintf("arm%g", i)]]$arm[1]]
-          }) > 0)
-          which_arms <- union(which_arms, seq_len(nrow(roundsj$arms)))
-          roundsj <- roundsj[c("arms", "selected", "beta_true",
-                               "mu_true", "mu_est", "se_est",
-                               "criteria", "ji",
-                               sprintf("arm%g", which_arms))]
+          if (concise >= 2){
 
+            roundsj <- roundsj[c("arms", "selected", "beta_true", "mu_true", "ji")]
+
+          } else{
+
+            ## TODO: only save a few arms
+            which_arms <- which(sapply(seq_len(nrow(roundsj$arms)), function(i){
+              roundsj$arms$N[roundsj[[sprintf("arm%g", i)]]$arm[1]]
+            }) > 0)
+            which_arms <- union(which_arms, seq_len(nrow(roundsj$arms)))
+            roundsj <- roundsj[c("arms", "selected", "beta_true",
+                                 "mu_true", "mu_est", "se_est",
+                                 "criteria", "ji",
+                                 sprintf("arm%g", which_arms))]
+          }
         }
         return(roundsj)
 
@@ -230,13 +231,17 @@ rounds2df <- function(rounds){
 
   ## TODO: extend beyond concise format
 
-  colnames(rounds$mu_est) <- sprintf("estimate%s", seq_len(ncol(rounds$mu_est)))
-  colnames(rounds$criteria) <- sprintf("criteria%s", seq_len(ncol(rounds$criteria)))
+  if (!is.null(rounds$mu_est))
+    colnames(rounds$mu_est) <- sprintf("estimate%s",
+                                       seq_len(ncol(rounds$mu_est)))
+  if (!is.null(rounds$criteria))
+    colnames(rounds$criteria) <- sprintf("criteria%s",
+                                         seq_len(ncol(rounds$criteria)))
 
   df <- cbind(
     t = 0,  # placeholder
     rounds$selected[, setdiff(names(rounds$selected), "interventions")],
-    rounds$mu_est, rounds$criteria, rounds$ji
+    do.call(cbind, rounds[intersect(names(rounds), c("mu_est", "criteria", "ji"))])
   )
   df <- df[df$arm > 0,, drop = FALSE]
   df$t <- seq_len(nrow(df))
@@ -250,7 +255,7 @@ rounds2df <- function(rounds){
 #' @export
 
 compiled2results <- function(path,
-                             concise = TRUE,
+                             concise = 2,
                              format = 2,
                              as_df = TRUE,
                              n_cores = -1,
@@ -466,8 +471,8 @@ df2line <- function(df,
            expected_reward = "Expected Reward of Selected Arm",
            expected_regret = "Simple Regret",
            greedy_regret = "Expected Regret of Arm with Highest Estimate",
-           cumulative = "Cumulative Regret",
-           expected_cumulative = "Expected Cumulative Regret",
+           cumulative = "Empirical Cumulative Regret",
+           expected_cumulative = "Cumulative Regret",
            mu_est = "MSE of Estimated Rewards",
            dag_mpg = "JI of MPG Estimate",
            cpdag_mpg = "JI of CPDAG of MPG Estimate",
