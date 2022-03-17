@@ -189,13 +189,20 @@ apply_method <- function(t,
       } else{
 
         criteria <- rounds$mu_int[t-1,]
+
+        ## if n_int = 0, investigate the arm
+        criteria <- ifelse(n_int > 0, criteria,
+                           max(c(criteria + 1, rounds$mu_true), na.rm = TRUE))
       }
     } else if (method == "ucb"){
 
       mu <- rounds$mu_int[t-1,]
-      n_int <- pmax(1, n_int)
       criteria <-
         mu + settings$c * sqrt(log(t - settings$n_obs) / n_int)
+
+      ## if n_int = 0, investigate the arm
+      criteria <- ifelse(n_int > 0, criteria,
+                         max(c(criteria + 1, rounds$mu_true), na.rm = TRUE))
 
     } else if (method == "ts"){
 
