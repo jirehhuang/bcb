@@ -203,6 +203,22 @@ average_compiled <- function(compiled,
                          mc.preschedule = FALSE, avg_fn2)
     names(averaged) <- nms
   }
+
+  ## add median and quantiles for expected_cumulative
+  exp_cum <- abind::abind(lapply(compiled, function(net_rounds){
+
+    max_mu <- max(abs(net_rounds[[1]]$mu_true))
+    sapply(net_rounds, function(roundsj){
+
+      roundsj$selected$expected_cumulative / max_mu
+    })
+  }), along = 2)
+  exp_cum_ci <- t(apply(exp_cum, 1, quantile,
+                        probs = c(0.025, 0.05, 0.5, 0.95, 0.975)))
+  colnames(exp_cum_ci) <- sprintf("expected_cumulative_%s",
+                                  c("025", "050", "500", "950", "975"))
+  averaged$selected <- cbind(averaged$selected, exp_cum_ci)
+
   ## adjust format
   if (across_networks){
 
@@ -364,19 +380,17 @@ headstart_df <- function(df,
 
     return(df)
   }
-  ## adjust cumulative ahd expected_cumulative
-  df$cumulative <-
-    df$cumulative - do.call(c, lapply(unique(df$method), function(method){
+  ## adjust cumulative
+  nms <- names(df)[grepl("cumulative",
+                         names(df))]
+  df[nms] <- lapply(nms, function(nm){
+
+    df[[nm]] - do.call(c, lapply(unique(df$method), function(method){
 
       rep(sum(df[(bool_method <- df$method == method) &
-                   df$t == 0, "cumulative"]), sum(bool_method))
+                   df$t == 0, nm]), sum(bool_method))
     }))
-  df$expected_cumulative <-
-    df$expected_cumulative - do.call(c, lapply(unique(df$method), function(method){
-
-      rep(sum(df[(bool_method <- df$method == method) &
-                   df$t == 0, "expected_cumulative"]), sum(bool_method))
-    }))
+  })
   if (trim){
 
     df <- df[df$t > 0,]
@@ -460,7 +474,7 @@ df2line <- function(df,
   }
   df$method <- factor(labels[df$method], levels = labels)
 
-  metrics <- metrics[metrics %in% names(df)]
+  metrics <- metrics[metrics %in% c(names(df), "expected_cumulative_")]
   ylabs <- sapply(metrics, function(x){
 
     switch(x,
@@ -473,6 +487,7 @@ df2line <- function(df,
            greedy_regret = "Expected Regret of Arm with Highest Estimate",
            cumulative = "Empirical Cumulative Regret",
            expected_cumulative = "Cumulative Regret",
+           expected_cumulative_ = "Cumulative Regret 90% Intervals",
            mu_est = "MSE of Estimated Rewards",
            dag_mpg = "JI of MPG Estimate",
            cpdag_mpg = "JI of CPDAG of MPG Estimate",
@@ -484,15 +499,34 @@ df2line <- function(df,
   })
   plotlist <- lapply(seq_len(length(metrics)), function(i){
 
-    ggplot(data = df,
-           aes(x = t, y = get(metrics[i]), group = method,
-               color = method, lty = method)) +
-      geom_line(size = 1) +
-      theme_fixed(...) +
-      ylab(ylabs[i]) +
-      scale_fill_manual(values = colors, breaks = labels) +
-      scale_color_manual(values = colors, breaks = labels) +
-      scale_linetype_manual(values = ltys, breaks = labels)
+    if (metrics[i] == "expected_cumulative_"){
+
+      ggplot(data = df,
+             aes(x = t, y = expected_cumulative, group = method,
+                 color = method, lty = method)) +
+        geom_line(size = 1) +
+        geom_ribbon(aes(ymin = expected_cumulative_050,
+                        ymax = expected_cumulative_950,
+                        group = method, fill = method),
+                    alpha = 0.2, linetype = 0) +
+        theme_fixed(...) +
+        ylab(ylabs[i]) +
+        scale_fill_manual(values = colors, breaks = labels) +
+        scale_color_manual(values = colors, breaks = labels) +
+        scale_linetype_manual(values = ltys, breaks = labels)
+
+    } else{
+
+      ggplot(data = df,
+             aes(x = t, y = get(metrics[i]), group = method,
+                 color = method, lty = method)) +
+        geom_line(size = 1) +
+        theme_fixed(...) +
+        ylab(ylabs[i]) +
+        scale_fill_manual(values = colors, breaks = labels) +
+        scale_color_manual(values = colors, breaks = labels) +
+        scale_linetype_manual(values = ltys, breaks = labels)
+    }
   })
   if (length(plotlist) > 1){
 
