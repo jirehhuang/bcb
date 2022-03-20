@@ -114,10 +114,10 @@ apply_method <- function(t,
 
           t_ <- sapply(unique(sapply(rounds$arms, `[[`, "node")), function(node){
 
-            a <- match(node, sapply(rounds$arms, `[[`, "node"))
-
-            ifelse(n_ess[a] == 0, 0,
-                   rt(n = 1, df = n_ess[a] + n_int[a]))
+            a <- match(node, sapply(rounds$arms,
+                                    `[[`, "node"))
+            rt(n = 1, df = max(1,
+                               n_ess[a] + n_int[a]))
           })
           criteria <- sapply(seq_len(length(rounds$arms)), function(a){
 
@@ -142,18 +142,30 @@ apply_method <- function(t,
 
         ## prioritize arms with n_int = 0
         criteria <- ifelse(n_int > 0, criteria,
-                           max(c(criteria + 1, rounds$mu_true), na.rm = TRUE))
+                           max(c(criteria[is.finite(criteria)] + 1,
+                                 rounds$mu_true), na.rm = TRUE))
 
       } else if (settings$bcb_criteria == "tuned"){
 
         if (settings$type == "bn.fit.gnet"){
 
-          browser()  # TODO:
+          se <- rounds$se_int[t-1,]
+          v <- (se^2 * n_int) +
+            sqrt(2 * log(t - settings$n_obs) / n_int)
 
         } else if (settings$type == "bn.fit.dnet"){
 
-          browser()  # TODO:
+          v <- pmin(0.25,
+                    mu * (1 - mu) + sqrt(2 * log(t - settings$n_obs) / n_int))
         }
+        criteria <-
+          mu + settings$c * sqrt(log(t - settings$n_obs) / n_int * v)
+
+        ## prioritize arms with n_int = 0
+        criteria <- ifelse(n_int > 0, criteria,
+                           max(c(criteria[is.finite(criteria)] + 1,
+                                 rounds$mu_true), na.rm = TRUE))
+
       } else if (settings$bcb_criteria == "csd"){
 
         criteria <-
@@ -175,7 +187,8 @@ apply_method <- function(t,
 
         ## prioritize arms with n_int = 0
         criteria <- ifelse(n_int > 0, criteria,
-                           max(c(criteria + 1, rounds$mu_true), na.rm = TRUE))
+                           max(c(criteria[is.finite(criteria)] + 1,
+                                 rounds$mu_true), na.rm = TRUE))
       }
     } else if (method == "ucb"){
 
@@ -188,18 +201,29 @@ apply_method <- function(t,
 
         ## prioritize arms with n_int = 0
         criteria <- ifelse(n_int > 0, criteria,
-                           max(c(criteria + 1, rounds$mu_true), na.rm = TRUE))
+                           max(c(criteria[is.finite(criteria)] + 1,
+                                 rounds$mu_true), na.rm = TRUE))
 
       } else if (settings$ucb_criteria == "tuned"){
 
         if (settings$type == "bn.fit.gnet"){
 
-          browser()  # TODO:
+          se <- rounds$se_int[t-1,]
+          v <- (se^2 * n_int) +
+            sqrt(2 * log(t - settings$n_obs) / n_int)
 
         } else if (settings$type == "bn.fit.dnet"){
 
-          browser()  # TODO:
+          v <- pmin(0.25,
+                    mu * (1 - mu) + sqrt(2 * log(t - settings$n_obs) / n_int))
         }
+        criteria <-
+          mu + settings$c * sqrt(log(t - settings$n_obs) / n_int * v)
+
+        ## prioritize arms with n_int = 0
+        criteria <- ifelse(n_int > 0, criteria,
+                           max(c(criteria[is.finite(criteria)] + 1,
+                                 rounds$mu_true), na.rm = TRUE))
       }
     } else if (method == "ts"){
 
