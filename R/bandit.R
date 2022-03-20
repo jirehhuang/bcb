@@ -103,38 +103,8 @@ apply_method <- function(t,
 
       if (settings$bcb_criteria == "bcb"){
 
-        if (settings$type == "bn.fit.gnet"){
-
-          criteria <-
-            mu + se * settings$c * sqrt(log(t - settings$n_obs))
-
-        } else if (settings$type == "bn.fit.dnet"){
-
-          # post <- method2post(method = method)
-          # dag <- switch(post,
-          #               star = bnlearn::amat(settings$bn.fit),
-          #               eg = bnlearn::amat(bnlearn::empty.graph(settings$nodes)),
-          #               rounds[[post]][t-1,])
-          # dag <- row2mat(row = dag, nodes = settings$nodes)
-
-          if (FALSE &&  # TODO: not always applicable for atomic interventions
-              grepl("bma|mpg", method)){  # TODO: implement for other methods
-
-            dag <- row2mat(row = rounds$bma[t-1,], nodes = settings$nodes)
-            mult <- unname(dag[sapply(rounds$arms, `[[`,
-                                      "node"), settings$target])
-          } else{
-
-            mult <- rep(1, length(mu))
-          }
-          criteria <- mu +
-            se * settings$c * sqrt(log(t - settings$n_obs)) * mult
-        }
-      } else if (settings$bcb_criteria == "ucb"){
-
-        n_int <- pmax(1, n_int)
         criteria <-
-          mu + settings$c * sqrt(log(t - settings$n_obs) / n_int)
+          mu + settings$c * se * sqrt(log(t - settings$n_obs))
 
       } else if (settings$bcb_criteria == "ts"){
 
@@ -153,16 +123,6 @@ apply_method <- function(t,
 
             mu[a] + t_[rounds$arms[[a]]$node] * se[a] * rounds$arms[[a]]$value
           })
-          ## TODO: check whether symmetric (above) or indep (below) criteria
-          # t_ <- sapply(seq_len(length(rounds$arms)), function(a){
-          #
-          #   rt(n = 1, df = n_ess[a] + n_int[a])
-          # })
-          # criteria <- sapply(seq_len(length(rounds$arms)), function(a){
-          #
-          #   mu[a] + t_[a] * se[a]
-          # })
-
         } else if (settings$type == "bn.fit.dnet"){
 
           ab <- n_int + n_ess
@@ -173,8 +133,31 @@ apply_method <- function(t,
         }
       } else if (settings$bcb_criteria == "uq"){
 
+        browser()  # TODO: upper quantile
+
+      } else if (settings$bcb_criteria == "c"){
+
         criteria <-
-          mu + se * settings$c
+          mu + settings$c * sqrt(log(t - settings$n_obs) / n_int)
+
+        ## prioritize arms with n_int = 0
+        criteria <- ifelse(n_int > 0, criteria,
+                           max(c(criteria + 1, rounds$mu_true), na.rm = TRUE))
+
+      } else if (settings$bcb_criteria == "tuned"){
+
+        if (settings$type == "bn.fit.gnet"){
+
+          browser()  # TODO:
+
+        } else if (settings$type == "bn.fit.dnet"){
+
+          browser()  # TODO:
+        }
+      } else if (settings$bcb_criteria == "csd"){
+
+        criteria <-
+          mu + settings$c * se
       }
     } else if (method == "random"){
 
@@ -190,20 +173,34 @@ apply_method <- function(t,
 
         criteria <- rounds$mu_int[t-1,]
 
-        ## if n_int = 0, investigate the arm
+        ## prioritize arms with n_int = 0
         criteria <- ifelse(n_int > 0, criteria,
                            max(c(criteria + 1, rounds$mu_true), na.rm = TRUE))
       }
     } else if (method == "ucb"){
 
       mu <- rounds$mu_int[t-1,]
-      criteria <-
-        mu + settings$c * sqrt(log(t - settings$n_obs) / n_int)
 
-      ## if n_int = 0, investigate the arm
-      criteria <- ifelse(n_int > 0, criteria,
-                         max(c(criteria + 1, rounds$mu_true), na.rm = TRUE))
+      if (settings$ucb_criteria == "c"){
 
+        criteria <-
+          mu + settings$c * sqrt(log(t - settings$n_obs) / n_int)
+
+        ## prioritize arms with n_int = 0
+        criteria <- ifelse(n_int > 0, criteria,
+                           max(c(criteria + 1, rounds$mu_true), na.rm = TRUE))
+
+      } else if (settings$ucb_criteria == "tuned"){
+
+        if (settings$type == "bn.fit.gnet"){
+
+          browser()  # TODO:
+
+        } else if (settings$type == "bn.fit.dnet"){
+
+          browser()  # TODO:
+        }
+      }
     } else if (method == "ts"){
 
       list2env(settings[c("mu_0", "nu_0", "b_0", "a_0")],
@@ -1150,6 +1147,12 @@ check_settings <- function(settings,
   settings$nodes <- names(bn.fit)
   settings$nnodes <- length(settings$nodes)
 
+  ## check type
+  if (is.null(settings$type)){
+    settings$type <- class(bn.fit)[2]
+    debug_cli(debug >= 3, "", "bn.fit type = {settings$type}")
+  }
+
   ## check method
   if (is.null(settings$method) ||
       ! ((settings$method <- tolower(settings$method)) %in%
@@ -1297,10 +1300,19 @@ check_settings <- function(settings,
 
   } else if (settings$method %in% c("ucb")){
 
+    ## check ucb_criteria
+    if (is.null(settings$ucb_criteria) ||
+        !is.character(settings$ucb_criteria) ||
+        !settings$ucb_criteria %in% avail_ucb_criteria){
+      settings$ucb_criteria <- "c"
+      debug_cli(debug >= 3, "", "default ucb_criteria = {settings$ucb_criteria} for ucb")
+    }
+
     ## check c
     if (is.null(settings$c) ||
-        settings$c < 0){
-      settings$c <- 1
+        is.na(settings$c) ||
+        settings$c <= 0){
+      settings$c <- ifelse(settings$ucb_criteria == "tuned", 1, sqrt(2))
       debug_cli(debug >= 3, "", "default c = {settings$c} for ucb")
     }
 
@@ -1334,13 +1346,6 @@ check_settings <- function(settings,
 
     ## TODO: figure out better names
 
-    ## check c
-    if (is.null(settings$c) ||
-        settings$c < 0){
-      settings$c <- 1
-      debug_cli(debug >= 3, "", "default c = {settings$c} for bcb")
-    }
-
     ## check bcb_combine
     if (is.null(settings$bcb_combine) ||
         !is.character(settings$bcb_combine) ||
@@ -1356,17 +1361,19 @@ check_settings <- function(settings,
       settings$bcb_criteria <- "bcb"
       debug_cli(debug >= 3, "", "default bcb_criteria = {settings$bcb_criteria} for bcb")
     }
+
+    ## check c
+    if (is.null(settings$c) ||
+        is.na(settings$c) ||
+        settings$c <= 0){
+      settings$c <- 1
+      debug_cli(debug >= 3, "", "default c = {settings$c} for bcb")
+    }
   }
   for (i in c("epsilon", "c", "mu_0", "nu_0", "b_0", "a_0",
               "bcb_combine", "bcb_criteria")){
     if (is.null(settings[[i]]))
       settings[[i]] <- NA
-  }
-
-  ## check type
-  if (is.null(settings$type)){
-    settings$type <- class(bn.fit)[2]
-    debug_cli(debug >= 3, "", "bn.fit type = {settings$type}")
   }
 
   ## check temp_dir
@@ -1499,7 +1506,7 @@ check_settings <- function(settings,
   nms <- c("method", "target", "run", "n_obs", "n_int",
            "initial_n_ess", "n_t", "max_cache", "int_parents",
            "success", "epsilon", "c", "mu_0", "nu_0", "b_0", "a_0",
-           "bcb_combine", "bcb_criteria", "score", "restrict",
+           "ucb_criteria", "bcb_combine", "bcb_criteria", "score", "restrict",
            "alpha", "max.sx", "max_parents", "threshold", "eta", "minimal",
            "nodes", "nnodes", "type", "temp_dir", "aps_dir", "mds_dir",
            "id", "rounds0", "data_obs")

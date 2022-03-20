@@ -55,6 +55,13 @@ avail_restrict <- c("none",  # no restriction
 
 
 
+# Available ucb methods for determining criteria
+
+avail_ucb_criteria <- c("c",      # default unknown distribution with c
+                        "tuned")  # ucb-tuned
+
+
+
 # Available bcb methods for combining obs and int estimates
 
 avail_bcb_combine <- c("average",    # weighted average
@@ -64,10 +71,12 @@ avail_bcb_combine <- c("average",    # weighted average
 
 # Available bcb methods for determining criteria
 
-avail_bcb_criteria <- c("bcb",  # default
-                        "ucb",  # upper confidence bound
-                        "ts",   # thompson sampling
-                        "uq")   # upper quantile; ucb with no log(t)
+avail_bcb_criteria <- c("bcb",    # default with c
+                        "ts",     # thompson sampling
+                        "uq",     # upper quantile with delta
+                        "c",      # ucb unknown distribution with c
+                        "tuned",  # ucb-tuned
+                        "csd")    # +c*sd
 
 
 
