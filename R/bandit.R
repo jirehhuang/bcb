@@ -227,8 +227,6 @@ apply_method <- function(t,
       }
     } else if (method == "ts"){
 
-      list2env(settings[c("mu_0", "nu_0", "b_0", "a_0")],
-               envir = environment())
       mu <- rounds$mu_est[t-1,]
 
       if (settings$type == "bn.fit.gnet"){
@@ -236,36 +234,61 @@ apply_method <- function(t,
         se <- rounds$se_est[t-1,]
         n_ess <- rounds$n_ess[t-1,]
 
-        if (mu_0 == 0){
+        ## symmetric criteria
+        t_ <- sapply(unique(sapply(rounds$arms, `[[`, "node")), function(node){
 
-          ## symmetric criteria
-          t_ <- sapply(unique(sapply(rounds$arms, `[[`, "node")), function(node){
+          a <- match(node, sapply(rounds$arms,
+                                  `[[`, "node"))
+          rt(n = 1, df = max(1,
+                             n_ess[a] + n_int[a]))
+        })
+        criteria <- sapply(seq_len(length(rounds$arms)), function(a){
 
-            a <- match(node, sapply(rounds$arms, `[[`, "node"))
-            rt(n = 1, df = n_ess[a] + n_int[a])
-          })
-          criteria <- sapply(seq_len(length(rounds$arms)), function(a){
+          mu[a] + t_[rounds$arms[[a]]$node] * se[a] * rounds$arms[[a]]$value
+        })
 
-            mu[a] + t_[rounds$arms[[a]]$node] * se[a] * rounds$arms[[a]]$value
-          })
-        } else{
-
-          ## independent criteria
-          t_ <- sapply(seq_len(length(rounds$arms)), function(a){
-
-            rt(n = 1, df = n_ess[a] + n_int[a])
-          })
-          criteria <- sapply(seq_len(length(rounds$arms)), function(a){
-
-            mu[a] + t_[a] * se[a]
-          })
-        }
       } else if (settings$type == "bn.fit.dnet"){
+
+        list2env(settings[c("b_0", "a_0")],
+                 envir = environment())
 
         ab <- n_int + a_0 + b_0
         criteria <- sapply(seq_len(length(rounds$arms)), function(a){
 
           rbeta(n = 1, shape1 = ab[a] * mu[a], shape2 = ab[a] * (1 - mu[a]))
+        })
+      }
+    } else if (method == "bofu"){
+
+      mu <- rounds$mu_est[t-1,]
+
+      if (settings$type == "bn.fit.gnet"){
+
+        se <- rounds$se_est[t-1,]
+        n_ess <- rounds$n_ess[t-1,]
+
+        ## symmetric criteria
+        t_ <- sapply(unique(sapply(rounds$arms, `[[`, "node")), function(node){
+
+          a <- match(node, sapply(rounds$arms,
+                                  `[[`, "node"))
+          qt(1 - settings$delta,
+             df = max(1, n_ess[a] + n_int[a]))
+        })
+        criteria <- sapply(seq_len(length(rounds$arms)), function(a){
+
+          mu[a] + t_[rounds$arms[[a]]$node] * se[a] * rounds$arms[[a]]$value
+        })
+      } else if (settings$type == "bn.fit.dnet"){
+
+        list2env(settings[c("b_0", "a_0")],
+                 envir = environment())
+
+        ab <- n_int + a_0 + b_0
+        criteria <- sapply(seq_len(length(rounds$arms)), function(a){
+
+          qbeta(1 - settings$delta,
+                shape1 = ab[a] * mu[a], shape2 = ab[a] * (1 - mu[a]))
         })
       }
     }
@@ -553,7 +576,7 @@ update_rounds <- function(t,
                 eg = bnlearn::amat(bnlearn::empty.graph(settings$nodes)),
                 rounds[[post]][t,])
 
-  if (method == "ts"){
+  if (method %in% c("ts", "bofu")){
 
     rounds <- update_ts(t = t, settings = settings, rounds = rounds)
 
@@ -1316,6 +1339,7 @@ check_settings <- function(settings,
 
     ## check epsilon
     if (is.null(settings$epsilon) ||
+        is.na(settings$epsilon) ||
         settings$epsilon > 1 ||
         settings$epsilon < 0){
       settings$epsilon <- 0.1
@@ -1340,11 +1364,12 @@ check_settings <- function(settings,
       debug_cli(debug >= 3, "", "default c = {settings$c} for ucb")
     }
 
-  } else if (settings$method == "ts"){
+  } else if (settings$method %in% c("ts", "bofu")){
 
     ## check mu_0
-    if (is.null(settings$mu_0)){
-      settings$mu_0 <- 1
+    if (is.null(settings$mu_0) ||
+        settings$mu_0 != 0){
+      settings$mu_0 <- 0  # TODO: remove to require symmetric criteria
       debug_cli(debug >= 3, "", "default mu_0 = {settings$mu_0} for ts")
     }
 
@@ -1364,6 +1389,18 @@ check_settings <- function(settings,
     if (is.null(settings$a_0) || settings$a_0 <= 0){
       settings$a_0 <- 1
       debug_cli(debug >= 3, "", "default a_0 = {settings$a_0} for ts")
+    }
+
+    if (settings$method == "bofu"){
+
+      ## check delta
+      if (is.null(settings$delta) ||
+          is.na(settings$delta) ||
+          settings$delta >= 1 ||
+          settings$delta <= 0){
+        settings$delta <- 1e-2
+        debug_cli(debug >= 3, "", "default delta = {settings$delta} for bofu")
+      }
     }
 
   } else if (grepl("bcb", settings$method)){
@@ -1529,7 +1566,7 @@ check_settings <- function(settings,
   ## sort settings
   nms <- c("method", "target", "run", "n_obs", "n_int",
            "initial_n_ess", "n_t", "max_cache", "int_parents",
-           "success", "epsilon", "c", "mu_0", "nu_0", "b_0", "a_0",
+           "success", "epsilon", "c", "mu_0", "nu_0", "b_0", "a_0", "delta",
            "ucb_criteria", "bcb_combine", "bcb_criteria", "score", "restrict",
            "alpha", "max.sx", "max_parents", "threshold", "eta", "minimal",
            "nodes", "nnodes", "type", "temp_dir", "aps_dir", "mds_dir",

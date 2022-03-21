@@ -23,6 +23,7 @@ avail_methods <- c("cache",     # cache observational rounds
                    "greedy",    # (epsilon)-greedy interventions
                    "ucb",       # upper-confidence bounds
                    "ts",        # thompson sampling
+                   "bofu",      # bayesian optimism in the face of uncertainty
                    "bcb",       # bayesian causal bandit; default bma
                    "bcb-star",  # true underlying dag
                    "bcb-bma",   # bayesian model averaging

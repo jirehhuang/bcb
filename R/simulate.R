@@ -428,7 +428,7 @@ check_method_grid <- function(method_grid){
   ## column names
   nms <- c("target", "n_run", "n_obs", "n_int", "initial_n_ess",
            "n_t", "max_cache", "int_parents", "success", "epsilon", "c",
-           "mu_0", "nu_0", "b_0", "a_0", "ucb_criteria", "bcb_combine",
+           "mu_0", "nu_0", "b_0", "a_0", "delta", "ucb_criteria", "bcb_combine",
            "bcb_criteria", "score", "restrict", "alpha", "max.sx",
            "max_parents", "threshold", "eta", "minimal", "unique_make")
 
