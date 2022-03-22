@@ -27,6 +27,7 @@ avail_methods <- c("cache",     # cache observational rounds
                    "bcb",       # bayesian causal bandit; default bma
                    "bcb-star",  # true underlying dag
                    "bcb-bma",   # bayesian model averaging
+                   "bcb-bofu",  # bayesian optimism in the face of uncertainty
                    "bcb-mpg",   # median probability graph
                    "bcb-mds",   # thompson sampling via modular dag sampling
                    "bcb-gies",  # greedy interventional equivalence search

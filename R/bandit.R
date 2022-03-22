@@ -101,7 +101,63 @@ apply_method <- function(t,
       mu <- rounds$mu_est[t-1,]
       se <- rounds$se_est[t-1,]
 
-      if (settings$bcb_criteria == "bcb"){
+      if (settings$method == "bcb-bofu"){
+
+        if (settings$type == "bn.fit.gnet"){
+
+          criteria <- sapply(seq_len(length(rounds$arms)), function(a){
+
+            node <- rounds$arms[[a]]$node
+            b <- match(rounds$arms[[a]]$value,
+                       rounds$node_values[[node]])
+
+            prob <- rounds$ps[[node]][,"prob"]
+            df <- n_int[a] +
+              rounds$bda[[node]][[settings$target]]$n_ess1
+            mu <- rounds$bda[[node]][[settings$target]]$mu1_est *
+              rounds$arms[[a]]$value
+            se <- rounds$bda[[node]][[settings$target]]$se1_est
+
+            t_ <- qt(1 - settings$delta, df = df)
+            par0 <- sum(prob * (mu + t_ * se))
+
+            fn <- function(par){
+
+              abs(1 - settings$delta -
+                    sum(prob * pt((par - mu) / se, df = df)))
+            }
+            optim(par0, fn, method = "Brent",
+                  lower = min(mu) - 1e2 * max(se),
+                  upper = max(mu) + 1e2 * max(se))$par
+          })
+
+        } else if (settings$type == "bn.fit.dnet"){
+
+          criteria <- sapply(seq_len(length(rounds$arms)), function(a){
+
+            node <- rounds$arms[[a]]$node
+            b <- match(rounds$arms[[a]]$value,
+                       rounds$node_values[[node]])
+
+            prob <- rounds$ps[[node]][,"prob"]
+            ab <- n_int[a] +
+              rounds$bda[[node]][[settings$target]][[sprintf("n_ess%g", b)]]
+            mu <- rounds$bda[[node]][[settings$target]][[sprintf("mu%g_est", b)]]
+
+            shape1 <- ab * mu
+            shape2 <- ab * (1 - mu)
+
+            par0 <- sum(prob * qbeta(1 - settings$delta,
+                                     shape1 = shape1, shape2 = shape2))
+            fn <- function(par){
+
+              abs(1 - settings$delta -
+                    sum(prob * pbeta(par, shape1 = shape1, shape2 = shape2)))
+            }
+            optim(par0, fn, method = "Brent", lower = 0, upper = 1)$par
+          })
+        }
+      } else if (settings$bcb_criteria == "bcb"){
 
         criteria <-
           mu + settings$c * se * sqrt(log(t - settings$n_obs))
@@ -481,7 +537,7 @@ update_rounds <- function(t,
     }
   }
   if (bool_ps <- !minimal ||  # not minimal, or
-      method %in% c("bcb-bma", "bcb-mpg",  # need ps updates, or
+      method %in% c("bcb-bma", "bcb-bofu", "bcb-mpg",  # need ps updates, or
                     "bcb-mds", "bcb-gies") ||
       (grepl("bcb", method) &&  # need initial ps
        length(rounds$ps) == 0)){

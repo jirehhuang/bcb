@@ -102,7 +102,7 @@ compute_bda <- function(data,
           ## have not computed bda effect
           if (is.na(temp[[j]][l, 1])){
 
-            temp[[j]][l, seq_len(ncol(temp[[j]]))] <- numeric(ncol(temp[[j]]))
+            temp[[j]][l, seq_len(ncol(temp[[j]])-5)] <- numeric(ncol(temp[[j]])-5)
             temp[[j]]$t_bda[l] <- t
             temp[[j]][l, c("n_bda", "n_ess1", "n_ess2")] <- n
 
