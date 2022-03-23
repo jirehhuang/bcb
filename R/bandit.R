@@ -151,14 +151,29 @@ apply_method <- function(t,
             shape1 <- ab * mu
             shape2 <- ab * (1 - mu)
 
-            par0 <- sum(prob * qbeta(1 - settings$delta,
-                                     shape1 = shape1, shape2 = shape2))
-            fn <- function(par){
+            # fn <- function(par){
+            #
+            #   abs(1 - settings$delta -
+            #         sum(prob * pbeta(par, shape1 = shape1, shape2 = shape2)))
+            # }
+            # n_steps <- 1e3
+            # bounds <- order(sapply(seq(1 / n_steps, 1,
+            #                            by = 1 / n_steps), fn))
+            # bounds <- range(bounds[seq_len(5)]) / n_steps
+            # opt <- optim(mean(bounds), fn, method = "Brent",
+            #              lower = bounds[1], upper = bounds[2],
+            #              control = list(maxit = 1e3,
+            #                             abstol = 1e-9))
+            # opt$par
 
-              abs(1 - settings$delta -
-                    sum(prob * pbeta(par, shape1 = shape1, shape2 = shape2)))
+            fun <- function(par){
+
+              sum(prob * pbeta(par, shape1 = shape1,
+                               shape2 = shape2)) - (1 - settings$delta)
             }
-            optim(par0, fn, method = "Brent", lower = 0, upper = 1)$par
+            bis <- pracma::bisect(fun = fun, a = 0, b = 1,
+                                  maxiter = 200)
+            bis$root
           })
         }
       } else if (settings$bcb_criteria == "bcb"){
