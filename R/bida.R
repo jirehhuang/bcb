@@ -144,7 +144,7 @@ compute_scores <- function(data,
 
           ## compute and store score
           if (settings$minimal &&
-              !settings$method %in% c("bcb-bma", "bcb-mpg",
+              !settings$method %in% c("bcb-bma", "bcb-bofu", "bcb-mpg",
                                       "bcb-mds", "bcb-gies")){
             scr <- -1
 

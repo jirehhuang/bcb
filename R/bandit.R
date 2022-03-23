@@ -144,6 +144,10 @@ apply_method <- function(t,
               rounds$bda[[node]][[settings$target]][[sprintf("n_ess%g", b)]]
             mu <- rounds$bda[[node]][[settings$target]][[sprintf("mu%g_est", b)]]
 
+            ab <- ab[prob > 0]
+            mu <- mu[prob > 0]
+            prob <- prob[prob > 0]
+
             shape1 <- ab * mu
             shape2 <- ab * (1 - mu)
 
