@@ -247,6 +247,11 @@ compute_arp <- function(data,
                         interventions = rep("", nrow(data)),
                         debug = 0){
 
+  ## not currently utilized for dnet
+  if (settings$type == "bn.fit.dnet"){
+
+    return(bnlearn::amat(bnlearn::empty.graph(settings$nodes)))
+  }
   ## load relevant settings
   list2env(settings[c("aps_dir", "nnodes")],
            envir = environment())
