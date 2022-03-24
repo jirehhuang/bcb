@@ -31,6 +31,7 @@ avail_methods <- c("cache",       # cache observational rounds
                    "bcb-bucb",    # bma + bucb with delta
                    "bcb-ts",      # mds + ts
                    "bcb-greedy",  # bma + greedy with epsilon
+                   "bcb-ucb",     # bma + tuned with c
                    "bcb-star",    # true underlying dag
                    "bcb-bma",     # bayesian model averaging
                    "bcb-mpg",     # median probability graph

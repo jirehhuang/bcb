@@ -1489,6 +1489,13 @@ check_settings <- function(settings,
       settings$bcb_criteria <- "greedy"
     }
 
+    ## preset: UCB
+    if (settings$method == "bcb-ucb"){
+      settings$method <- "bcb-bma"
+      settings$bcb_combine <- "conjugate"
+      settings$bcb_criteria <- "tuned"
+    }
+
     ## check bcb_combine
     if (is.null(settings$bcb_combine) ||
         !is.character(settings$bcb_combine) ||
