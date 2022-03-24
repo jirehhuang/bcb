@@ -165,7 +165,7 @@ apply_method <- function(t,
           })
         }
         if (any(!is.finite(criteria)))
-          criteria <- rep(max(rounds$mu_true), length(criteria))
+          criteria <- rep(0, length(criteria))
 
       } else if (settings$bcb_criteria == "ts"){
 
@@ -191,6 +191,16 @@ apply_method <- function(t,
 
             rbeta(n = 1, shape1 = ab[a] * mu[a], shape2 = ab[a] * (1 - mu[a]))
           })
+        }
+      } else if (settings$bcb_criteria == "greedy"){
+
+        if (runif(1) < settings$epsilon){
+
+          criteria <- rep(0, length(rounds$arms))
+
+        } else{
+
+          criteria <- mu
         }
       } else if (settings$bcb_criteria == "c"){
 
@@ -334,7 +344,7 @@ apply_method <- function(t,
         })
       }
       if (any(!is.finite(criteria)))
-        criteria <- rep(max(rounds$mu_true), length(criteria))
+        criteria <- rep(0, length(criteria))
     }
     a <- random_which.max(criteria)
     rounds$criteria[t,] <- criteria
@@ -399,11 +409,11 @@ update_arms <- function(t,
 
 
 
-# Perform Thompson sampling update
+# Perform Bayesian posterior update
 
-update_ts <- function(t,
-                      settings,
-                      rounds){
+update_bayes <- function(t,
+                         settings,
+                         rounds){
 
   list2env(settings[c("mu_0", "nu_0", "b_0", "a_0")],
            envir = environment())
@@ -622,7 +632,7 @@ update_rounds <- function(t,
 
   if (method %in% c("ts", "bucb")){
 
-    rounds <- update_ts(t = t, settings = settings, rounds = rounds)
+    rounds <- update_bayes(t = t, settings = settings, rounds = rounds)
 
   } else{  # else if (method != "ts")
 
@@ -1246,8 +1256,8 @@ check_settings <- function(settings,
 
   ## check method
   if (is.null(settings$method) ||
-      ! ((settings$method <- tolower(settings$method)) %in%
-         avail_methods)){
+      !((settings$method <- tolower(settings$method)) %in%
+        avail_methods)){
     settings$method <- "cache"
     debug_cli(debug >= 3, "", "default method = {settings$method}")
   }
@@ -1377,9 +1387,15 @@ check_settings <- function(settings,
     debug_cli(debug >= 3, "", "default eta = {settings$eta}")
   }
 
-  if (settings$method == "random"){
+  ## check cn-alg presets
+  if (grepl("cn-", settings$method)){
 
-  } else if (settings$method == "greedy"){
+    settings$method <- gsub("cn-", "", settings$method)
+    settings$int_parents <- 2
+  }
+  if (grepl("greedy", settings$method) ||
+      (grepl("bcb", settings$method) &&
+       settings$bcb_criteria == "greedy")){
 
     ## check epsilon
     if (is.null(settings$epsilon) ||
@@ -1389,8 +1405,10 @@ check_settings <- function(settings,
       settings$epsilon <- 0.1
       debug_cli(debug >= 3, "", "default epsilon = {settings$epsilon} for greedy")
     }
+  }
+  if (settings$method == "random"){
 
-  } else if (settings$method %in% c("ucb")){
+  } else if (settings$method %in% c("ucb", "cn-ucb")){
 
     ## check ucb_criteria
     if (is.null(settings$ucb_criteria) ||
@@ -1450,11 +1468,32 @@ check_settings <- function(settings,
 
     ## TODO: figure out better names
 
+    ## preset: Bayes-UCB
+    if (settings$method == "bcb-bucb"){
+      settings$method <- "bcb-bma"
+      settings$bcb_combine <- "conjugate"
+      settings$bcb_criteria <- "bucb"
+    }
+
+    ## preset: Thompson sampling
+    if (settings$method == "bcb-ts"){
+      settings$method <- "bcb-mds"
+      settings$bcb_combine <- "conjugate"
+      settings$bcb_criteria <- "ts"
+    }
+
+    ## preset: epsilon-greedy
+    if (settings$method == "bcb-greedy"){
+      settings$method <- "bcb-bma"
+      settings$bcb_combine <- "conjugate"
+      settings$bcb_criteria <- "greedy"
+    }
+
     ## check bcb_combine
     if (is.null(settings$bcb_combine) ||
         !is.character(settings$bcb_combine) ||
         !settings$bcb_combine %in% avail_bcb_combine){
-      settings$bcb_combine <- "average"
+      settings$bcb_combine <- "conjugate"
       debug_cli(debug >= 3, "", "default bcb_combine = {settings$bcb_combine} for bcb")
     }
 

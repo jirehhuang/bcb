@@ -18,19 +18,25 @@ avail_bnrepository <- c(
 
 # Available bandit methods (i.e. algorithms; policies)
 
-avail_methods <- c("cache",     # cache observational rounds
-                   "random",    # random interventions
-                   "greedy",    # (epsilon)-greedy interventions
-                   "ucb",       # upper-confidence bounds
-                   "ts",        # thompson sampling
-                   "bucb",      # bayes-ucb
-                   "bcb",       # bayesian causal bandit; default bma
-                   "bcb-star",  # true underlying dag
-                   "bcb-bma",   # bayesian model averaging
-                   "bcb-mpg",   # median probability graph
-                   "bcb-mds",   # thompson sampling via modular dag sampling
-                   "bcb-gies",  # greedy interventional equivalence search
-                   "bcb-eg")    # empty graph
+avail_methods <- c("cache",       # cache observational rounds
+                   "random",      # random interventions
+                   "bucb",        # bayes-ucb
+                   "ts",          # thompson sampling
+                   "greedy",      # epsilon-greedy interventions
+                   "ucb",         # upper-confidence bounds
+                   "cn-bucb",     # bucb + int_parents = 2
+                   "cn-ts",       # ts + int_parents = 2
+                   "cn-greedy",   # epsilon-greedy + int_parents = 2
+                   "cn-ucb",      # ucb + int_parents = 2
+                   "bcb-bucb",    # bma + bucb with delta
+                   "bcb-ts",      # mds + ts
+                   "bcb-greedy",  # bma + greedy with epsilon
+                   "bcb-star",    # true underlying dag
+                   "bcb-bma",     # bayesian model averaging
+                   "bcb-mpg",     # median probability graph
+                   "bcb-mds",     # thompson sampling via modular dag sampling
+                   "bcb-gies",    # greedy interventional equivalence search
+                   "bcb-eg")      # empty graph
 
 
 
@@ -65,18 +71,19 @@ avail_ucb_criteria <- c("c",      # default unknown distribution with c
 
 # Available bcb methods for combining obs and int estimates
 
-avail_bcb_combine <- c("average",    # weighted average
-                       "conjugate")  # conjugate
+avail_bcb_combine <- c("conjugate",  # default conjugate
+                       "average")    # TODO: deprecate weighted average
 
 
 
 # Available bcb methods for determining criteria
 
-avail_bcb_criteria <- c("bucb",   # default bayes-ucb with delta
-                        "ts",     # thompson sampling
-                        "c",      # ucb unknown distribution with c
-                        "tuned",  # c with variance
-                        "csd")    # +c*sd
+avail_bcb_criteria <- c("bucb",    # default bayes-ucb with delta
+                        "ts",      # thompson sampling
+                        "greedy",  # greedy with epsilon
+                        "c",       # ucb unknown distribution with c
+                        "tuned",   # ucb using variance with c
+                        "csd")     # +c*sd
 
 
 
