@@ -169,8 +169,30 @@ apply_method <- function(t,
 
       } else if (settings$bcb_criteria == "ts"){
 
-        n_ess <- rounds$n_ess[t-1,]
+        if (settings$method == "bcb-bma"){
 
+          ## independent local sampling of parent sets
+          mu_se_n_ess <- t(sapply(seq_len(length(rounds$arms)), function(a){
+
+            node <- rounds$arms[[a]]$node
+            b <- match(rounds$arms[[a]]$value,
+                       rounds$node_values[[node]])
+
+            prob <- rounds$ps[[node]][,"prob"]
+            l <- sample(length(prob), size = 1, prob = prob)
+
+            rounds$bda[[node]][[settings$target]][l, c(sprintf("mu%g_est", b),
+                                                       sprintf("se%g_est", b),
+                                                       sprintf("n_ess%g", b))]
+          }))
+          mu <- unlist(mu_se_n_ess[,1])
+          se <- unlist(mu_se_n_ess[,2])
+          n_ess <- unlist(mu_se_n_ess[,3])
+
+        } else{
+
+          n_ess <- rounds$n_ess[t-1,]
+        }
         if (settings$type == "bn.fit.gnet"){
 
           t_ <- sapply(unique(sapply(rounds$arms, `[[`, "node")), function(node){
@@ -1475,8 +1497,15 @@ check_settings <- function(settings,
       settings$bcb_criteria <- "bucb"
     }
 
-    ## preset: Thompson sampling
+    ## preset: Thompson sampling with independent local sampling
     if (settings$method == "bcb-ts"){
+      settings$method <- "bcb-bma"
+      settings$bcb_combine <- "conjugate"
+      settings$bcb_criteria <- "ts"
+    }
+
+    ## preset: Thompson sampling with modular DAG sampling
+    if (settings$method == "bcb-mds-ts"){
       settings$method <- "bcb-mds"
       settings$bcb_combine <- "conjugate"
       settings$bcb_criteria <- "ts"

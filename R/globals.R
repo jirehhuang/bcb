@@ -29,7 +29,8 @@ avail_methods <- c("cache",       # cache observational rounds
                    "cn-greedy",   # epsilon-greedy + int_parents = 2
                    "cn-ucb",      # ucb + int_parents = 2
                    "bcb-bucb",    # bma + bucb with delta
-                   "bcb-ts",      # mds + ts
+                   "bcb-ts",      # bma + ts
+                   "bcb-mds-ts",  # mds + ts
                    "bcb-greedy",  # bma + greedy with epsilon
                    "bcb-ucb",     # bma + tuned with c
                    "bcb-star",    # true underlying dag
