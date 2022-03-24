@@ -23,11 +23,10 @@ avail_methods <- c("cache",     # cache observational rounds
                    "greedy",    # (epsilon)-greedy interventions
                    "ucb",       # upper-confidence bounds
                    "ts",        # thompson sampling
-                   "bofu",      # bayesian optimism in the face of uncertainty
+                   "bucb",      # bayes-ucb
                    "bcb",       # bayesian causal bandit; default bma
                    "bcb-star",  # true underlying dag
                    "bcb-bma",   # bayesian model averaging
-                   "bcb-bofu",  # bayesian optimism in the face of uncertainty
                    "bcb-mpg",   # median probability graph
                    "bcb-mds",   # thompson sampling via modular dag sampling
                    "bcb-gies",  # greedy interventional equivalence search
@@ -73,11 +72,10 @@ avail_bcb_combine <- c("average",    # weighted average
 
 # Available bcb methods for determining criteria
 
-avail_bcb_criteria <- c("bcb",    # default with c
+avail_bcb_criteria <- c("bucb",   # default bayes-ucb with delta
                         "ts",     # thompson sampling
-                        "uq",     # upper quantile with delta
                         "c",      # ucb unknown distribution with c
-                        "tuned",  # ucb-tuned
+                        "tuned",  # c with variance
                         "csd")    # +c*sd
 
 

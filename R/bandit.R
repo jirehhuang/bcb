@@ -101,11 +101,16 @@ apply_method <- function(t,
       mu <- rounds$mu_est[t-1,]
       se <- rounds$se_est[t-1,]
 
-      if (settings$method == "bcb-bofu"){
+      if (settings$bcb_criteria == "bucb"){
+
+        alpha <- 1 / ((t - settings$n_obs) * settings$delta)
 
         if (settings$type == "bn.fit.gnet"){
 
           criteria <- sapply(seq_len(length(rounds$arms)), function(a){
+
+            if (alpha == 0 || alpha == 1)
+              return(ifelse(alpha == 0, -Inf, Inf))
 
             node <- rounds$arms[[a]]$node
             b <- match(rounds$arms[[a]]$value,
@@ -118,19 +123,17 @@ apply_method <- function(t,
               rounds$arms[[a]]$value
             se <- rounds$bda[[node]][[settings$target]]$se1_est
 
-            t_ <- qt(1 - settings$delta, df = df)
-            par0 <- sum(prob * (mu + t_ * se))
+            fun <- function(par){
 
-            fn <- function(par){
-
-              abs(1 - settings$delta -
-                    sum(prob * pt((par - mu) / se, df = df)))
+              sum(prob * pt((par - mu) / se,
+                            df = df)) - (1 - alpha)
             }
-            optim(par0, fn, method = "Brent",
-                  lower = min(mu) - 1e2 * max(se),
-                  upper = max(mu) + 1e2 * max(se))$par
+            bis <- pracma::bisect(fun = fun,
+                                  a = min(mu) - 1e2 * max(se),
+                                  b = max(mu) + 1e2 * max(se),
+                                  maxiter = 200)
+            bis$root
           })
-
         } else if (settings$type == "bn.fit.dnet"){
 
           criteria <- sapply(seq_len(length(rounds$arms)), function(a){
@@ -151,35 +154,18 @@ apply_method <- function(t,
             shape1 <- ab * mu
             shape2 <- ab * (1 - mu)
 
-            # fn <- function(par){
-            #
-            #   abs(1 - settings$delta -
-            #         sum(prob * pbeta(par, shape1 = shape1, shape2 = shape2)))
-            # }
-            # n_steps <- 1e3
-            # bounds <- order(sapply(seq(1 / n_steps, 1,
-            #                            by = 1 / n_steps), fn))
-            # bounds <- range(bounds[seq_len(5)]) / n_steps
-            # opt <- optim(mean(bounds), fn, method = "Brent",
-            #              lower = bounds[1], upper = bounds[2],
-            #              control = list(maxit = 1e3,
-            #                             abstol = 1e-9))
-            # opt$par
-
             fun <- function(par){
 
               sum(prob * pbeta(par, shape1 = shape1,
-                               shape2 = shape2)) - (1 - settings$delta)
+                               shape2 = shape2)) - (1 - alpha)
             }
             bis <- pracma::bisect(fun = fun, a = 0, b = 1,
                                   maxiter = 200)
             bis$root
           })
         }
-      } else if (settings$bcb_criteria == "bcb"){
-
-        criteria <-
-          mu + settings$c * se * sqrt(log(t - settings$n_obs))
+        if (any(!is.finite(criteria)))
+          criteria <- rep(max(rounds$mu_true), length(criteria))
 
       } else if (settings$bcb_criteria == "ts"){
 
@@ -206,10 +192,6 @@ apply_method <- function(t,
             rbeta(n = 1, shape1 = ab[a] * mu[a], shape2 = ab[a] * (1 - mu[a]))
           })
         }
-      } else if (settings$bcb_criteria == "uq"){
-
-        browser()  # TODO: upper quantile
-
       } else if (settings$bcb_criteria == "c"){
 
         criteria <-
@@ -222,24 +204,8 @@ apply_method <- function(t,
 
       } else if (settings$bcb_criteria == "tuned"){
 
-        if (settings$type == "bn.fit.gnet"){
-
-          se <- rounds$se_int[t-1,]
-          v <- (se^2 * n_int) +
-            sqrt(2 * log(t - settings$n_obs) / n_int)
-
-        } else if (settings$type == "bn.fit.dnet"){
-
-          v <- pmin(0.25,
-                    mu * (1 - mu) + sqrt(2 * log(t - settings$n_obs) / n_int))
-        }
         criteria <-
-          mu + settings$c * sqrt(log(t - settings$n_obs) / n_int * v)
-
-        ## prioritize arms with n_int = 0
-        criteria <- ifelse(n_int > 0, criteria,
-                           max(c(criteria[is.finite(criteria)] + 1,
-                                 rounds$mu_true), na.rm = TRUE))
+          mu + settings$c * se * sqrt(log(t - settings$n_obs))
 
       } else if (settings$bcb_criteria == "csd"){
 
@@ -333,9 +299,10 @@ apply_method <- function(t,
           rbeta(n = 1, shape1 = ab[a] * mu[a], shape2 = ab[a] * (1 - mu[a]))
         })
       }
-    } else if (method == "bofu"){
+    } else if (method == "bucb"){
 
       mu <- rounds$mu_est[t-1,]
+      alpha <- 1 / ((t - settings$n_obs) * settings$delta)
 
       if (settings$type == "bn.fit.gnet"){
 
@@ -347,7 +314,7 @@ apply_method <- function(t,
 
           a <- match(node, sapply(rounds$arms,
                                   `[[`, "node"))
-          qt(1 - settings$delta,
+          qt(1 - alpha,
              df = max(1, n_ess[a] + n_int[a]))
         })
         criteria <- sapply(seq_len(length(rounds$arms)), function(a){
@@ -362,10 +329,12 @@ apply_method <- function(t,
         ab <- n_int + a_0 + b_0
         criteria <- sapply(seq_len(length(rounds$arms)), function(a){
 
-          qbeta(1 - settings$delta,
+          qbeta(1 - alpha,
                 shape1 = ab[a] * mu[a], shape2 = ab[a] * (1 - mu[a]))
         })
       }
+      if (any(!is.finite(criteria)))
+        criteria <- rep(max(rounds$mu_true), length(criteria))
     }
     a <- random_which.max(criteria)
     rounds$criteria[t,] <- criteria
@@ -556,7 +525,7 @@ update_rounds <- function(t,
     }
   }
   if (bool_ps <- !minimal ||  # not minimal, or
-      method %in% c("bcb-bma", "bcb-bofu", "bcb-mpg",  # need ps updates, or
+      method %in% c("bcb-bma", "bcb-mpg",  # need ps updates, or
                     "bcb-mds", "bcb-gies") ||
       (grepl("bcb", method) &&  # need initial ps
        length(rounds$ps) == 0)){
@@ -651,7 +620,7 @@ update_rounds <- function(t,
                 eg = bnlearn::amat(bnlearn::empty.graph(settings$nodes)),
                 rounds[[post]][t,])
 
-  if (method %in% c("ts", "bofu")){
+  if (method %in% c("ts", "bucb")){
 
     rounds <- update_ts(t = t, settings = settings, rounds = rounds)
 
@@ -1439,7 +1408,7 @@ check_settings <- function(settings,
       debug_cli(debug >= 3, "", "default c = {settings$c} for ucb")
     }
 
-  } else if (settings$method %in% c("ts", "bofu")){
+  } else if (settings$method %in% c("ts", "bucb")){
 
     ## check mu_0
     if (is.null(settings$mu_0) ||
@@ -1466,15 +1435,14 @@ check_settings <- function(settings,
       debug_cli(debug >= 3, "", "default a_0 = {settings$a_0} for ts")
     }
 
-    if (settings$method == "bofu"){
+    if (settings$method == "bucb"){
 
       ## check delta
       if (is.null(settings$delta) ||
           is.na(settings$delta) ||
-          settings$delta >= 1 ||
           settings$delta <= 0){
-        settings$delta <- 1e-2
-        debug_cli(debug >= 3, "", "default delta = {settings$delta} for bofu")
+        settings$delta <- 1
+        debug_cli(debug >= 3, "", "default delta = {settings$delta} for bucb")
       }
     }
 
