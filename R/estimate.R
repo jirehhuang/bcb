@@ -108,8 +108,10 @@ compute_bda <- function(data,
 
             if (settings$type == "bn.fit.gnet"){
 
+              temp[[j]][l, "rss"] <- sum(Xy[seq_len(settings$n_obs), j]^2)
+
               temp[[j]][l, sprintf("se%g_bda", seq_len(length(i_values)))] <-
-                sd(Xy[seq_len(settings$n_obs),j]) / sqrt(settings$n_obs)
+                sqrt(temp[[j]][l, "rss"] / (settings$n_obs - 1) / settings$n_obs)
 
             } else if (settings$type == "bn.fit.dnet"){
 

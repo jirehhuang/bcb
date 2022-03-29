@@ -158,6 +158,7 @@ simulate_method <- function(method_num,
 
       msg <- sprintf("error executing %s%s on dataset %s: %s",
                      method, method_num, i, as.character(err))
+      msg <- gsub("\\{", "-[", msg)
 
       debug_cli(TRUE, cli::cli_alert_danger, msg,
                 .envir = environment())
@@ -227,6 +228,7 @@ sim_method_grid <- function(method,
 
       msg <- sprintf("error executing %s%s (%s): %s",
                      method, method_num, paste(method_nums, collapse = ","), as.character(err))
+      msg <- gsub("\\{", "-[", msg)
 
       bcb:::debug_cli(TRUE, cli::cli_alert_danger, msg,
                       .envir = environment())
