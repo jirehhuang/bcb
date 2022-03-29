@@ -135,6 +135,11 @@ compute_bda <- function(data,
               temp[[j]][l, c("beta_bda", "se1_bda",
                              "rss", "xtx", "n_ess1")] <- values
 
+              ## redo rss
+              y_tilde <- Xy[, j] - temp[[j]]$beta_bda[l] * Xy[, i]
+              y_tilde <- y_tilde[seq_len(settings$n_obs)]
+              temp[[j]]$rss[l] <- sum((y_tilde - mean(y_tilde))^2)
+
               for (b in seq_len(length(i_values))){
 
                 temp[[j]][[sprintf("mu%g_bda", b)]][l] <-
@@ -261,10 +266,10 @@ compute_bda <- function(data,
                               max(min(n_ess, n_int), 1),
                               min(n_ess, settings$initial_n_ess))
               nu_0 <- n_ess
-              a_0 <- max(1, (n_bda - length(ik) - 1) / 2)
+              a_0 <- max(1, (settings$n_obs - length(ik) - 1) / 2)
 
               beta_0 <- temp[[j]]$beta_bda[l]
-              b_0 <- ifelse(1 > (n_bda - length(ik) - 1) / 2,
+              b_0 <- ifelse((settings$n_obs - length(ik) - 1) / 2 < 1,
                             1, temp[[j]]$rss[l] / 2)
 
               ## posterior update
