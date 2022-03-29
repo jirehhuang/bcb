@@ -123,6 +123,11 @@ apply_method <- function(t,
               rounds$arms[[a]]$value
             se <- rounds$bda[[node]][[settings$target]]$se1_est
 
+            df <- df[prob > 0]
+            mu <- mu[prob > 0]
+            se <- se[prob > 0]
+            prob <- prob[prob > 0]
+
             fun <- function(par){
 
               sum(prob * pt((par - mu) / se,

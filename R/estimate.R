@@ -108,8 +108,8 @@ compute_bda <- function(data,
 
             if (settings$type == "bn.fit.gnet"){
 
-              # temp[[j]][l, sprintf("se%g_bda",
-              #                      seq_len(length(i_values)))] <- sqrt(sum(Xy[,j]^2) / n)
+              temp[[j]][l, sprintf("se%g_bda", seq_len(length(i_values)))] <-
+                sd(Xy[seq_len(settings$n_obs),j]) / sqrt(settings$n_obs)
 
             } else if (settings$type == "bn.fit.dnet"){
 
