@@ -346,18 +346,12 @@ apply_method <- function(t,
         se <- rounds$se_est[t-1,]
         n_ess <- rounds$n_ess[t-1,]
 
-        ## symmetric criteria
-        t_ <- sapply(unique(sapply(rounds$arms, `[[`, "node")), function(node){
+        t_ <- sapply(seq_len(length(rounds$arms)), function(a){
 
-          a <- match(node, sapply(rounds$arms,
-                                  `[[`, "node"))
-          qt(1 - alpha,
-             df = max(1, n_ess[a] + n_int[a]))
+          qt(1 - alpha, df = max(1, n_ess[a] + n_int[a]))
         })
-        criteria <- sapply(seq_len(length(rounds$arms)), function(a){
+        criteria <- mu + t_ * se
 
-          mu[a] + t_[rounds$arms[[a]]$node] * se[a] * rounds$arms[[a]]$value
-        })
       } else if (settings$type == "bn.fit.dnet"){
 
         list2env(settings[c("b_0", "a_0")],
