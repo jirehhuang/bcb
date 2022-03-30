@@ -86,8 +86,8 @@ compile_path <- function(path,
           sse <- cbind(sse_nns, data.frame(sse_bma = sse_bma,
                                            sse_mu_bma = sse_mu_bma, sse_mu_est = sse_mu_est))
 
-          arm1 <- data.frame(arm1_mu_est = roundsj$arm1$mu_est - roundsj$arm1$mu_true,
-                             arm1_mu_bma = roundsj$arm1$mu_bma - roundsj$arm1$mu_true,
+          arm1 <- data.frame(arm1_mu_est = (roundsj$arm1$mu_est - roundsj$arm1$mu_true)^2,
+                             arm1_mu_bma = (roundsj$arm1$mu_bma - roundsj$arm1$mu_true)^2,
                              sse_arm1 = sse[[sprintf("sse_%s", roundsj$arms$node[roundsj$arm1$arm[1]])]])
 
           roundsj$selected <-
