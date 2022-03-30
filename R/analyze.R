@@ -66,12 +66,38 @@ compile_path <- function(path,
           roundsj$ji <- as.data.frame(sapply(cp_dag,
                                              function(x) roundsj[[x]]$JI, simplify = FALSE))
 
+          bn.fit <- roundsj$settings$bn.fit
+          amat <- bnlearn::amat(bn.fit)
+          temp <- amat * 0L
+
+          ## sse of per node neighbor support
+          sse_nns <- sapply(roundsj$settings$nodes, function(node){
+
+            temp[node,] <- temp[,node] <- 1L
+            ind <- which(temp > 0)
+
+            apply(roundsj$bma, 1, function(x) sum((x[ind] - amat[ind])^2))
+          })
+          colnames(sse_nns) <- sprintf("sse_%s", roundsj$settings$nodes)
+          sse_bma <- apply(roundsj$bma, 1, function(x) sum((x - amat)^2))
+          sse_mu_bma <- apply(roundsj$mu_bma, 1, function(x) sum((x - roundsj$mu_true)^2))
+          sse_mu_est <- apply(roundsj$mu_est, 1, function(x) sum((x - roundsj$mu_true)^2))
+
+          sse <- cbind(sse_nns, data.frame(sse_bma = sse_bma,
+                                           sse_mu_bma = sse_mu_bma, sse_mu_est = sse_mu_est))
+
+          arm1 <- data.frame(arm1_mu_est = roundsj$arm1$mu_est - roundsj$arm1$mu_true,
+                             arm1_mu_bma = roundsj$arm1$mu_bma - roundsj$arm1$mu_true,
+                             sse_arm1 = sse[[sprintf("sse_%s", roundsj$arms$node[roundsj$arm1$arm[1]])]])
+
           roundsj$selected <-
             roundsj$selected[intersect(names(roundsj$selected),
                                        c("arm", "interventions", "reward", "estimate",
                                          "criteria", "expected_reward", "expected_regret",
                                          "greedy_expected", "greedy_regret", "cumulative",
                                          "expected_cumulative", "mu_est"))]
+          roundsj$selected <- cbind(roundsj$selected, sse, arm1)
+
           if (concise >= 2){
 
             roundsj <- roundsj[c("arms", "selected", "beta_true", "mu_true", "ji")]
