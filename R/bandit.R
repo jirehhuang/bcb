@@ -119,8 +119,7 @@ apply_method <- function(t,
             prob <- rounds$ps[[node]][,"prob"]
             df <- n_int[a] +
               rounds$bda[[node]][[settings$target]]$n_ess1
-            mu <- rounds$bda[[node]][[settings$target]]$mu1_est *
-              rounds$arms[[a]]$value
+            mu <- rounds$bda[[node]][[settings$target]][[sprintf("mu%g_est", b)]]
             se <- rounds$bda[[node]][[settings$target]]$se1_est
 
             df <- df[prob > 0]
