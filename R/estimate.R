@@ -213,15 +213,22 @@ compute_bda <- function(data,
         ## TODO: compute int quantities before looping through various k
 
         ## compute joint estimate est
-        if ((rounds$selected$arm[t] > 0 &&
+        if ((updated_bda <- rounds$selected$arm[t] > 0 &&
              temp[[j]]$t_bda[l] == t) ||  # just updated bda with int data
             rounds$selected$interventions[t] ==
             nodes[i]){  # or most recent intervention is on i
 
-          a <- rounds$selected$arm[t]
-          value <- rounds$arms[[a]]$value
-
           if (settings$type == "bn.fit.gnet"){
+
+            a <- if (updated_bda){
+
+              which(sapply(rounds$arms, `[[`, "node") == nodes[i])[1]
+
+            } else{
+
+              rounds$selected$arm[t]
+            }
+            value <- rounds$arms[[a]]$value
 
             if (settings$bcb_combine == "average"){
 
@@ -297,6 +304,7 @@ compute_bda <- function(data,
           } else if (settings$type == "bn.fit.dnet"){
 
             ## only update corresponding level
+            a <- rounds$selected$arm[t]
             b <- rounds$arms[[a]]$value
 
             if (settings$bcb_combine == "average"){
