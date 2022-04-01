@@ -70,25 +70,25 @@ compile_path <- function(path,
           amat <- bnlearn::amat(bn.fit)
           temp <- amat * 0L
 
-          ## sse of per node neighbor support
-          sse_nns <- sapply(roundsj$settings$nodes, function(node){
+          ## sae of per node neighbor support
+          sae_nns <- sapply(roundsj$settings$nodes, function(node){
 
             temp[node,] <- temp[,node] <- 1L
             ind <- which(temp > 0)
 
-            apply(roundsj$bma, 1, function(x) sum((x[ind] - amat[ind])^2))
+            apply(roundsj$bma, 1, function(x) sum(abs(x[ind] - amat[ind])))
           })
-          colnames(sse_nns) <- sprintf("sse_%s", roundsj$settings$nodes)
-          sse_bma <- apply(roundsj$bma, 1, function(x) sum((x - amat)^2))
-          sse_mu_bma <- apply(roundsj$mu_bma, 1, function(x) sum((x - roundsj$mu_true)^2))
-          sse_mu_est <- apply(roundsj$mu_est, 1, function(x) sum((x - roundsj$mu_true)^2))
+          colnames(sae_nns) <- sprintf("sae_%s", roundsj$settings$nodes)
+          sae_bma <- apply(roundsj$bma, 1, function(x) sum(abs(x - amat)))
+          sae_mu_bma <- apply(roundsj$mu_bma, 1, function(x) sum(abs(x - roundsj$mu_true)))
+          sae_mu_est <- apply(roundsj$mu_est, 1, function(x) sum(abs(x - roundsj$mu_true)))
 
-          sse <- cbind(sse_nns, data.frame(sse_bma = sse_bma,
-                                           sse_mu_bma = sse_mu_bma, sse_mu_est = sse_mu_est))
+          sae <- cbind(sae_nns, data.frame(sae_bma = sae_bma,
+                                           sae_mu_bma = sae_mu_bma, sae_mu_est = sae_mu_est))
 
-          arm1 <- data.frame(arm1_mu_est = (roundsj$arm1$mu_est - roundsj$arm1$mu_true)^2,
-                             arm1_mu_bma = (roundsj$arm1$mu_bma - roundsj$arm1$mu_true)^2,
-                             sse_arm1 = sse[[sprintf("sse_%s", roundsj$arms$node[roundsj$arm1$arm[1]])]])
+          arm1 <- data.frame(arm1_mu_est = abs(roundsj$arm1$mu_est - roundsj$arm1$mu_true),
+                             arm1_mu_bma = abs(roundsj$arm1$mu_bma - roundsj$arm1$mu_true),
+                             sae_arm1 = sae[[sprintf("sae_%s", roundsj$arms$node[roundsj$arm1$arm[1]])]])
 
           roundsj$selected <-
             roundsj$selected[intersect(names(roundsj$selected),
@@ -96,7 +96,7 @@ compile_path <- function(path,
                                          "criteria", "expected_reward", "expected_regret",
                                          "greedy_expected", "greedy_regret", "cumulative",
                                          "expected_cumulative", "mu_est"))]
-          roundsj$selected <- cbind(roundsj$selected, sse, arm1)
+          roundsj$selected <- cbind(roundsj$selected, sae, arm1)
 
           if (concise >= 2){
 
