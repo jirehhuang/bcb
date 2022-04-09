@@ -92,7 +92,7 @@ compile_path <- function(path,
 
           roundsj$selected <-
             roundsj$selected[intersect(names(roundsj$selected),
-                                       c("arm", "interventions", "reward", "estimate",
+                                       c("arm", "interventions", "time", "reward", "estimate",
                                          "criteria", "expected_reward", "expected_regret",
                                          "greedy_expected", "greedy_regret", "cumulative",
                                          "expected_cumulative", "mu_est"))]
