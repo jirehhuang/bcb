@@ -124,7 +124,7 @@ E_1_1 <- function(n, p1, p2){
 
 E_W <- function(n, p, i){
 
-  n * (p[i,1] + p[i,2])
+  (p[i,1] + p[i,2])
 }
 
 
@@ -133,7 +133,7 @@ E_W <- function(n, p, i){
 
 Var_W <- function(n, p, i){
 
-  n * (p[i,1] + p[i,2]) * (1 - (p[i,1] + p[i,2]))
+  (p[i,1] + p[i,2]) * (1 - (p[i,1] + p[i,2])) / n
 }
 
 
@@ -142,7 +142,7 @@ Var_W <- function(n, p, i){
 
 Cov_W <- function(n, p, i, j){
 
-  -n * (p[i,1] + p[i,2]) * (p[j,1] + p[j,2])
+  -(p[i,1] + p[i,2]) * (p[j,1] + p[j,2]) / n
 }
 
 
@@ -157,9 +157,9 @@ Cov_W <- function(n, p, i, j){
 
 E_M <- function(n, p, i){
 
-  # E_k(n, p[i,1], 2) + E_1_1(n, p[i,1], p[i,2]) + E_1_1(n, p[i,1], p[i,3])  # verified
+  # (E_k(n, p[i,1], 2) + E_1_1(n, p[i,1], p[i,2]) + E_1_1(n, p[i,1], p[i,3])) / n^2  # verified
 
-  n * p[i,1] * (1 + (n-1) * sum(p[i,]))
+  p[i,1] * (1 + (n-1) * sum(p[i,])) / n
 }
 
 
@@ -232,11 +232,8 @@ Cov_ab_ac <- function(n, p, i){
 
 Var_M <- function(n, p, i){
 
-  Var_aa(n, p, i) + Var_ab(n, p, i, 1) + Var_ab(n, p, i, 2) +
-    2 * (Cov_aa_ab(n, p, i, 1) + Cov_aa_ab(n, p, i, 2) + Cov_ab_ac(n, p, i))  # verified
-
-  # Var_aa(n, p, i) + Var_ab(n, p, i, 1) + Var_ab(n, p, i, 2) +
-  #   2 * (Cov_aa_ab(n, p, i, 1) / p[i,2] * (p[i,2] + p[i,3]) + Cov_ab_ac(n, p, i))  # can result in NaN
+  (Var_aa(n, p, i) + Var_ab(n, p, i, 1) + Var_ab(n, p, i, 2) +
+    2 * (Cov_aa_ab(n, p, i, 1) + Cov_aa_ab(n, p, i, 2) + Cov_ab_ac(n, p, i))) / n^4
 }
 
 
@@ -297,17 +294,11 @@ Cov_iaib_jajc <- function(n, p, i, j, prime_i = 1, prime_j = 1){
 
 Cov_M <- function(n, p, i, j){
 
-  Cov_ii_jj(n, p, i, j) +
+  (Cov_ii_jj(n, p, i, j) +
     Cov_ii_jajb(n, p, i, j, 1) + Cov_ii_jajb(n, p, i, j, 2) +
     Cov_ii_jajb(n, p, j, i, 1) + Cov_ii_jajb(n, p, j, i, 2) +
     Cov_iaib_jajc(n, p, i, j, 1, 1) + Cov_iaib_jajc(n, p, i, j, 1, 2) +
-    Cov_iaib_jajc(n, p, i, j, 2, 1) + Cov_iaib_jajc(n, p, i, j, 2, 2)  # verified
-
-  # Cov_ii_jj(n, p, i, j) +
-  #   Cov_ii_jajb(n, p, i, j, 1) / p[j,2] * (p[j,2] + p[j,3]) +
-  #   Cov_ii_jajb(n, p, j, i, 1) / p[i,2] * (p[i,2] + p[i,3]) +
-  #   Cov_iaib_jajc(n, p, i, j, 1, 1) / (p[i,2] * p[j,2]) *
-  #   (p[i,2] + p[i,3]) * (p[j,2] + p[j,3])  # can result in NaN
+    Cov_iaib_jajc(n, p, i, j, 2, 1) + Cov_iaib_jajc(n, p, i, j, 2, 2)) / n^4
 }
 
 
@@ -379,14 +370,9 @@ Cov_iaib_jc <- function(n, p, i, j, prime_i = 1, prime_j = 0){
 
 Cov_M_W <- function(n, p, i){
 
-  Cov_ii_i(n, p, i) + Cov_ii_ja(n, p, i, i, 1) +
+  (Cov_ii_i(n, p, i) + Cov_ii_ja(n, p, i, i, 1) +
     Cov_ab_a(n, p, i, 0, 1) + Cov_ab_a(n, p, i, 1, 0) + Cov_ab_a(n, p, i, 0, 2) +
-    Cov_iaib_jc(n, p, i, i, 2, 1)  # verified
-
-  # Cov_ii_i(n, p, i) + Cov_ii_ja(n, p, i, i, 1) +
-  #   Cov_ab_a(n, p, i, 0, 1) / p[i,2] * (p[i,2] + p[i,3]) +
-  #   Cov_ab_a(n, p, i, 1, 0) +
-  #   Cov_iaib_jc(n, p, i, i, 2, 1)  # can result in NaN
+    Cov_iaib_jc(n, p, i, i, 2, 1)) / n^3
 }
 
 
@@ -395,15 +381,15 @@ Cov_M_W <- function(n, p, i){
 
 Cov_Mi_Wj <- function(n, p, i, j){
 
-  # Cov_ii_ja(n, p, i, j, 0) + Cov_ii_ja(n, p, i, j, 1) +
+  # (Cov_ii_ja(n, p, i, j, 0) + Cov_ii_ja(n, p, i, j, 1) +
   #   Cov_iaib_jc(n, p, i, j, 1, 0) + Cov_iaib_jc(n, p, i, j, 1, 1) +
-  #   Cov_iaib_jc(n, p, i, j, 2, 0) + Cov_iaib_jc(n, p, i, j, 2, 1)  # verified
+  #   Cov_iaib_jc(n, p, i, j, 2, 0) + Cov_iaib_jc(n, p, i, j, 2, 1)) / n^3  # verified
 
-  n * p[i,1] * (p[j,1] + p[j,2]) * (
+  (p[i,1] * (p[j,1] + p[j,2]) * (
 
     (n-1) * (1 + (n-2) * p[i,1]) - n * (1 + (n-1) * p[i,1])
 
-  ) - 2 * n * (n-1) * p[i,1] * ((p[i,2] + p[i,3]) * (p[j,1] + p[j,2]))
+  ) - 2 * (n-1) * p[i,1] * ((p[i,2] + p[i,3]) * (p[j,1] + p[j,2]))) / n^2
 }
 
 
@@ -512,7 +498,7 @@ Q2Var_Pr <- function(Q, n){
       2 * sum(unlist(sapply(seq_r[seq_r > i],
                             function(j) cov(Q[,i], Q[,j],
                                             use = "complete.obs"))))
-  })) / n^2
+  }))
 }
 
 
@@ -596,7 +582,7 @@ Var_Pr <- function(n,
     Var_Q(n, p, i, M_plus, W_plus) +
       2 * sum(unlist(sapply(seq_r[seq_r > i],
                             function(j) Cov_Q(n, p, i, j, M_plus, W_plus))))
-  })) / n^2
+  }))
 }
 
 
@@ -695,8 +681,8 @@ jpt2p <- function(jpt,
 
 test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
                         path,
-                        nq = 1e5,
-                        nboot = 1e4,
+                        nq = 1e4,
+                        nboot = 1e3,
                         nrep = 1e3,
                         clear = FALSE,
                         debug = 1){
