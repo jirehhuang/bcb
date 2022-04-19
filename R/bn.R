@@ -345,7 +345,7 @@ dkpar_bn <- function(p1,   # number of parents of target node
   bn <- bnlearn::empty.graph(nodes = nodes)
 
   amat <- bnlearn::amat(bn)
-  for (i in seq_len(length(nodes) - 1)){
+  for (i in rev(seq_len(length(nodes) - 1))){
 
     f <- sample(length(nodes) - i, size = 1)
     to <- unique(i + sample(length(nodes) - i,
