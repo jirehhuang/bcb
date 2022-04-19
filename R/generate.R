@@ -62,6 +62,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
                                       data_row$index, data_row$id,
                                       data_row$network, data_row$n_obs))
         dir_check(data_dir)
+        write.table(data_row, file.path(data_dir, "data_row0.txt"))
 
         ## files already completed
         if (all(c("bn.fit.rds", "effects_array.rds",
@@ -72,7 +73,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
                     "{i} previously prepared network {data_row$network}",
                     .envir = environment())
 
-          write.table(x = data_row, file = file.path(data_dir, "data_row.txt"))
+          data_row <- read.table(file = file.path(data_dir, "data_row.txt"))
 
           return(data_row)
         }
@@ -82,7 +83,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
                   .envir = environment())
 
         ## load bn structure
-        if (grepl("rand", data_row$network)){
+        if (grepl("rand|dkpar", data_row$network)){
 
           set.seed(data_row$seed)
           repeat{
@@ -166,7 +167,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
         } else if (data_row$data_type == "discrete"){
 
           if (data_row$normalize ||
-              grepl("parallel|chain|sink|random", data_row$network)){
+              grepl("parallel|chain|sink|rand|par", data_row$network)){
 
             bn.fit <- process_dnet(bn.fit,
                                    min_levels = 1,

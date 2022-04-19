@@ -273,7 +273,8 @@ random_bn <- function(p,
     a <- as(nel, "matrix")
 
     ## TODO: control with argument
-    if (all(colSums(a) <= 4)) break
+    # if (all(colSums(a) <= 4)) break
+    break
   }
   rownames(a) <- colnames(a) <- nodes
 
@@ -307,7 +308,7 @@ sink_bn <- function(p,   # number of parents of target node
 
 
 
-# Create random graph structure terminating in a parallel structure
+# Create random ER graph structure terminating in a parallel structure
 
 randpar_bn <- function(p1,   # number of parents of target node
                        p2,   # number of additional nodes
@@ -323,6 +324,66 @@ randpar_bn <- function(p1,   # number of parents of target node
 
   bnlearn::amat(bn)[-sink, -sink] <- bnlearn::amat(rand_bn)
   bnlearn::amat(bn)[tail(bnlearn::node.ordering(rand_bn), p1),
+                    sink] <- 1L
+  return(bn)
+}
+
+
+
+# Create random graph structure as in de Kroon (2021) terminating in a parallel structure
+
+dkpar_bn <- function(p1,   # number of parents of target node
+                     p2,   # number of additional nodes
+                     d,    # maximum in-degree
+                     seed){
+
+  if (!missing(seed) && !is.na(seed) && is.numeric(seed))
+    set.seed(seed)
+
+  nodes <- sprintf("V%s", seq_len(p1 + p2 + 1))
+  sink <- length(nodes)
+  bn <- bnlearn::empty.graph(nodes = nodes)
+
+  amat <- bnlearn::amat(bn)
+  for (i in seq_len(length(nodes) - 1)){
+
+    f <- sample(length(nodes) - i, size = 1)
+    to <- unique(i + sample(length(nodes) - i,
+                            size = f, replace = TRUE))
+    to <- to[colSums(amat)[to] < d]  # restrict maximum in-degree
+
+    amat[i, to] <- 1L
+  }
+  if (sum(amat[,sink]) < p1){
+
+    from <- sample(setdiff(seq_len(length(nodes) - 1),
+                           which(amat[,sink] > 0)),
+                   p1 - sum(amat[,sink]))
+    amat[from, sink] <- 1L
+  }
+  bnlearn::amat(bn) <- amat
+
+  return(bn)
+}
+
+
+
+# Load bnrepository structure terminating in a parallel structure
+
+bnrpar_bn <- function(x,    # name of network in bnrepository
+                      p,    # number of parents of target node
+                      seed){
+
+  if (!missing(seed) && !is.na(seed) && is.numeric(seed))
+    set.seed(seed)
+
+  bn.fit <- load_bn.fit(x = x)
+  nodes <- sprintf("V%s", seq_len(length(bn.fit) + 1))
+  sink <- length(nodes)
+  bn <- bnlearn::empty.graph(nodes = nodes)
+
+  bnlearn::amat(bn)[-sink, -sink] <- bnlearn::amat(bn.fit)
+  bnlearn::amat(bn)[sample(nodes[-sink], size = p),
                     sink] <- 1L
   return(bn)
 }
@@ -381,6 +442,23 @@ load_bn.fit <- function(x,
                      p2 = p1_p2_d_seed[2],
                      d = p1_p2_d_seed[3],
                      seed = p1_p2_d_seed[4])
+    bn.fit <- bn2gnet(bn = bn, ...)
+
+  } else if (grepl("dkpar", x)){
+
+    p1_p2_d_seed <- as.numeric(strsplit(x, "_")[[1]][seq_len(4) + 1])
+    bn <- dkpar_bn(p1 = p1_p2_d_seed[1],
+                   p2 = p1_p2_d_seed[2],
+                   d = p1_p2_d_seed[3],
+                   seed = p1_p2_d_seed[4])
+    bn.fit <- bn2gnet(bn = bn, ...)
+
+  } else if (grepl("bnrpar", x)){
+
+    x_p_seed <- strsplit(x, "_")[[1]][seq_len(3) + 1]
+    bn <- bnrpar_bn(x = x_p_seed[1],
+                    p = as.numeric(x_p_seed[2]),
+                    seed = as.numeric(x_p_seed[3]))
     bn.fit <- bn2gnet(bn = bn, ...)
 
   } else{
@@ -1711,9 +1789,9 @@ bn2dnet <- function(bn,
   }
   debug_cli(!success && debug >= 2, cli::cli_alert_danger,
             c("failed to generate dnet with {length(bn)} nodes and ",
-            "{sum(bnlearn::amat(bn))} edges after {n_attempts} attempts, ",
-            "resulting in marginal_lb = {attr(dnet, 'marginal_lb')} ",
-            "and ce_lb = {attr(dnet, 'ce_lb')}"),
+              "{sum(bnlearn::amat(bn))} edges after {n_attempts} attempts, ",
+              "resulting in marginal_lb = {attr(dnet, 'marginal_lb')} ",
+              "and ce_lb = {attr(dnet, 'ce_lb')}"),
             .envir = environment())
 
   attr(dnet, "marginal_lb") <- attr(dnet,
