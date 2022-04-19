@@ -4,6 +4,7 @@
 simulate_method <- function(method_num,
                             settings,
                             path = NULL,
+                            n_dat = -1,
                             n_cores = 1,
                             resimulate = FALSE,
                             debug = 0){
@@ -33,6 +34,12 @@ simulate_method <- function(method_num,
     })
   )
   rownames(dataset_grid) <- NULL
+  dataset_grid <- dataset_grid[order(dataset_grid$dataset),,
+                               drop = FALSE]
+  if (n_dat < 0)
+    n_dat <- min(data_grid$n_dat)
+  dataset_grid <- dataset_grid[dataset_grid$dataset <= n_dat,,
+                               drop = FALSE]
 
   ## set up parallel execution
   if (n_cores < 1)
@@ -41,7 +48,7 @@ simulate_method <- function(method_num,
   mclapply <- get_mclapply(n_cores = n_cores)
 
   debug_cli(debug, cli::cli_alert_info,
-            "executing {method}{method_num} on {sum(data_grid$n_dat)} datasets using {n_cores} core(s)")
+            "executing {method}{method_num} on {nrow(dataset_grid)} datasets using {n_cores} core(s)")
 
   ## function for simulating
   sim_fn <- function(i){
@@ -67,7 +74,7 @@ simulate_method <- function(method_num,
           file.exists(progressi)){
 
         debug_cli(debug, cli::cli_alert_success,
-                  "{i} already executed {method}{method_num} on dataset {j} of {data_row$n_dat} for network {data_row$network}",
+                  "{i} already executed {method}{method_num} on dataset {j} of {min(data_row$n_dat, n_dat)} for network {data_row$network}",
                   .envir = environment())
 
         return(NULL)  # skip if in progress or complete
@@ -89,7 +96,7 @@ simulate_method <- function(method_num,
         }
       }, add = TRUE)
       debug_cli(debug, "",
-                "{i} executing {method}{method_num} on dataset {j} of {data_row$n_dat} for network {data_row$network}",
+                "{i} executing {method}{method_num} on dataset {j} of {min(data_row$n_dat, n_dat)} for network {data_row$network}",
                 .envir = environment())
 
       ## settings
@@ -200,6 +207,7 @@ sim_method_grid <- function(method,
                             method_nums,
                             method_grid,
                             path,
+                            n_dat = -1,
                             n_cores = 1,
                             resimulate = FALSE,
                             debug = 0){
@@ -220,6 +228,7 @@ sim_method_grid <- function(method,
       simulate_method(method_num = method_num,
                       settings = settings,
                       path = path,
+                      n_dat = n_dat,
                       n_cores = n_cores,
                       resimulate = resimulate,
                       debug = debug)
