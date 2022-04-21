@@ -757,60 +757,60 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
 
 
     ## generate network
-    nnodes <- 10
-    nodes <- sprintf("V%g", seq_len(nnodes))
-    target <- nodes[nnodes]
-    repeat{
-
-      ## generate network
-      bn <- bcb:::dkpar_bn(p1 = 3, p2 = 6, d = max(3, r))
-
-      ## should not have any disconnected components
-      ig <- igraph::graph.adjacency(bnlearn::amat(bn))
-      if (length(igraph::decompose.graph(ig)) > 1){
-
-        next
-      }
-      ## detect nodes with r parents and select one
-      if (length(int <- which(colSums(bnlearn::amat(bn))[-nnodes] == r))){
-
-        if (length(int) > 1)
-          int <- sample(int, size = 1)
-        int <- sprintf("V%g", int)
-
-      } else{
-
-        next
-      }
-      ## convert to dnet
-      dnet <- bn2dnet(bn = bn, # seed = seed,
-                      min_levels = 2,
-                      max_levels = 2,
-                      marginal_lb = 1e-2,
-                      ce_lb = 0.05,
-                      n_attempts = 100,
-                      time_limit = Inf,
-                      debug = debug)
-      break
-    }
-    nodes <- union(c(target, int), nodes)
-    dnet <- bcb:::reorder_bn.fit(dnet, ordering = match(nodes, names(dnet)))
-    amat <- bnlearn::amat(dnet)
-    nodes <- c(target, int, dnet[[int]]$parents)
+    # nnodes <- 10
+    # nodes <- sprintf("V%g", seq_len(nnodes))
+    # target <- nodes[nnodes]
+    # repeat{
+    #
+    #   ## generate network
+    #   bn <- bcb:::dkpar_bn(p1 = 3, p2 = 6, d = max(3, r))
+    #
+    #   ## should not have any disconnected components
+    #   ig <- igraph::graph.adjacency(bnlearn::amat(bn))
+    #   if (length(igraph::decompose.graph(ig)) > 1){
+    #
+    #     next
+    #   }
+    #   ## detect nodes with r parents and select one
+    #   if (length(int <- which(colSums(bnlearn::amat(bn))[-nnodes] == r))){
+    #
+    #     if (length(int) > 1)
+    #       int <- sample(int, size = 1)
+    #     int <- sprintf("V%g", int)
+    #
+    #   } else{
+    #
+    #     next
+    #   }
+    #   ## convert to dnet
+    #   dnet <- bn2dnet(bn = bn, # seed = seed,
+    #                   min_levels = 2,
+    #                   max_levels = 2,
+    #                   marginal_lb = 1e-2,
+    #                   ce_lb = 0.05,
+    #                   n_attempts = 100,
+    #                   time_limit = Inf,
+    #                   debug = debug)
+    #   break
+    # }
+    # nodes <- union(c(target, int), nodes)
+    # dnet <- bcb:::reorder_bn.fit(dnet, ordering = match(nodes, names(dnet)))
+    # amat <- bnlearn::amat(dnet)
+    # nodes <- c(target, int, dnet[[int]]$parents)
     ######################################################################
-    # bn <- bnlearn::empty.graph(nodes = sprintf("V%s", seq_len(r + 2)))
-    # amat <- bnlearn::amat(bn)
-    # amat[-seq_len(2), 2] <- amat[2, 1] <- 1L
-    # amat[-seq_len(2), 1] <- sample(c(0, 1), r,  # confounding
-    #                                replace = TRUE)
-    # bnlearn::amat(bn) <- amat
-    # dnet <- bn2dnet(bn = bn, # seed = seed,
-    #                 min_levels = 2,
-    #                 max_levels = 2,
-    #                 marginal_lb = 1e-2,
-    #                 ce_lb = 0.05,
-    #                 debug = debug)
-    # nodes <- names(dnet)
+    bn <- bnlearn::empty.graph(nodes = sprintf("V%s", seq_len(r + 2)))
+    amat <- bnlearn::amat(bn)
+    amat[-seq_len(2), 2] <- amat[2, 1] <- 1L
+    amat[-seq_len(2), 1] <- sample(c(0, 1), r,  # confounding
+                                   replace = TRUE)
+    bnlearn::amat(bn) <- amat
+    dnet <- bn2dnet(bn = bn, # seed = seed,
+                    min_levels = 2,
+                    max_levels = 2,
+                    marginal_lb = 1e-2,
+                    ce_lb = 0.05,
+                    debug = debug)
+    nodes <- names(dnet)
     ######################################################################
     jpt <- get_jpt(bn.fit = dnet,
                    nodes = nodes)
