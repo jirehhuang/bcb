@@ -809,6 +809,8 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
                     max_levels = 2,
                     marginal_lb = 1e-2,
                     ce_lb = 0.05,
+                    n_attempts = 100,
+                    time_limit = Inf,
                     debug = debug)
     nodes <- names(dnet)
     ######################################################################
