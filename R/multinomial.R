@@ -755,12 +755,35 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
               .envir = environment())
     set.seed(seed)
 
-    p <- runif(r * 3)
-    p <- p / sum(p)
-    dim(p) <- c(r, 3)
-    Pr_true <- sum(p[,1] * rowSums(p) /
+
+    ## generate network
+    bn <- bnlearn::empty.graph(nodes = sprintf("V%s", seq_len(r + 2)))
+    amat <- bnlearn::amat(bn)
+    amat[-seq_len(2), 2] <- amat[2, 1] <- 1L
+    amat[-seq_len(2), 1] <- sample(c(0, 1), r,  # confounding
+                                   replace = TRUE)
+    bnlearn::amat(bn) <- amat
+    dnet <- bn2dnet(bn = bn, # seed = seed,
+                    min_levels = 2,
+                    max_levels = 2,
+                    marginal_lb = 1e-2,
+                    ce_lb = 0.05,
+                    debug = debug)
+    nodes <- names(dnet)
+    jpt <- get_jpt(bn.fit = dnet,
+                   nodes = nodes)
+    p <- jpt2p(jpt = jpt,
+               levels = c(1, 1),
+               nodes = nodes)
+    # true_Pr <- query_jpt(jpt,
+    #                      target = nodes[1],
+    #                      given = nodes[2],
+    #                      adjust = nodes[-c(1, 2)])[1, 1]
+    true_Pr <- sum(p[,1] * rowSums(p) /
                      rowSums(p[,seq_len(2),drop=F]))
 
+
+    ## generate data
     X <- rmultinom(n = 1e6, size = n, prob = p)
     N <- t(X)
     dim(N) <- c(ncol(X), nrow(p), 3)
@@ -771,8 +794,12 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
     Q <- M / W
     Pr <- rowSums(Q) / n
     Phat <- N / n
-    Phat1 <- Phat + 1 / (3 * r * n)
-    Phat1 <- Phat1 / rowSums(Phat1)
+
+    n_prior <- 1
+    N_prior <- array(1, dim = dim(N))
+    N_prior[,,3] <- 2
+    N_prior <- N_prior * n_prior / (4 * dim(N)[2])
+    Phat1 <- (N + N_prior) / (n + n_prior)
 
 
     ## for conciseness
@@ -780,8 +807,8 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
 
       mean(sapply(seq_len(length(se_vec)), function(i){
 
-        (Pr[i] - 2 * se_vec[i]) < Pr_true &&
-          Pr_true < (Pr[i] + 2 * se_vec[i])
+        (Pr[i] - 2 * se_vec[i]) < true_Pr &&
+          true_Pr < (Pr[i] + 2 * se_vec[i])
 
       }), na.rm = TRUE)
     }
@@ -795,45 +822,27 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
                                 boot_Var_Pr, n = n, nrep = nrep, nprior = 0)
 
     ## proposed
-    estimates$proposed00 <- apply(Phat[seq_len(nq),,,drop=F], 1, Var_Pr,
-                                  n = n, M_plus = 0, W_plus = 0)
-    estimates$proposed01 <- apply(Phat[seq_len(nq),,,drop=F], 1, Var_Pr,
-                                  n = n, M_plus = 0, W_plus = 1)
-    estimates$proposed11 <- apply(Phat[seq_len(nq),,,drop=F], 1, Var_Pr,
-                                  n = n, M_plus = 1, W_plus = 1)
-    estimates$proposed0_ <- ifelse(is.na(estimates$proposed00),
-                                   estimates$proposed01, estimates$proposed00)
+    estimates$proposed0 <- apply(Phat[seq_len(nq),,,drop=F], 1, Var_Pr,
+                                 n = n, M_plus = 0, W_plus = 0)
     estimates$proposed1 <- apply(Phat1[seq_len(nq),,,drop=F], 1, Var_Pr,
                                  n = n, M_plus = 0, W_plus = 0)
-    estimates$proposed_ <- ifelse(is.na(estimates$proposed00),
-                                  estimates$proposed1, estimates$proposed00)
+    estimates$proposed_ <- ifelse(is.na(estimates$proposed0),
+                                  estimates$proposed1, estimates$proposed0)
 
     ## bootstrap from p-hat estimates
     estimates$bootstrap0 <- apply(Phat[seq_len(nboot),,,drop=F], 1, boot_Var_Pr,
                                   n = n, nrep = nrep, nprior = 0)
-    estimates$bootstrap1 <- apply(Phat[seq_len(nboot),,,drop=F], 1, boot_Var_Pr,
-                                  n = n, nrep = nrep, nprior = 1)
+    estimates$bootstrap1 <- apply(Phat1[seq_len(nboot),,,drop=F], 1, boot_Var_Pr,
+                                  n = n, nrep = nrep)
     estimates$bootstrap_ <- ifelse(is.na(estimates$bootstrap0),
                                    estimates$bootstrap1, estimates$bootstrap0)
 
-    ## treat as a proportion, which it's obviously not
-    estimates$naive <- Pr * (1 - Pr) / n
+    ## treat as a conditional proportion, which is only true if r = 0
+    estimates$naive <- Pr * (1 - Pr) / (n * query_jpt(jpt,
+                                                      target = nodes[2])[1])
 
 
     ## compile and save results
-    seq_r <- seq_len(nrow(p))
-    mu_list <- lapply(seq_r, function(i){
-
-      c(mean(M[,i]), mean(W[,i]))
-    })
-    taylor1Q00 <- sapply(seq_r, MW2taylorQ,
-                         M = M, W = W, M_plus = 0, W_plus = 0, order = 1)
-    taylor1Q01 <- sapply(seq_r, MW2taylorQ,
-                         M = M, W = W, M_plus = 0, W_plus = 1, order = 1)
-    taylor2Q00 <- sapply(seq_r, MW2taylorQ,
-                         M = M, W = W, M_plus = 0, W_plus = 0, order = 2)
-    taylor2Q01 <- sapply(seq_r, MW2taylorQ,
-                         M = M, W = W, M_plus = 0, W_plus = 1, order = 2)
     results <- do.call(rbind, lapply(estimates, function(x){
 
       len <- length(x)
@@ -847,52 +856,28 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
     }))
     results <- cbind(
       eg[rep(i, nrow(results)),],
+      true_Pr = true_Pr,
       min_p = min(p), max_p = max(p),
       mean_p1 = mean(p[,1]), mean_p2 = mean(p[,2]), mean_p3 = mean(p[,3]),
-      na_Pr = mean(is.na(Pr)), mean_Pr = mean(Pr, na.rm = TRUE),
+      na_Pr = mean(is.na(Pr)),
+      mean_Pr = mean(Pr, na.rm = TRUE),
       var_Pr = var(Pr, na.rm = TRUE),
-      Q2Var_Pr = Q2Var_Pr(Q, n),
-      taylor1Q2Var_Pr00 = Q2Var_Pr(taylor1Q00, n),
-      taylor1Q2Var_Pr01 = Q2Var_Pr(taylor1Q01, n),
-      taylor2Q2Var_Pr00 = Q2Var_Pr(taylor2Q00, n),
-      taylor2Q2Var_Pr01 = Q2Var_Pr(taylor2Q01, n),
-      mse_taylor1Q00 = mean((taylor1Q00 - Q)^2, na.rm = TRUE),
-      mse_taylor1Q01 = mean((taylor1Q01 - Q)^2, na.rm = TRUE),
-      mse_taylor2Q00 = mean((taylor2Q00 - Q)^2, na.rm = TRUE),
-      mse_taylor2Q01 = mean((taylor2Q01 - Q)^2, na.rm = TRUE),
-      mean_q = mean(sapply(mu_list, q)),
-      mean_dqdM = mean(sapply(mu_list, dqdM)),
-      mean_dqdW = mean(sapply(mu_list, dqdW)),
-      mean_d2qdW2 = mean(sapply(mu_list, d2qdW2)),
-      mean_d2qdMW = mean(sapply(mu_list, d2qdMW)),
-      delta_Var_Q = sum(sapply(seq_r, function(i){
-
-        mean(apply(Phat[seq_len(nq),,,drop=F], 1, Var_Q,
-                   n = n, i = i, M_plus = 0, W_plus = 0) -
-               var(Q[,i], na.rm = TRUE), na.rm = TRUE)
-      })),
-      delta_Cov_Q = sum(unlist(sapply(seq_r, function(i){
-
-        sapply(seq_r[-i], function(j){
-
-          mean(apply(Phat[seq_len(nq),,], 1, Cov_Q,
-                     n = n, i = i, j = j, M_plus = 0, W_plus = 0) -
-                 cov(Q[,i], Q[,j], use = "complete.obs"), na.rm = TRUE)
-        })
-      }))),
       mean_sampling = mean(estimates$sampling, na.rm = TRUE),
       sd_sampling = sd(estimates$sampling, na.rm = TRUE),
-      method = names(estimates), results
+      method = names(estimates),
+      results
     )
-    rownames(results) <- NULL
-    saveRDS(object = results, file = rds)
-
-
     end_time <- Sys.time()
     run_time <- as.numeric(end_time - start_time, units = 'secs')
+    results$time <- run_time
+    rownames(results) <- NULL
+
+
+    saveRDS(object = results, file = rds)
     debug_cli(debug, cli::cli_alert_success,
               "completed {i} in {prettyunits::pretty_sec(run_time)}",
               .envir = environment())
+
 
     if (i %% 1e2 == 0 || i == nrow(eg))
       compile_fn()
