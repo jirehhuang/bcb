@@ -1739,10 +1739,10 @@ bn2dnet <- function(bn,
       ## add parents and generate cpts
       bn_list <- lapply(dnet_i[seq_len(length(dnet_i))], function(node){
 
-        node$children <- bn[[node$node]]$children
-        if (length(bn[[node$node]]$parents)){
+        node$children <- bnlearn::children(x = bn, node = node$node)
+        if (length(bnlearn::parents(x = bn, node = node$node))){
 
-          node$parents <- bn[[node$node]]$parents
+          node$parents <- bnlearn::parents(x = bn, node = node$node)
           new_dimnames <- c(dimnames(node$prob),
                             do.call(c, lapply(node$parents, function(x)
                               dimnames(dnet_i[[x]]$prob)[1])))
