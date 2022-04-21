@@ -1615,7 +1615,7 @@ solve_cpt_dnet <- function(bn.fit,
 
     null <- tryCatch({
 
-      setTimeLimit(time_limit)
+      setTimeLimit(time_limit, transient = TRUE)
       debug_cli(debug >= 3, cli::cli_alert,
                 "attempt {i} of adding parent(s) {paste(parents, collapse = ',')} to target {target}",
                 .envir = environment())
@@ -1655,6 +1655,7 @@ solve_cpt_dnet <- function(bn.fit,
                   .envir = environment())
 
         success <- TRUE
+        setTimeLimit(Inf, transient = TRUE)
         break
       }
     }, error = function(err){
@@ -1709,7 +1710,7 @@ bn2dnet <- function(bn,
 
     null <- tryCatch({
 
-      setTimeLimit(time_limit)
+      setTimeLimit(time_limit, transient = TRUE)
       debug_cli(debug >= 3, cli::cli_alert,
                 c("attempt {i} of generating dnet with {length(bnlearn::nodes(bn))} ",
                   "nodes and {sum(bnlearn::amat(bn))} edges"),
@@ -1777,6 +1778,7 @@ bn2dnet <- function(bn,
                   .envir = environment())
 
         success <- TRUE
+        setTimeLimit(Inf, transient = TRUE)
         break
       }
     },
