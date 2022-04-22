@@ -681,19 +681,17 @@ jpt2p <- function(jpt,
 
 test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
                         path,
-                        nq = 1e4,
-                        nboot = 1e3,
+                        nest = 1e3,
                         nrep = 1e3,
                         clear = FALSE,
                         debug = 1){
 
 
-  nq <- min(nq, 1e6)
-  nboot <- min(nboot, 1e6)
+  nest <- min(nest, 1e6)
   debug_cli(debug, cli::cli_alert,
             c("simulating {nrow(eg)} scenarios with ",
-              "nq = {nq}, nboot = {nboot}, and nrep = {nrep}"))
-  folder <- file.path(path, sprintf("%s_%s_%s", nq, nboot, nrep))
+              "nest = {nest}, and nrep = {nrep}"))
+  folder <- file.path(path, sprintf("%s_%s", nest, nrep))
   dir_check(folder)
 
 
@@ -708,8 +706,8 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
       files <- file.path(folder, files)
       df <- do.call(rbind, lapply(files, readRDS))
       saveRDS(object = df,
-              file.path(path, sprintf("test_Var_Pr_%s_%s_%s.rds",
-                                      nq, nboot, nrep)))
+              file.path(path, sprintf("test_Var_Pr_%s_%s.rds",
+                                      nest, nrep)))
     },
     error = function(err){
 
@@ -860,30 +858,40 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
 
     ## compute estimates
     estimates <- list()
+    seq_nest <- seq_len(nest)
 
     ## simulated true sampling distribution
-    estimates$sampling <- apply(aperm(replicate(n = nboot, p), c(3, 1, 2)), 1,
-                                boot_Var_Pr, n = n, nrep = nrep, nprior = 0)
+    if (nest * nrep <= length(Pr)){
 
+      seq_nrep <- seq_len(nrep)
+      estimates$sampling <- sapply(seq_nest, function(x){
+
+        var(Pr[seq_nrep + (x - 1) * nrep], na.rm = TRUE)
+      })
+    } else{
+
+      estimates$sampling <- apply(aperm(replicate(n = nest, p), c(3, 1, 2)), 1,
+                                  boot_Var_Pr, n = n, nrep = nrep, nprior = 0)
+    }
     ## proposed
-    estimates$proposed0 <- apply(Phat[seq_len(nq),,,drop=F], 1, Var_Pr,
+    estimates$proposed0 <- apply(Phat[seq_nest,,,drop=F], 1, Var_Pr,
                                  n = n, M_plus = 0, W_plus = 0)
-    estimates$proposed1 <- apply(Phat1[seq_len(nq),,,drop=F], 1, Var_Pr,
+    estimates$proposed1 <- apply(Phat1[seq_nest,,,drop=F], 1, Var_Pr,
                                  n = n, M_plus = 0, W_plus = 0)
     estimates$proposed_ <- ifelse(is.na(estimates$proposed0),
                                   estimates$proposed1, estimates$proposed0)
 
     ## bootstrap from p-hat estimates
-    estimates$bootstrap0 <- apply(Phat[seq_len(nboot),,,drop=F], 1, boot_Var_Pr,
+    estimates$bootstrap0 <- apply(Phat[seq_nest,,,drop=F], 1, boot_Var_Pr,
                                   n = n, nrep = nrep, nprior = 0)
-    estimates$bootstrap1 <- apply(Phat1[seq_len(nboot),,,drop=F], 1, boot_Var_Pr,
+    estimates$bootstrap1 <- apply(Phat1[seq_nest,,,drop=F], 1, boot_Var_Pr,
                                   n = n, nrep = nrep)
     estimates$bootstrap_ <- ifelse(is.na(estimates$bootstrap0),
                                    estimates$bootstrap1, estimates$bootstrap0)
 
     ## treat as a conditional proportion, which is only true if r = 0
-    estimates$naive <- Pr * (1 - Pr) / (n * query_jpt(jpt,
-                                                      target = nodes[2])[1])
+    estimates$naive <- Pr[seq_nest] * (1 - Pr[seq_nest]) /
+      c(n - apply(N[seq_nest, , 3, drop = FALSE], c(1, 3), sum))
 
 
     ## compile and save results
@@ -900,6 +908,8 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
     }))
     results <- cbind(
       eg[rep(i, nrow(results)),],
+      nest = nest,
+      nrep = nrep,
       true_Pr = true_Pr,
       min_p = min(p), max_p = max(p),
       mean_p1 = mean(p[,1]), mean_p2 = mean(p[,2]), mean_p3 = mean(p[,3]),
