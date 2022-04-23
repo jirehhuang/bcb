@@ -730,7 +730,8 @@ test_Var_Pr <- function(eg,  # grid of scenarios with seed, r, and n
       if (clear && is.null(readRDS(file = rds))){
 
         debug_cli(debug, cli::cli_alert,
-                  "deleting file {i}")
+                  "deleting file {i}",
+                  .envir = environment())
         file.remove(rds)
       }
       return(NULL)
