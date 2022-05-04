@@ -33,7 +33,7 @@ bandit <- function(bn.fit,
 
   tt <- if (settings$method == "cache"){
 
-    floor(seq(1, n_obs, length.out = min(n_obs, settings$max_cache)))
+    floor(rev(seq(n_obs, 1, length.out = min(n_obs, settings$max_cache))))
 
   } else{
 
@@ -1415,6 +1415,7 @@ check_settings <- function(settings,
   }
   if (grepl("greedy", settings$method) ||
       (grepl("bcb", settings$method) &&
+       length(settings$bcb_criteria) &&
        settings$bcb_criteria == "greedy")){
 
     ## check epsilon
@@ -1426,17 +1427,26 @@ check_settings <- function(settings,
       debug_cli(debug >= 3, "", "default epsilon = {settings$epsilon} for greedy")
     }
   }
+
+  ## check ucb_criteria
+  if (is.null(settings$ucb_criteria) ||
+      !is.character(settings$ucb_criteria) ||
+      !settings$ucb_criteria %in% avail_ucb_criteria){
+    settings$ucb_criteria <- "c"
+    debug_cli(debug >= 3, "", "default ucb_criteria = {settings$ucb_criteria} for ucb")
+  }
+
+  ## check delta
+  if (is.null(settings$delta) ||
+      is.na(settings$delta) ||
+      settings$delta <= 0){
+    settings$delta <- 1
+    debug_cli(debug >= 3, "", "default delta = {settings$delta} for bucb")
+  }
+
   if (settings$method == "random"){
 
   } else if (settings$method %in% c("ucb", "cn-ucb")){
-
-    ## check ucb_criteria
-    if (is.null(settings$ucb_criteria) ||
-        !is.character(settings$ucb_criteria) ||
-        !settings$ucb_criteria %in% avail_ucb_criteria){
-      settings$ucb_criteria <- "c"
-      debug_cli(debug >= 3, "", "default ucb_criteria = {settings$ucb_criteria} for ucb")
-    }
 
     ## check c
     if (is.null(settings$c) ||
@@ -1471,17 +1481,6 @@ check_settings <- function(settings,
     if (is.null(settings$a_0) || settings$a_0 <= 0){
       settings$a_0 <- 1
       debug_cli(debug >= 3, "", "default a_0 = {settings$a_0} for ts")
-    }
-
-    if (settings$method == "bucb"){
-
-      ## check delta
-      if (is.null(settings$delta) ||
-          is.na(settings$delta) ||
-          settings$delta <= 0){
-        settings$delta <- 1
-        debug_cli(debug >= 3, "", "default delta = {settings$delta} for bucb")
-      }
     }
 
   } else if (grepl("bcb", settings$method)){
