@@ -1,3 +1,15 @@
+# Utility function
+
+bnlearn_nodes <- function(bn){
+
+  stopifnot(class(bn)[1] %in% c("bn", "bn.fit"))
+
+  return(ifelse(class(bn) == "bn"),
+         names(bn$nodes), names(bn))
+}
+
+
+
 # Convert bn.fit (or bn_list) to edgeList
 
 bn.fit2edgeList <- function(bn.fit){
@@ -43,7 +55,7 @@ reorder_bn.fit <- function(bn.fit,
   ## if bn_list, convert to bn.fit
   if (is.list(bn.fit) && !"bn.fit" %in% class(bn.fit))
     bn.fit <- bn_list2bn.fit(bn.fit)
-  nodes <- bnlearn::nodes(bn.fit)
+  nodes <- bnlearn_nodes(bn.fit)
 
   ## get ordering
   if (is.logical(ordering)){
@@ -95,7 +107,7 @@ rename_bn.fit <- function(bn.fit,
     nodes <- sprintf("%s%s", nodes[1], seq_len(length(bn.fit)))
 
   ## rename nodes
-  original <- bnlearn::nodes(bn.fit)
+  original <- bnlearn_nodes(bn.fit)
   bnlearn::nodes(bn.fit) <- nodes
 
   ## if discrete, rename discrete categorical levels
@@ -156,7 +168,7 @@ bn2gnet <- function(bn,
   if (!missing(seed) && is.numeric(seed) && !is.na(seed))
     set.seed(seed)
 
-  gnet <- bnlearn::empty.graph(nodes = bnlearn::nodes(bn))
+  gnet <- bnlearn::empty.graph(nodes = bnlearn_nodes(bn))
   bnlearn::amat(gnet) <- bnlearn::amat(bn)
 
   ## generate parameters for gnet
@@ -189,7 +201,7 @@ bn2gnet <- function(bn,
     ## visit nodes topologically
     for (node in bnlearn::node.ordering(bn)){
 
-      if (length(bn[[node]]$parents) == 0){
+      if (length(bnlearn::parents(bn, node)) == 0){
 
         ## if no parents, variance 1
         Omega[node, node] <- 1
@@ -527,9 +539,9 @@ bn.fit2data_row <- function(bn.fit,
       data_row$target <= length(bn.fit)){
 
     ## provided index
-    data_row$target <- bnlearn::nodes(bn.fit)[data_row$target]
+    data_row$target <- bnlearn_nodes(bn.fit)[data_row$target]
 
-  } else if (! data_row$target %in% bnlearn::nodes(bn.fit)){
+  } else if (! data_row$target %in% bnlearn_nodes(bn.fit)){
 
     ## default to root
     data_row$target <- bnlearn::node.ordering(bn.fit)[length(bn.fit)]
@@ -588,7 +600,7 @@ bn.fit2effects <- function(bn.fit){
   debug_cli_sprintf(! class(bn.fit)[2] %in% c("bn.fit.gnet", "bn.fit.dnet"),
                     "abort", "Currently only bn.fit.gnet and bn.fit.dnet supported for determining true causal effects")
 
-  nodes <- bnlearn::nodes(bn.fit)
+  nodes <- bnlearn_nodes(bn.fit)
   effects <- array(0, dim = c(length(nodes), length(nodes), 2))
 
   if ("bn.fit.gnet" %in% class(bn.fit)){
@@ -715,7 +727,7 @@ bn.fit2values <- function(bn.fit){
   debug_cli_sprintf(! class(bn.fit)[2] %in% c("bn.fit.gnet", "bn.fit.dnet"),
                     "abort", "Currently only bn.fit.gnet and bn.fit.dnet supported for determining true causal effects")
 
-  nodes <- bnlearn::nodes(bn.fit)
+  nodes <- bnlearn_nodes(bn.fit)
 
   if ("bn.fit.gnet" %in% class(bn.fit)){
 
@@ -1489,7 +1501,7 @@ process_dnet <- function(bn.fit,
   if (length(small)){
 
     ordering <- bnlearn:::topological.ordering(bn.fit)
-    ordered <- identical(ordering, bnlearn::nodes(bn.fit))
+    ordered <- identical(ordering, bnlearn_nodes(bn.fit))
     for (node in small){
 
       bn.fit <- solve_cpt_dnet(bn.fit = bn.fit, target = node,
@@ -1712,13 +1724,13 @@ bn2dnet <- function(bn,
 
       setTimeLimit(time_limit, transient = TRUE)
       debug_cli(debug >= 3, cli::cli_alert,
-                c("attempt {i} of generating dnet with {length(bnlearn::nodes(bn))} ",
+                c("attempt {i} of generating dnet with {length(bnlearn_nodes(bn))} ",
                   "nodes and {sum(bnlearn::amat(bn))} edges"),
                 .envir = environment())
 
       ## initialize with empty graph with random marginal probabilities
-      dnet_i <- bnlearn::empty.graph(nodes = bnlearn::nodes(bn))
-      dist <- sapply(bnlearn::nodes(bn), function(node){
+      dnet_i <- bnlearn::empty.graph(nodes = bnlearn_nodes(bn))
+      dist <- sapply(bnlearn_nodes(bn), function(node){
 
         prob <- -1
         while (any(prob < marginal_lb)){
@@ -1735,7 +1747,7 @@ bn2dnet <- function(bn,
         return(prob)
 
       }, simplify = FALSE)
-      dnet_i <- bnlearn::custom.fit(bnlearn::empty.graph(nodes = bnlearn::nodes(bn)), dist)
+      dnet_i <- bnlearn::custom.fit(bnlearn::empty.graph(nodes = bnlearn_nodes(bn)), dist)
 
       ## add parents and generate cpts
       bn_list <- lapply(dnet_i[seq_len(length(dnet_i))], function(node){
