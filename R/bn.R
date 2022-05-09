@@ -4,8 +4,14 @@ bnlearn_nodes <- function(bn){
 
   stopifnot(class(bn)[1] %in% c("bn", "bn.fit"))
 
-  return(ifelse(class(bn) == "bn"),
-         names(bn$nodes), names(bn))
+  if (class(bn) == "bn"){
+
+    return(names(bn$nodes))
+
+  } else{
+
+    return(names(bn))
+  }
 }
 
 
