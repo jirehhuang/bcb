@@ -4,7 +4,7 @@ bnlearn_nodes <- function(bn){
 
   stopifnot(class(bn)[1] %in% c("bn", "bn.fit"))
 
-  if (class(bn) == "bn"){
+  if (class(bn)[1] == "bn"){
 
     return(names(bn$nodes))
 
@@ -195,7 +195,8 @@ bn2gnet <- function(bn,
   })
 
   ## normalize variances
-  if (normalize){
+  if (normalize &&
+      all(sapply(dist, `[[`, "sd") > 0)){
 
     beta <- wamat(bnlearn::custom.fit(gnet, dist = dist))  # coefficient matrix
     I <- diag(length(dist))  # identity matrix
