@@ -82,15 +82,18 @@ gen_data_grid <- function(data_grid = build_data_grid(),
                   "{i} preparing network {data_row$network}",
                   .envir = environment())
 
+        set.seed(data_row$seed)
+        rename <- !grepl("bnrpar",
+                         data_row$network)
+
         ## load bn structure
         if (grepl("rand|dkpar", data_row$network)){
 
-          set.seed(data_row$seed)
           repeat{
 
             ## generate random graph
             bn.fit <- load_bn.fit(x = data_row$network,
-                                  reorder = TRUE, rename = TRUE)
+                                  reorder = TRUE, rename = rename)
             nodes <- names(bn.fit)
             if (grepl("randpar", data_row$network)){
 
@@ -129,7 +132,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
         } else{
 
           bn.fit <- load_bn.fit(x = data_row$network,
-                                reorder = TRUE, rename = TRUE)
+                                reorder = TRUE, rename = rename)
         }
         if (data_row$data_type == "gaussian"){
 
@@ -177,7 +180,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
                                    remove_order = "decreasing",
                                    min_cp = 0,
                                    ce_lb = data_row$ce_lb,
-                                   rename = TRUE,
+                                   rename = rename,
                                    debug = debug)
             ## generate cpts
             attempt <- 1
@@ -225,7 +228,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
                                    remove_order = "decreasing",
                                    min_cp = .Machine$double.eps,
                                    ce_lb = data_row$ce_lb,
-                                   rename = TRUE,
+                                   rename = rename,
                                    debug = debug)
           }  # end if else normalize
         }  # end if gaussian else if discrete
