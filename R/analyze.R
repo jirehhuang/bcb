@@ -86,6 +86,16 @@ compile_path <- function(path,
           sae <- cbind(sae_nns, data.frame(sae_bma = sae_bma,
                                            sae_mu_bma = sae_mu_bma, sae_mu_est = sae_mu_est))
 
+          arm0 <- which.max(roundsj$mu_true)
+          node0 <- roundsj$arms$node[arm0]
+          arm0 <- sprintf("arm%g", which(sapply(seq_len(nrow(roundsj$arms)), function(x){
+
+            roundsj[[sprintf("arm%g", x)]]$arm[1]
+          }) == arm0))
+          arm0 <- data.frame(arm0_mu_est = abs(roundsj[[arm0]]$mu_est - roundsj[[arm0]]$mu_true),
+                             arm0_mu_bma = abs(roundsj[[arm0]]$mu_bma - roundsj[[arm0]]$mu_true),
+                             sae_arm0 = sae[[sprintf("sae_%s", node0)]])
+
           arm1 <- data.frame(arm1_mu_est = abs(roundsj$arm1$mu_est - roundsj$arm1$mu_true),
                              arm1_mu_bma = abs(roundsj$arm1$mu_bma - roundsj$arm1$mu_true),
                              sae_arm1 = sae[[sprintf("sae_%s", roundsj$arms$node[roundsj$arm1$arm[1]])]])
@@ -96,7 +106,7 @@ compile_path <- function(path,
                                          "criteria", "expected_reward", "expected_regret",
                                          "greedy_expected", "greedy_regret", "cumulative",
                                          "expected_cumulative", "mu_est"))]
-          roundsj$selected <- cbind(roundsj$selected, sae, arm1)
+          roundsj$selected <- cbind(roundsj$selected, sae, arm0, arm1)
 
           if (concise >= 2){
 
