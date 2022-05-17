@@ -265,12 +265,6 @@ get_progress <- function(path,
                          method = "all",
                          data_grid){
 
-  ## TODO: remove; temporary for development
-  # if (!dir.exists(path)){
-  #
-  #   path <- file.path(get_projects_dir(debug = 0),
-  #                     "current","simulations", path)
-  # }
   path <- check_path(path)
   methods <- list.files(path)
   methods <- methods[grepl(paste(avail_methods,

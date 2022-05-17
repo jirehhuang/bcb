@@ -327,7 +327,6 @@ check_path <- function(path){
 # @param fmt character value input to \code{\link[base]{sprintf}}.
 # @param ... additional arguments passed into \code{\link[base]{sprintf}}.
 # @return None.
-# @author Jireh Huang (\email{jirehhuang@@ucla.edu})
 # @examples
 # fn <- function(debug = FALSE){
 #

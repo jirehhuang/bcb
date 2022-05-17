@@ -46,7 +46,7 @@ setRefClass("Score",
                 nodes = character(0),
                 ...) {
                 .nodes <<- nodes
-                pp.dat$targets <<- pcalg:::.tidyTargets(length(nodes), targets)  # jirehhuang
+                pp.dat$targets <<- pcalg:::.tidyTargets(length(nodes), targets)  # edited
               },
 
               # Yields a vector of node names
@@ -146,7 +146,7 @@ setRefClass("Score",
               }
             )
 )
-# @noRd  # jirehhuang
+# @noRd  # edited
 
 setRefClass("DataScore",
             contains = "Score",
@@ -186,7 +186,7 @@ setRefClass("DataScore",
                 if (is.null(nodes)) {
                   nodes <- as.character(1:ncol(data))
                 }
-                targetList <- pcalg:::.tidyTargets(ncol(data), targets, target.index)  # jirehhuang
+                targetList <- pcalg:::.tidyTargets(ncol(data), targets, target.index)  # edited
                 callSuper(targets = targetList$targets, nodes, ...)
 
                 ## Order by ascending target indices (necessary for certain scoring objects)
@@ -205,7 +205,7 @@ setRefClass("DataScore",
 
                 ## Store list of index vectors of "non-interventions": for each vertex k,
                 ## store the indices of the data points for which k has NOT been intervened
-                A <- !pcalg:::targets2mat(pp.dat$vertex.count, pp.dat$targets, pp.dat$target.index)  # jirehhuang
+                A <- !pcalg:::targets2mat(pp.dat$vertex.count, pp.dat$targets, pp.dat$target.index)  # edited
                 pp.dat$non.int <<- lapply(seq_len(ncol(A)), function(i) which(A[, i]))
                 # apply() cannot be used since we need a list, not a matrix.
                 pp.dat$data.count <<- as.integer(colSums(A))
@@ -225,7 +225,7 @@ setRefClass("DataScore",
               }
             )
 )
-# @noRd  # jirehhuang
+# @noRd  # edited
 
 
 

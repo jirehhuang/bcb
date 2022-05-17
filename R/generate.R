@@ -535,7 +535,6 @@ ribn <- function(x,
 # @param network character value indicating network name.
 # @param debug logical value that activates printing debugging output.
 # @return data.frame with grid of network settings.
-# @author Jireh Huang (\email{jirehhuang@@ucla.edu})
 # @examples
 # ## Default data_grid
 # build_data_grid()

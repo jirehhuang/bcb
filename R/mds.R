@@ -16,11 +16,11 @@ execute_mds <- function(ps,
 
     return(bnlearn::amat(bnlearn::empty.graph(nodes = settings$nodes)))
   }
-  ## TODO: remove; temporary because mds not working for hoffman2
-  if (Sys.info()["user"] == "jirehhua" || length(ps) > 12){
+  ## TODO: remove; temporary because mds not working for cluster
+  if (grepl("login|node", Sys.info()["nodename"]) || length(ps) > 12){
 
     debug_cli(debug >= 2, cli::cli_alert_warning,
-              "{.pkg mds} not yet supported on hoffman2 or large graphs")
+              "{.pkg mds} not yet supported on cluster or large graphs")
 
     ## return empty graph
     return(bnlearn::amat(bnlearn::empty.graph(nodes = settings$nodes)))
@@ -149,11 +149,11 @@ compile_mds <- function(mds_dir = get_mds(dir = TRUE),
   debug_cli(debug >= 2, cli::cli_alert_info,
             "compiling {.pkg mds} using make")
 
-  ## TODO: remove; temporary because mds not working for hoffman2
-  if (Sys.info()["user"] == "jirehhua"){
+  ## TODO: remove; temporary because mds not working for cluster
+  if (grepl("login|node", Sys.info()["nodename"])){
 
     debug_cli(debug >= 2, cli::cli_alert_warning,
-              "{.pkg mds} not yet supported on hoffman2")
+              "{.pkg mds} not yet supported on cluster")
 
     return(NULL)
   }
