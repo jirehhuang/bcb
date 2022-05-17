@@ -10,11 +10,14 @@ set.seed(1)
 bcb:::load_example(eg = "gnet", network = "asia")
 
 ## bandit()
+settings$method <- "bcb-star"
 settings$n_obs <- 10
 settings$n_int <- 10
+settings$restrict <- "pc"
 bndt <- bandit(bn.fit = bn.fit, settings = settings, debug = debug)
 
 ## write_rounds()
+settings <- bndt$settings
 rounds_dir <- file.path(settings$temp_dir,
                         sprintf("rounds%g", settings$run))
 bcb:::write_rounds(rounds = bndt,
