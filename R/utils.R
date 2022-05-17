@@ -96,12 +96,12 @@ debug_width <- function(){
 dir_check <- function(path,
                       min_depth = 2){
 
-  ## append path to getwd() if home directory not included
-  ## TODO: revert; temporary for development
+  ## append path to projects_dir if home directory not included
+  ## TODO: temporary for development
   # if (! grepl(path.expand("~"), path)){
-  if (! grepl(get_projects_dir(debug = 0), path)){
+  if (! grepl(projects_dir <- get_projects_dir(debug = 0), path)){
 
-    path <- file.path(getwd(), path)
+    path <- file.path(projects_dir, path)
   }
   folders <- strsplit(path, split = .Platform$file.sep)[[1]]
   folders <- folders[folders != ""]  # trim blank "" from the end(s)
@@ -298,20 +298,17 @@ check_path <- function(path){
   if (is.null(path)){
 
     ## default directory
-    ## TODO: revert; temporary for development
-    # path <- file.path(getwd(), "simulations", Sys.time())
+    ## TODO: temporary for development
     path <- file.path(get_projects_dir(debug = 0),
                       "current", "simulations", Sys.time())
 
   } else if (!dir.exists(path) &&
-             ## TODO: revert; temporary for development
-             # ! grepl(path.expand("~"), path)){
-             ! grepl(get_projects_dir(debug = 0), path)){
+             ## TODO: temporary for development
+             !grepl(projects_dir <- get_projects_dir(debug = 0), path)){
 
-    ## append dir to getwd() if home directory not included
-    ## TODO: revert; temporary for development
-    # path <- file.path(getwd(), path)
-    path <- file.path(get_projects_dir(debug = 0),
+    ## append dir to projects_dir if home directory not included
+    ## TODO: temporary for development
+    path <- file.path(projects_dir,
                       "current","simulations", path)
   }
   return(path)
