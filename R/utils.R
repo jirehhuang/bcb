@@ -90,14 +90,7 @@ debug_width <- function(){
 
 
 
-#' Check directory
-#'
-#' Checks if a directory exists, creating folder(s) if necessary.
-#'
-#' @param path character value specifying a directory.
-#' @param min_depth numeric value indicating the minimum depth.
-#' @details If the first min_depth folders in the directory do not exist, there are likely typos in \code{path} and an error will be thrown.
-#' @author Jireh Huang (\email{jirehhuang@@ucla.edu})
+# Check directory
 #' @export
 
 dir_check <- function(path,
