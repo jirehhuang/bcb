@@ -7,7 +7,7 @@ dir_check(path)
 
 ## simulation settings
 eg <- expand.grid(seed = seq_len(1e3),
-                  r = c(0, 1, 2, 3, 4),
+                  r = c(0, 1, 2, 3),
                   n = 100 * 2^(0:5))
 
 
