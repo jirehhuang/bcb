@@ -2,4 +2,4 @@ mds0 is the original uncompiled mds folder: https://github.com/ttalvitie/modular
 
 mds.zip is the zipped original folder (unzips as mds, not mds0)
 
-mds is a precompiled copy to accelerate development by avoiding recompiling the tool after each installation
+mds is a precompiled copy to accelerate development by avoiding recompiling the tool after each installation, with minor modifications made to set the random seed (see run_sampler in sampler.cpp)

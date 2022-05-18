@@ -33,7 +33,7 @@ void write_dags(const std::vector<std::vector<int>>& dags) {
 template <class Sampler>
 void run_sampler(int number_of_dags, typename Sampler::WeightT weights) {
 
-    rng.seed(number_of_dags);  // jirehhuang
+    rng.seed(number_of_dags);  // edited
 
     std::cerr << "Sampling " << number_of_dags << " DAGs\n";
 
@@ -45,7 +45,7 @@ void run_sampler(int number_of_dags, typename Sampler::WeightT weights) {
 
     std::vector<std::vector<int>> dags;
     for (int i = 0; i < number_of_dags; ++i) {
-    // for (int i = 0; i < 1; ++i) {  // jirehhuang
+    // for (int i = 0; i < 1; ++i) {  // edited
         dags.push_back(sampler.sample());
     }
 
