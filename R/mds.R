@@ -17,7 +17,8 @@ execute_mds <- function(ps,
     return(bnlearn::amat(bnlearn::empty.graph(nodes = settings$nodes)))
   }
   ## TODO: remove; temporary because mds not working for cluster
-  if (grepl("login|node", Sys.info()["nodename"]) || length(ps) > 12){
+  if (gsub("[0-9]+", "", Sys.info()[["nodename"]]) %in% c("login", "n") ||
+      length(ps) > 12){
 
     debug_cli(debug >= 2, cli::cli_alert_warning,
               "{.pkg mds} not yet supported on cluster or large graphs")
@@ -150,7 +151,7 @@ compile_mds <- function(mds_dir = get_mds(dir = TRUE),
             "compiling {.pkg mds} using make")
 
   ## TODO: remove; temporary because mds not working for cluster
-  if (grepl("login|node", Sys.info()["nodename"])){
+  if (gsub("[0-9]+", "", Sys.info()[["nodename"]]) %in% c("login", "n")){
 
     debug_cli(debug >= 2, cli::cli_alert_warning,
               "{.pkg mds} not yet supported on cluster")
