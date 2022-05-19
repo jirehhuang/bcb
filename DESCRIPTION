@@ -7,7 +7,7 @@ Authors@R:
            role = c("aut", "cre"),
            email = "jirehhuang@ucla.edu")
 Description: Bayesian Causal Bandits
-License: TBD
+License: GPL (>= 3)
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
