@@ -9,7 +9,7 @@ Jireh Huang and Qing Zhou
 
 NeurIPS 2022
 
-## Requirements
+## Installation
 
 On R version 3.6.0 or more recent, first install the
 [phsl](https://github.com/jirehhuang/phsl) package according to the
@@ -98,7 +98,7 @@ Drive\]](https://drive.google.com/drive/folders/1VP-WoJ5wDQM4LjOv_XZvXIcFvteezTI
 
 #### 4. Analyzing Results
 
-Append `_done` from the compiled directories from `compile_dkpar.R`,
+Append `_done` to the compiled directories from `compile_dkpar.R`,
 resulting in folder names `dkpar_3_6_3-d_done` and `dkpar_3_6_3-g_done`.
 The compiled results for each algorithm are not necessary – only
 `df_2.rds` and `method_grid.txt` in the `concise` folder.
@@ -135,15 +135,3 @@ adjustment coverage probabilities for the discrete
 (`bda_coverage-d.{eps, png}`) and Gaussian (`bda_coverage-g.{eps, png}`)
 simulations. The results are available at [\[Google
 Drive\]](https://drive.google.com/drive/folders/1BvlbSjHGmVEo4wim4tHMzCj4fVBf2gOA).
-
-## Results
-
-<img src="inst/figures/cumulative.png" width="80%" />
-
-<img src="inst/figures/hs-d.png" width="80%" />
-
-<img src="inst/figures/essae.png" width="80%" />
-
-<img src="inst/figures/bda_coverage-d.png" width="80%" />
-
-<img src="inst/figures/bda_coverage-g.png" width="80%" />

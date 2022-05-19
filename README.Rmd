@@ -13,7 +13,7 @@ NeurIPS 2022
 
 
 
-## Requirements
+## Installation
 
 On R version 3.6.0 or more recent, first install the [phsl](https://github.com/jirehhuang/phsl) package according to the instructions provided by the author. Unfortunately, some functionality of the bcb package is not compatible with Windows due to the integration of [BIDA](https://github.com/jopensar/BIDA) and [modular-dag-sampling](https://github.com/ttalvitie/modular-dag-sampling), copies of which are included in the `inst` folder with permission from the respective authors.
 
@@ -76,7 +76,7 @@ source("compile_dkpar.R")
 
 #### 4. Analyzing Results
 
-Append `_done` from the compiled directories from `compile_dkpar.R`, resulting in folder names `dkpar_3_6_3-d_done` and `dkpar_3_6_3-g_done`. The compiled results for each algorithm are not necessary -- only `df_2.rds` and `method_grid.txt` in the `concise` folder.
+Append `_done` to the compiled directories from `compile_dkpar.R`, resulting in folder names `dkpar_3_6_3-d_done` and `dkpar_3_6_3-g_done`. The compiled results for each algorithm are not necessary -- only `df_2.rds` and `method_grid.txt` in the `concise` folder.
 
 ```{r, eval = FALSE}
 source("analyze_dkpar.R")
@@ -96,27 +96,3 @@ source("analyze_bda.R")
 ```
 
 `test_bda.R` creates folders `test_bda-{d, g}`, investigating 24000 randomly generated scenarios for each distributional setting. In each folder, an RDS file is compiled containing the simulation results. The script executed in about 167 days of single thread CPU time using the UCLA Hoffman2 computing cluster. `analyze_bda.R` creates the backdoor adjustment coverage probabilities for the discrete (`bda_coverage-d.{eps, png}`) and Gaussian (`bda_coverage-g.{eps, png}`) simulations. The results are available at [[Google Drive]](https://drive.google.com/drive/folders/1BvlbSjHGmVEo4wim4tHMzCj4fVBf2gOA). 
-
-
-
-## Results
-
-```{r, echo=FALSE, out.width = "80%"}
-knitr::include_graphics("inst/figures/cumulative.png")
-```
-
-```{r, echo=FALSE, out.width = "80%"}
-knitr::include_graphics("inst/figures/hs-d.png")
-```
-
-```{r, echo=FALSE, out.width = "80%"}
-knitr::include_graphics("inst/figures/essae.png")
-```
-
-```{r, echo=FALSE, out.width = "80%"}
-knitr::include_graphics("inst/figures/bda_coverage-d.png")
-```
-
-```{r, echo=FALSE, out.width = "80%"}
-knitr::include_graphics("inst/figures/bda_coverage-g.png")
-```
