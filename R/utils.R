@@ -399,7 +399,7 @@ get_projects_dir <- function(scratch = TRUE,
                              envir = sys.frame(-1),
                              debug = 1){
 
-  user <- Sys.info()["user"]
+  user <- Sys.info()[["user"]]
 
   if (user == "jireh"){
 
@@ -416,8 +416,10 @@ get_projects_dir <- function(scratch = TRUE,
 
   } else{
 
-    debug_cli(TRUE, cli::cli_abort,
-              "invalid user")
+    projects_dir <- getwd()
+
+    debug_cli(TRUE, cli::cli_alert_warning,
+              "using current working directory")
   }
   debug_cli(debug, cli::cli_alert_info,
             "user = {user}, projects_dir = {projects_dir}")
