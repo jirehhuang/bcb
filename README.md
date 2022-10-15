@@ -7,8 +7,6 @@ Jireh Huang
 
 Jireh Huang and Qing Zhou
 
-NeurIPS 2022
-
 ## Installation
 
 On R version 3.6.0 or more recent, first install the
