@@ -1099,7 +1099,7 @@ get_jpt <- function(bn.fit,
   if (sum(jpt) != 1){
 
     debug_cli(abs(sum(jpt) - 1) > .Machine$double.eps, cli::cli_warn,
-              "numerical error of {abs(sum(jpt) - 1)} > {.Machine$double.eps}")
+              "numerical error of {abs(sum(jpt) - 1)} > { .Machine$double.eps}")
 
     jpt <- jpt / sum(jpt)
   }
