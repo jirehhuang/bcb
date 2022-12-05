@@ -407,7 +407,7 @@ get_projects_dir <- function(scratch = TRUE,
 
   } else if (user == "jirehhua"){
 
-    projects_dir <- ifelse(scratch, "/u/flashscratch/j/jirehhua",
+    projects_dir <- ifelse(scratch, "/u/scratch/j/jirehhua",
                            "/u/home/j/jirehhua/research/projects")
 
   } else if (user == "jirehhuang"){
