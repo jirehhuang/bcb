@@ -382,7 +382,8 @@ clear_path <- function(path,
 
     debug_cli(debug, cli::cli_alert_info,
               c("deleting {length(list.files(err_dir, all.files = TRUE, recursive = TRUE))} ",
-                "error files"))
+                "error files"),
+              .envir = environment())
 
     unlink(err_dir, recursive = TRUE)
   }
