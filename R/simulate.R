@@ -365,10 +365,17 @@ clear_path <- function(path,
   n_cores <- round(n_cores)
   mclapply <- get_mclapply(n_cores = n_cores)
 
-  debug_cli(debug && length(methods), cli::cli_alert_info,
+  if (n_cores < 1){
+
+    debug_cli(debug, cli::cli_alert_info,
+              c("no methods found to clear"))
+    return(invisible(NULL))
+  }
+  debug_cli(debug, cli::cli_alert_info,
             c("clearing {clear_type} files ",
               "for method(s): `{paste(methods, collapse = ', ')}` ",
-              "with n_cores = {n_cores}"))
+              "with n_cores = {n_cores}"),
+            .envir = environment())
 
   err_dir <- file.path(path, "errors")
   if (dir.exists(err_dir)){
@@ -412,6 +419,7 @@ clear_path <- function(path,
   }
   null <- mclapply(methods, mc.cores = n_cores,
                    mc.preschedule = FALSE, clr_fn)
+  return(invisible(NULL))
 }
 
 
