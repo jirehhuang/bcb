@@ -89,6 +89,20 @@ avail_bcb_criteria <- c("bucb",    # default bayes-ucb with delta
 
 
 
+# Flow cytometry node names
+
+cytometry_nodes <- c("Raf",  # praf
+                     "Mek",  # pmek
+                     "Plcg",  # plcg
+                     "PIP2", "PIP3",
+                     "Erk",  # p44/42
+                     "Akt",  # pakts472
+                     "PKA", "PKC",
+                     "P38",  # P38
+                     "Jnk")  # pjnk
+
+
+
 # Width of function portion of debugging output
 
 DEBUG_WIDTH <- 20

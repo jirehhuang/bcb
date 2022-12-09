@@ -550,9 +550,9 @@ build_data_grid <- function(network = "survey",
                             ce_lb = 1e-2,  # causal effect lower bound
                             ri_lb = 1e-2,  # reward identifiability lower bound
                             reg_lb = 0,  # regret difference lower bound
-                            var_lb = 0.1,
-                            var_ub = 0.2,
-                            coef_lb = 0.5,
+                            var_lb = ifelse(data_type == "gaussian", 0.1, 2),
+                            var_ub = ifelse(data_type == "gaussian", 0.2, 2),
+                            coef_lb = ifelse(data_type == "gaussian", 0.5, 1e-2),
                             coef_ub = 1,
                             normalize = TRUE,
                             copies = 1,
