@@ -177,7 +177,7 @@ simulate_method <- function(method_num,
       ## write in method error folder
       method_err_dir <- file.path(method_dir, "errors")
       dir_check(method_err_dir)
-      file <- file.path(method_err_dir, sprintf("%s_%s_%s.txt", nodename,
+      file <- file.path(method_err_dir, sprintf("%s_%s_%s.txt", Sys.info()[["nodename"]],
                                                 i, gsub(" ", "_", Sys.time())))
       write.table(x = msg, file = file,
                   quote = FALSE, row.names = FALSE, col.names = FALSE)
@@ -185,7 +185,7 @@ simulate_method <- function(method_num,
       ## write in path error folder
       err_method_dir <- file.path(path, "errors", sprintf("%s%s", method, method_num))
       dir_check(err_method_dir)
-      file <- file.path(err_method_dir, sprintf("%s_%s_%s.txt", nodename,
+      file <- file.path(err_method_dir, sprintf("%s_%s_%s.txt", Sys.info()[["nodename"]],
                                                 i, gsub(" ", "_", Sys.time())))
       write.table(x = msg, file = file,
                   quote = FALSE, row.names = FALSE, col.names = FALSE)
@@ -250,7 +250,7 @@ sim_method_grid <- function(method,
       err_dir <- file.path(path, "errors")
       dir_check(err_dir)
       file <- file.path(err_dir, sprintf("%s_%s%s_%s_%s.txt",
-                                         nodename, method, method_num,
+                                         Sys.info()[["nodename"]], method, method_num,
                                          paste(method_nums, collapse = ","),
                                          gsub(" ", "_", Sys.time())))
       write.table(x = msg, file = file,
