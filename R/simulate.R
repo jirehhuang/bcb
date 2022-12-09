@@ -116,7 +116,11 @@ simulate_method <- function(method_num,
         if (file.exists(cache_file))
           settings$rounds0 <- readRDS(cache_file)
       }
-      settings$target <- data_row$target
+      if (is.null(settings$target) ||
+          !settings$target %in% names(bn.fit)){
+
+        settings$target <- data_row$target
+      }
       settings$run <- j
       settings$data_obs <- file.path(data_dir,
                                      sprintf("data%g.txt", j))
