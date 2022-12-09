@@ -233,6 +233,63 @@ gen_data_grid <- function(data_grid = build_data_grid(),
           }  # end if else normalize
         }  # end if gaussian else if discrete
 
+        ## sample from data
+        if (data_row$network == "cytometry"){
+
+          ## load from sparsebn
+          require(sparsebn, quietly = TRUE)
+
+          target <- unlist(lapply(cytometry$ivn,
+                                  function(x) ifelse(is.null(x), NA, x)))
+          target <- unname(c(pka = "PKA", akt = "Akt", pkc = "PKC", pip2 = "PIP2", mek = "Mek")[target])
+
+          if (data_row$data_type == "gaussian"){
+
+            data(cytometryContinuous)
+            cytometry <- cytometryContinuous
+
+            data <- cytometry$data
+            names(data) <- cytometry_nodes
+
+            # data <- as.data.frame(lapply(data, function(x) x - mean(x)))
+
+            not_na <- !is.na(target)
+            obs_means <- colMeans(data[!not_na,])
+
+            ## TODO: Gaussian implementation
+            browser()
+
+          } else if (data_row$data_type == "discrete"){
+
+            data(cytometryDiscrete)
+            cytometry <- cytometryDiscrete
+
+            data <- cytometry$data
+            names(data) <- cytometry_nodes
+            # data <- as.data.frame(lapply(data, pmax, 1)) - 1
+            data <- as.data.frame(lapply(data, pmin, 1))
+            data <- as.data.frame(lapply(data, as.factor), stringsAsFactors = TRUE)
+          }
+
+          if (!identical(names(bn.fit), names(data))){
+
+            if (setequal(names(bn.fit), names(data))){
+
+              data <- data[names(bn.fit)]
+
+            } else{
+
+              new_names <- names(bn.fit)
+              names(new_names) <- names(data)
+
+              names(data) <- unname(new_names[names(data)])
+              target <- unname(new_names[target])
+            }
+          }
+          attr(bn.fit, "data") <- data
+          attr(bn.fit, "target") <- target
+        }
+
         ## true graphs
         true_dag <- bnlearn::amat(bn.fit)
         true_cpdag <- bnlearn::amat(bnlearn::cpdag(bn.fit))
@@ -348,14 +405,14 @@ gen_data_grid <- function(data_grid = build_data_grid(),
 
             if ("bn.fit.gnet" %in% class(bn.fit)){
 
-              data <- bnlearn::rbn(x = bn.fit, n = data_row$n_obs)
+              data <- ribn(x = bn.fit, n = data_row$n_obs)
 
             } else if ("bn.fit.dnet" %in% class(bn.fit)){
 
               attempt <- 1
               repeat{
 
-                data <- bnlearn::rbn(x = bn.fit, n = data_row$n_obs)
+                data <- ribn(x = bn.fit, n = data_row$n_obs)
 
                 ## check if any with only one discrete level
                 invalid <- sum(sapply(data, function(x) var(as.integer(x))) == 0)
@@ -428,6 +485,37 @@ ribn <- function(x,
 
   if (!is.null(seed))
     set.seed(seed)
+
+  ## sample from data
+  if (!is.null(data <- attr(x, "data")) &&
+      !is.null(target <- attr(x, "target"))){
+
+    if (length(intervene) == 0){
+
+      debug_cli(!any(bool_obs <- is.na(target)), cli::cli_abort,
+                "no observational data available to resample")
+
+      data <- data[sample(x = which(bool_obs),
+                          size = n, replace = TRUE),, drop = FALSE]
+      return(data)
+
+    } else{
+
+      ## TODO: generalize to multiple interventions
+      if (length(intervene) > 1 ||
+          length(intervene[[1]]) > 2){
+
+        browser()
+      }
+      int <- intervene[[1]]
+      node <- setdiff(names(int), "n")
+      value <- ifelse(is.numeric(int[[node]]),
+                      levels(data[[node]])[int[[node]]], int[[node]])
+      data <- data[sample(x = which(data[[node]] == value & target == node),
+                          size = int$n, replace = TRUE),, drop = FALSE]
+      return(data)
+    }
+  }
 
   bnlearn:::check.bn.or.fit(x)
 

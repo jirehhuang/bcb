@@ -19,9 +19,10 @@ bandit <- function(bn.fit,
   settings <- check_settings(settings = settings,
                              bn.fit = bn.fit, debug = debug)
   set.seed(seed0 + sum(settings$run))
-  if (is.null(settings$data_obs))
+  if (is.null(settings$data_obs)){
     settings$data_obs <- ribn(x = bn.fit,
                               n = settings$n_obs)
+  }
   on.exit(clear_temp(settings = settings),
           add = TRUE) # score/support/arp/gobnilp
 
@@ -1053,19 +1054,45 @@ initialize_rounds <- function(settings,
     rounds$selected$reward[1] <- -1  # indicate where to begin
     rownames(rounds$arp) <- colnames(rounds$arp) <- settings$nodes
 
-    rounds$mu_true <- sapply(rounds$arms, function(arm){
+    ## if sampling from data
+    if (!is.null(data <- attr(bn.fit, "data")) &&
+        !is.null(target <- attr(bn.fit, "target"))){
 
-      ## TODO: change
-      if (class(bn.fit)[2] == "bn.fit.gnet"){
+      not_na <- !is.na(target)
 
-        arm$value * rounds$beta_true[arm$node, settings$target, 1]
+      rounds$mu_true <- sapply(rounds$arms, function(arm){
 
-      } else if (class(bn.fit)[2] == "bn.fit.dnet"){
+        if (class(bn.fit)[2] == "bn.fit.gnet"){
 
-        rounds$beta_true[arm$node, settings$target, arm$value]
-      }
-    })
+          browser()
 
+          mean(data[[settings$target]][not_na & target == arm$node])
+
+        } else if (class(bn.fit)[2] == "bn.fit.dnet"){
+
+          value <- ifelse(is.numeric(arm$value),
+                          levels(data[[arm$node]])[arm$value], arm$value)
+
+          mean(data[[settings$target]][not_na & target == arm$node &
+                                         data[[arm$node]] == value] ==
+                 levels(data[[settings$target]])[settings$success])
+        }
+      })
+    } else{
+
+      rounds$mu_true <- sapply(rounds$arms, function(arm){
+
+        ## TODO: change
+        if (class(bn.fit)[2] == "bn.fit.gnet"){
+
+          arm$value * rounds$beta_true[arm$node, settings$target, 1]
+
+        } else if (class(bn.fit)[2] == "bn.fit.dnet"){
+
+          rounds$beta_true[arm$node, settings$target, arm$value]
+        }
+      })
+    }
     acal <- matrix(0, nrow = n_obs + n_int,
                    ncol = length(rounds$arms))  # one column for each arm
     pxp <- matrix(0, nrow = n_obs + n_int,
@@ -1245,6 +1272,30 @@ build_arms <- function(bn.fit, settings, debug = 0){
     ## TODO: check validity of arms
 
     arms <- settings$arms
+  }
+  if (!is.null(data <- attr(bn.fit, "data")) &&
+      !is.null(target <- attr(bn.fit, "target"))){
+
+    # arms <- arms[sapply(arms, `[[`, "node") %in% unique(target)]
+
+    unique_target <- unique(target)
+
+    if (class(bn.fit)[2] == "bn.fit.gnet"){
+
+      ## TODO: Gaussian implementation
+      browser()
+
+    } else if (class(bn.fit)[2] == "bn.fit.dnet"){
+
+      arms <- arms[sapply(arms, function(x){
+
+        value <- ifelse(is.numeric(x$value),
+                        levels(data[[x$node]])[x$value], x$value)
+
+        x$node %in% unique_target && sum(target == x$node &
+                                           data[[x$node]] == value, na.rm = TRUE) > 1
+      })]
+    }
   }
   return(unname(arms))
 }
