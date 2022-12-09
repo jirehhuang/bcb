@@ -794,11 +794,15 @@ dag2arp <- function(dag = bnlearn::amat(bn.fit),
 
 # Zero intercepts of bn.fit
 
-zero_bn.fit <- function(bn.fit){
+zero_bn.fit <- function(bn.fit, keep_attrib = TRUE){
 
   if (class(bn.fit)[2] != "bn.fit.gnet")
     return(bn.fit)
 
+  if (keep_attrib){
+
+    attrib <- attributes(bn.fit)
+  }
   ## already zeroed
   if (!is.null(attr(bn.fit, "obs_means")))
     return(bn.fit)
@@ -818,6 +822,10 @@ zero_bn.fit <- function(bn.fit){
   bn.fit <- bn_list2bn.fit(bn_list)
   attr(bn.fit, "obs_means") <- obs_means
 
+  if (keep_attrib){
+
+    attributes(bn.fit) <- attrib
+  }
   return(bn.fit)
 }
 
