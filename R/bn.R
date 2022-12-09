@@ -480,6 +480,19 @@ load_bn.fit <- function(x,
                     seed = as.numeric(x_p_seed[3]))
     bn.fit <- bn2gnet(bn = bn, ...)
 
+  } else if (grepl("cytometry", x)){
+
+    ## load from sparsebn
+    require(sparsebn, quietly = TRUE)
+    data(cytometryDiscrete)
+
+    dag <- as.matrix(sparsebnUtils::get.adjacency.matrix(cytometryDiscrete$dag))
+    rownames(dag) <- colnames(dag) <- cytometry_nodes
+    bn <- bnlearn::empty.graph(nodes = cytometry_nodes)
+    bnlearn::amat(bn) <- dag
+
+    bn.fit <- bn2gnet(bn = bn, ...)
+
   } else{
 
     browser()
