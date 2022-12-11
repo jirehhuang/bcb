@@ -18,27 +18,32 @@ avail_bnrepository <- c(
 
 # Available bandit methods (i.e. algorithms; policies)
 
-avail_methods <- c("cache",       # cache observational rounds
-                   "random",      # random interventions
-                   "bucb",        # bayes-ucb
-                   "ts",          # thompson sampling
-                   "greedy",      # epsilon-greedy interventions
-                   "ucb",         # upper-confidence bounds
-                   "cn-bucb",     # bucb + int_parents = 2
-                   "cn-ts",       # ts + int_parents = 2
-                   "cn-greedy",   # epsilon-greedy + int_parents = 2
-                   "cn-ucb",      # ucb + int_parents = 2
-                   "bcb-bucb",    # bma + bucb with delta
-                   "bcb-ts",      # bma + ts
-                   "bcb-mds-ts",  # mds + ts
-                   "bcb-greedy",  # bma + greedy with epsilon
-                   "bcb-ucb",     # bma + tuned with c
-                   "bcb-star",    # true underlying dag
-                   "bcb-bma",     # bayesian model averaging
-                   "bcb-mpg",     # median probability graph
-                   "bcb-mds",     # thompson sampling via modular dag sampling
-                   "bcb-gies",    # greedy interventional equivalence search
-                   "bcb-eg")      # empty graph
+avail_methods <- c(
+  "cache",          # cache observational rounds
+  "random",         # random interventions
+  "bucb",           # bayes-ucb
+  "ts",             # thompson sampling
+  "greedy",         # epsilon-greedy interventions
+  "ucb",            # upper-confidence bounds
+  "cn-bucb",        # bucb + int_parents = 2
+  "cn-ts",          # ts + int_parents = 2
+  "cn-greedy",      # epsilon-greedy + int_parents = 2
+  "cn-ucb",         # ucb + int_parents = 2
+  "bcb-bucb",       # bma + bucb with delta
+  "bcb-ts",         # bma + ts
+  "bcb-mds-ts",     # mds + ts
+  "bcb-greedy",     # bma + greedy with epsilon
+  "bcb-ucb",        # bma + tuned with c
+  "bcb-star",       # true underlying dag
+  "bcb-bma",        # bayesian model averaging
+  "bcb-mpg",        # median probability graph
+  "bcb-mds",        # thompson sampling via modular dag sampling
+  "bcb-gies",       # greedy interventional equivalence search
+  "bcb-eg",         # empty graph
+  "bcb-mcmc-bucb",  # bma + bucb with delta
+  "bcb-mcmc-ts",    # bma + ts
+  "bcb-mcmc-ucb"    # bma + ts
+)
 
 
 

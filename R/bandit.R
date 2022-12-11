@@ -1595,7 +1595,7 @@ check_settings <- function(settings,
     if (settings$method == "bcb-mcmc-bucb"){
       settings$method <- "bcb-bma"
       settings$bcb_combine <- "conjugate"
-      settings$bcb_criteria <- "ts"
+      settings$bcb_criteria <- "bucb"
       settings$bcb_engine <- "mcmc"
       settings$threshold <- 1
     }
