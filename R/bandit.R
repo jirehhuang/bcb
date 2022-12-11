@@ -1046,7 +1046,11 @@ initialize_rounds <- function(settings,
       ps = list(),
       bda = list(),
       arp = matrix(NA, nrow = settings$nnodes, ncol = settings$nnodes),
-      beta_true = bn.fit2effects(bn.fit = bn.fit),
+      beta_true = if (is.null(settings$data_dir)){
+        bn.fit2effects(bn.fit = bn.fit)
+      } else{
+        readRDS(file = file.path(settings$data_dir, "effects_array.rds"))
+      },
       mu_true = numeric()
     )
     rounds$selected$reward[seq_len(n_obs)] <-

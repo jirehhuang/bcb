@@ -122,6 +122,7 @@ simulate_method <- function(method_num,
         settings$target <- data_row$target
       }
       settings$run <- j
+      settings$data_dir <- data_dir
       settings$data_obs <- file.path(data_dir,
                                      sprintf("data%g.txt", j))
       ## ensure unique id; reset in bandit()
