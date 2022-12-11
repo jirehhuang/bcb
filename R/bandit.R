@@ -577,7 +577,7 @@ update_rounds <- function(t,
                             settings = settings,
                             interventions = interventions,
                             blmat = rounds$blmat[t,],
-                            iterative = t %% 100 == 0,
+                            iterative = t %% 100 == 0 && settings$restrict != "none",
                             debug = debug)
     } else{
 
@@ -602,9 +602,16 @@ update_rounds <- function(t,
 
       } else{
 
-        # rounds$blmat[t+1,] <- 1 - es2mpg(es = rounds$bma[t,],
-        #                                  prob = 0.05)  # TODO: specify
-        rounds$blmat[t+1,] <- rounds$blmat[t,]
+        ## TODO: figure out best way to expand search space
+        ## iterativeMCMC can expand or reduce search space
+
+        ## keep the same as before
+        # rounds$blmat[t+1,] <- rounds$blmat[t,]
+
+        ## expand if high edge support probability
+        rounds$blmat[t+1,] <- 1 - es2mpg(es = rounds$bma[t,],
+                                         prob = 0.1)  # TODO: specify
+        rounds$blmat[t+1,] <- pmin(rounds$blmat[t+1,], rounds$blmat[t,])
       }
     }
   }
