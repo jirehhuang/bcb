@@ -226,7 +226,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
                                    max_in_deg = data_row$max_in_deg,
                                    max_out_deg = data_row$max_out_deg,
                                    remove_order = "decreasing",
-                                   min_cp = .Machine$double.eps,
+                                   # min_cp = .Machine$double.eps,
                                    ce_lb = data_row$ce_lb,
                                    rename = rename,
                                    debug = debug)
@@ -306,7 +306,9 @@ gen_data_grid <- function(data_grid = build_data_grid(),
           })
         )
         ## update data_row
-        data_row <- bn.fit2data_row(bn.fit, data_row)
+        data_row <- bn.fit2data_row(bn.fit = bn.fit,
+                                    data_row = data_row,
+                                    effects_array = effects_array)
 
         ## write files
         write.table(data_row, file.path(data_dir, "data_row.txt"))
