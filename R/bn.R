@@ -1119,7 +1119,8 @@ get_jpt <- function(bn.fit,
 
 add_j_m_pt <- function(bn.fit,
                        nodes = names(bn.fit),
-                       ignore_if_present = TRUE){
+                       ignore_if_present = TRUE,
+                       attempt_global = FALSE){
 
   ## if mpt and jpt already present for each node, ignore
   if (ignore_if_present &&
@@ -1131,6 +1132,9 @@ add_j_m_pt <- function(bn.fit,
 
     ## attempt using bn.fit2jpt()
     bn_list <- tryCatch({
+
+      debug_cli(!attempt_global, cli::cli_abort,
+                "skipping {.fn bn.fit2jpt}")
 
       jpt <- bn.fit2jpt(bn.fit = bn.fit)
 
@@ -1145,7 +1149,7 @@ add_j_m_pt <- function(bn.fit,
     },
     error = function(err){
 
-      debug_cli(TRUE, cli::cli_alert_danger,
+      debug_cli(attempt_global, cli::cli_alert_danger,
                 c("error using {.fn bn.fit2jpt} for {length(bn.fit)} nodes: ",
                   "{gsub('\\n', ' ', as.character(err))}"),
                 .envir = environment())
@@ -1160,7 +1164,7 @@ add_j_m_pt <- function(bn.fit,
   ## reattempt using get_jpt() and then empirical jpt
   if (length(bn_list) == 0){
 
-    debug_cli(setequal(names(bn.fit), nodes), cli::cli_alert,
+    debug_cli(attempt_global && setequal(names(bn.fit), nodes), cli::cli_alert,
               "reattempting by applying {.fn get_jpt} to each node")
 
     data <- NULL
