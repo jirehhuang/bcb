@@ -534,7 +534,7 @@ update_rounds <- function(t,
 
   ## load settings
   list2env(settings[c("n_obs", "n_int", "method",
-                      "target", "minimal")],
+                      "target", "minimal", "bcb_engine")],
            envir = environment())
   data <- rounds$data[seq_len(t),,drop = FALSE]
   interventions <- rounds$selected$interventions[seq_len(t)]
@@ -570,22 +570,60 @@ update_rounds <- function(t,
                                        dag = FALSE, debug = debug)
       rounds$blmat[t,] <- 1 - rounds$gies[t,]
     }
-    compute_scores(data = data, settings = settings, blmat = rounds$blmat[t,],
-                   interventions = interventions, debug = debug)
-    rounds$ps <- compute_ps(data = data,
+    if (bcb_engine == "mcmc"){
+
+      ## update ps
+      rounds$ps <- bidag_ps(data = data,
                             settings = settings,
                             interventions = interventions,
+                            blmat = rounds$blmat[t,],
+                            iterative = t %% 100 == 0,
                             debug = debug)
+    } else{
+
+      compute_scores(data = data, settings = settings, blmat = rounds$blmat[t,],
+                     interventions = interventions, debug = debug)
+      rounds$ps <- compute_ps(data = data,
+                              settings = settings,
+                              interventions = interventions,
+                              debug = debug)
+    }
     rounds$bma[t,] <- ps2es(ps = rounds$ps, settings = settings)
     rounds$mpg[t,] <- es2mpg(es = rounds$bma[t,], prob = 0.5)
+
+    ## update blmat
+    if (bcb_engine == "mcmc" &&
+        settings$restrict != "none" &&
+        t < (settings$n_obs + settings$n_int)){
+
+      if (!is.null(attr(rounds$ps, "endspace"))){
+
+        rounds$blmat[t+1,] <- 1 - attr(rounds$ps, "endspace")
+
+      } else{
+
+        # rounds$blmat[t+1,] <- 1 - es2mpg(es = rounds$bma[t,],
+        #                                  prob = 0.05)  # TODO: specify
+        rounds$blmat[t+1,] <- rounds$blmat[t,]
+      }
+    }
   }
-  rounds$mds[t,] <- execute_mds(ps = rounds$ps, settings = settings,
-                                seed = sample(t, size = 1), debug = debug)
-  if (bool_ps)
+  if (bcb_engine == "mcmc"){
+
+    rounds$mds[t,] <- as.matrix(attr(rounds$ps, "sampled"))
+
+  } else{
+
+    rounds$mds[t,] <- execute_mds(ps = rounds$ps, settings = settings,
+                                  seed = sample(t, size = 1), debug = debug)
+  }
+  if (bool_ps){
+
     rounds$ps <- threshold_ps(t = t,
                               rounds = rounds,
                               settings = settings,
                               debug = debug)
+  }
   if (t > n_obs){
 
     post <- method2post(method = method)
@@ -619,11 +657,13 @@ update_rounds <- function(t,
   }
   rounds <- compute_int(t = t, settings = settings,
                         rounds = rounds, debug = debug)
-  if (length(rounds$ps))
+  if (length(rounds$ps)){
+
     rounds$bda <- compute_bda(data = data, settings = settings, rounds = rounds,
                               # target = NULL,  # to estimate pairwise effects
                               target = target,  # focus on target
                               debug = debug)
+  }
   ## posterior mean
   for (post in avail_bda){
 
@@ -665,11 +705,14 @@ update_rounds <- function(t,
     } else{  # t > n_obs
 
       ## mu and se
-      if (length(rounds$ps))
+      if (length(rounds$ps)){
+
         rounds <- compute_mu_se(t = t, rounds = rounds, target = target,
                                 dag = dag, type = "est", post = post, est = "est")
+      }
     }
-    if (length(rounds$ps))
+    if (length(rounds$ps)){
+
       rounds$n_ess[t,] <- sapply(rounds$arms, function(arm){
 
         int_index <- match(arm$value, rounds$node_values[[arm$node]])
@@ -677,6 +720,7 @@ update_rounds <- function(t,
                     from = arm$node, to = target,
                     metric = sprintf("n_ess%g", int_index))
       })
+    }
   }
   if (t <= n_obs){
 
@@ -1129,7 +1173,10 @@ initialize_rounds <- function(settings,
     } else{
 
       tt <- seq_len(n_obs)
-      tt <- tt[tt > settings$max_parents + 2 | tt > n_obs]
+      tt <- tt[tt > settings$max_parents + 2]
+      if (settings$max_cache <= 1)
+        tt <- tt[tt >= n_obs]
+
       for (t in tt){
 
         restrict <- ifelse(settings$restrict == "pc",

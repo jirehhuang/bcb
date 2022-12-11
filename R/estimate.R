@@ -27,6 +27,7 @@ compute_bda <- function(data,
 
   ## initialize storage structure
   if (length(rounds$bda) == 0 ||
+      settings$bcb_engine == "mcmc" ||
       !identical(sapply(rounds$ps, nrow),
                  sapply(rounds$bda, function(x)
                    unlist(sapply(x, nrow)))[1,])){
@@ -34,7 +35,9 @@ compute_bda <- function(data,
     debug_cli(debug >= 2, cli::cli_alert,
               c("initializing bda",
                 ifelse(length(rounds$bda) == 0, "",
-                       " because dimensions changed")))
+                       ifelse(settings$bcb_engine == "mcmc",
+                              " because using MCMC",
+                              " because dimensions changed"))))
 
     bda <- lapply(seq_p, function(i){
 
