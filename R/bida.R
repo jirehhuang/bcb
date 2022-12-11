@@ -139,8 +139,8 @@ compute_scores <- function(data,
           bnlearn::amat(network) <- amat
 
           extra.args <- list()
-          extra.args = bnlearn:::check.score.args(score = score, network = network,
-                                                  data = data, extra.args = extra.args)
+          extra.args <- bnlearn:::check.score.args(score = score, network = network,
+                                                   data = data, extra.args = extra.args)
 
           ## compute and store score
           if (settings$minimal &&
