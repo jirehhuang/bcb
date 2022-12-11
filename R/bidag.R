@@ -47,7 +47,7 @@ bidag_ps <- function(data,
                                  scoreout = TRUE,
                                  iterations = iterations,
                                  stepsave = 1,
-                                 hardlimit = max(max(colSums(startspace)) + 1,
+                                 hardlimit = max(max(colSums(startspace)),
                                                  settings$max_parents),
                                  startspace = startspace,
                                  scoretable = scoretable,
@@ -62,6 +62,7 @@ bidag_ps <- function(data,
   mult <- 6
   iterations <- max(1000,
                     ceiling(mult * p^2 / log(p)))
+  burnin <- 0.2  # TODO: specify
 
   mcmc <- bidag::orderMCMC(scorepar = scorepar,
                            MAP = FALSE,
@@ -69,7 +70,7 @@ bidag_ps <- function(data,
                            chainout = TRUE,
                            iterations = iterations,
                            stepsave = 1,
-                           hardlimit = max(max(colSums(startspace)) + 1,
+                           hardlimit = max(max(colSums(startspace)),
                                            settings$max_parents),
                            startspace = startspace,
                            scoretable = scoretable,
@@ -77,11 +78,10 @@ bidag_ps <- function(data,
 
   ## sampled DAGs
   incidence0 <- mcmc$traceadd$incidence
+  incidence0 <- incidence0[-seq_len(burnin * length(incidence0))]
   incidence <- abind::abind(lapply(incidence0,
                                    as.matrix), along = 3)
-  incidence <- incidence[,,apply(incidence, 3,
-                                 function(x) max(colSums(x))) <= settings$max_parents,
-                         drop = FALSE]
+
   ## create ps
   ps <- sapply(settings$nodes, function(node){
 
