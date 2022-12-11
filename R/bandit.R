@@ -1542,6 +1542,35 @@ check_settings <- function(settings,
 
     ## TODO: figure out better names
 
+    ## TODO: mcmc generally needs restrict; need better input validation
+
+    ## preset: Bayes-UCB with mcmc
+    if (settings$method == "bcb-mcmc-bucb"){
+      settings$method <- "bcb-bma"
+      settings$bcb_combine <- "conjugate"
+      settings$bcb_criteria <- "ts"
+      settings$bcb_engine <- "mcmc"
+      settings$threshold <- 1
+    }
+
+    ## preset: Thompson sampling with mcmc
+    if (settings$method == "bcb-mcmc-ts"){
+      settings$method <- "bcb-mds"
+      settings$bcb_combine <- "conjugate"
+      settings$bcb_criteria <- "ts"
+      settings$bcb_engine <- "mcmc"
+      settings$threshold <- 1
+    }
+
+    ## preset: UCB with mcmc
+    if (settings$method == "bcb-mcmc-ucb"){
+      settings$method <- "bcb-bma"
+      settings$bcb_combine <- "conjugate"
+      settings$bcb_criteria <- "tuned"
+      settings$bcb_engine <- "mcmc"
+      settings$threshold <- 1
+    }
+
     ## preset: Bayes-UCB
     if (settings$method == "bcb-bucb"){
       settings$method <- "bcb-bma"
