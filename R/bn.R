@@ -31,6 +31,10 @@ bn.fit2edgeList <- function(bn.fit){
 
 bn_list2bn.fit <- function(bn_list){
 
+  if (class(bn_list)[1] == "bn.fit"){
+
+    return(bn_list)
+  }
   nodes <- unname(sapply(bn_list, `[[`, "node"))
   bn <- sparsebnUtils::to_bn(bn.fit2edgeList(bn_list))
   bnlearn::nodes(bn) <- nodes
