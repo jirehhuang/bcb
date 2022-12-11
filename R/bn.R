@@ -571,8 +571,11 @@ bn.fit2data_row <- function(bn.fit,
 
   } else if (! data_row$target %in% bnlearn_nodes(bn.fit)){
 
-    ## default to root
-    data_row$target <- bnlearn::node.ordering(bn.fit)[length(bn.fit)]
+    ## default to leaf which has the most parents
+    nodes <- rev(bnlearn::node.ordering(bn.fit))
+    nodes <- nodes[sapply(nodes, function(x) length(bn.fit[[x]]$children)) == 0]
+    data_row$target <- nodes[[which.max(sapply(nodes,
+                                               function(x) length(bn.fit[[x]]$parents)))]]
   }
   if ("bn.fit.gnet" %in% class(bn.fit)){
 
