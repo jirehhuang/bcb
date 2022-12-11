@@ -1332,7 +1332,7 @@ process_dnet <- function(bn.fit,
       ## add to group based on merge order
       marginals <- sapply(groups, function(x) sum(node$mpt[x]))
       k <- switch(merge_order,
-                  random = sample(length(groups)),
+                  random = sample(x = length(groups), size = 1),
                   increasing = which.min(marginals),
                   decreasing = which.max(marginals))
 
