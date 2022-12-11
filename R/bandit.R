@@ -370,7 +370,7 @@ apply_method <- function(t,
     a <- random_which.max(criteria)
     rounds$criteria[t,] <- criteria
 
-    debug_cli(debug >= 2, cli::cli_alert,
+    debug_cli(debug >= 1.5, cli::cli_alert,
               c("{method} selected {rounds$arms[[a]]$node} = ",
                 "{rounds$arms[[a]]$value} with estimate ",
                 "{format(rounds$arms[[a]]$estimate, digits = 4, nsmall = 4)} ",
@@ -1612,6 +1612,7 @@ check_settings <- function(settings,
       settings$bcb_combine <- "conjugate"
       settings$bcb_criteria <- "bucb"
       settings$bcb_engine <- "mcmc"
+      settings$max_parents <- min(settings$nnodes-1, 20)
       settings$threshold <- 1
     }
 
@@ -1621,6 +1622,7 @@ check_settings <- function(settings,
       settings$bcb_combine <- "conjugate"
       settings$bcb_criteria <- "ts"
       settings$bcb_engine <- "mcmc"
+      settings$max_parents <- min(settings$nnodes-1, 20)
       settings$threshold <- 1
     }
 
@@ -1630,6 +1632,7 @@ check_settings <- function(settings,
       settings$bcb_combine <- "conjugate"
       settings$bcb_criteria <- "tuned"
       settings$bcb_engine <- "mcmc"
+      settings$max_parents <- min(settings$nnodes-1, 20)
       settings$threshold <- 1
     }
 
