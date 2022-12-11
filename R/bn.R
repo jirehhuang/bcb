@@ -678,12 +678,13 @@ bn.fit2effects <- function(bn.fit){
     node_values <- bn.fit2values(bn.fit = bn.fit)
     success <- 1  # TODO: generalize
 
-    ## TODO: remove; temporary for checking
-    jpt <- bn.fit2jpt(bn.fit)
-
     for (node in names(bn.fit)){
 
       for (value in node_values[[node]]){
+
+        debug_cli(TRUE, cli::cli_alert,
+                  c("computing effects of intervention {node} = {value}"),
+                  .envir = environment())
 
         if (length(bn.fit[[node]]$parents)){
 
@@ -704,32 +705,6 @@ bn.fit2effects <- function(bn.fit){
 
         node_i <- match(node, names(bn.fit))
         effects[node_i, -node_i, value] <- sapply(mpt[-node_i], `[[`, success)
-
-        ## TODO: remove below; temporary for checking
-        effects_i_value <- sapply(names(bn.fit)[-node_i], function(target){
-
-          if (target %in% bn.fit[[node]]$parents){
-
-            query_jpt(jpt = jpt, target = target)[success]
-
-          } else{
-
-            query_jpt(jpt = jpt, target = target, given = setdiff(node, target),
-                      adjust = setdiff(bn.fit[[node]]$parents, target))[success, value]
-          }
-        })
-        bool_valid <- bnlearn::amat(bn.fit)[-node_i,
-                                            node_i] == 0  # target -/-> node
-        ae <- all.equal(effects[node_i, -node_i, value][bool_valid],
-                        effects_i_value[bool_valid], check.attributes = FALSE)
-        if (ae != TRUE){
-
-          print(ae)
-          print(effects[node_i, -node_i, value])
-          print(effects_i_value)
-          browser()
-        }
-        ## TODO: remove above; temporary for checking
       }
     }
     dimnames(effects) <- list(nodes, nodes, c(1,   # E(Y | do(X = 1))
