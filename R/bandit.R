@@ -536,6 +536,9 @@ update_rounds <- function(t,
   list2env(settings[c("n_obs", "n_int", "method",
                       "target", "minimal", "bcb_engine")],
            envir = environment())
+  bcb_engine <- ifelse(is.na(bcb_engine),
+                       "exact", bcb_engine)
+
   data <- rounds$data[seq_len(t),,drop = FALSE]
   interventions <- rounds$selected$interventions[seq_len(t)]
 
@@ -1693,7 +1696,7 @@ check_settings <- function(settings,
     }
   }
   for (i in c("epsilon", "c", "mu_0", "nu_0", "b_0", "a_0",
-              "bcb_combine", "bcb_criteria")){
+              "bcb_combine", "bcb_criteria", "bcb_engine")){
     if (is.null(settings[[i]]))
       settings[[i]] <- NA
   }
