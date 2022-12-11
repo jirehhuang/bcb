@@ -929,7 +929,9 @@ validate_cpt <- function(cpt,
   ## normalize, if necessary
   sums <- sum_pt(cpt,
                  given)
-  if (any(sums == 0)){
+  if (length(sums) == 0 ||
+      any(is.na(sums)) ||
+      any(sums == 0)){
 
     browser()
 
