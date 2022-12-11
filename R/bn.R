@@ -1167,7 +1167,8 @@ add_j_m_pt <- function(bn.fit,
       node <- node[names(node)]
       node$jpt <- tryCatch({
 
-        get_jpt(bn.fit = bn.fit, nodes = c(node$node, node$parents))
+        get_jpt(bn.fit = bn_list2bn.fit(bn.fit),
+                nodes = c(node$node, node$parents))
       },
       error = function(err){
 
