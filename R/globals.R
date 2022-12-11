@@ -47,7 +47,7 @@ avail_methods <- c("cache",       # cache observational rounds
 avail_bda <- c("star",  # true underlying dag
                "bma",   # bayesian model averaging
                "mpg",   # median probability graph
-               "mds",   # thompson sampling via modular dag sampling
+               "mds",   # thompson sampling via modular dag sampling; TODO: change to sample
                "gies",  # greedy interventional equivalence search
                "eg")    # empty graph
 
@@ -86,6 +86,13 @@ avail_bcb_criteria <- c("bucb",    # default bayes-ucb with delta
                         "c",       # ucb unknown distribution with c
                         "tuned",   # ucb using variance with c
                         "csd")     # +c*sd
+
+
+
+# Available bcb methods for
+
+avail_bcb_engine <- c("exact",  # using bida or mds
+                      "mcmc")   # using MCMC with bidag
 
 
 

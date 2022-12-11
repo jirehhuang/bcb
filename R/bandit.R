@@ -1593,6 +1593,14 @@ check_settings <- function(settings,
       debug_cli(debug >= 3, "", "default bcb_criteria = {settings$bcb_criteria} for bcb")
     }
 
+    ## check bcb_engine
+    if (is.null(settings$bcb_engine) ||
+        !is.character(settings$bcb_engine) ||
+        !settings$bcb_engine %in% avail_bcb_engine){
+      settings$bcb_engine <- "exact"
+      debug_cli(debug >= 3, "", "default bcb_engine = {settings$bcb_engine} for bcb")
+    }
+
     ## check c
     if (is.null(settings$c) ||
         is.na(settings$c) ||
@@ -1605,6 +1613,16 @@ check_settings <- function(settings,
               "bcb_combine", "bcb_criteria")){
     if (is.null(settings[[i]]))
       settings[[i]] <- NA
+  }
+
+  ## check data_dir
+  if (is.null(settings$data_dir) ||
+      !is.character(settings$data_dir) ||
+      !dir.exists(settings$data_dir)){
+
+    settings$data_dir <- data_dir
+
+    debug_cli(debug >= 3, "", "data_dir not provided")
   }
 
   ## check temp_dir
@@ -1737,9 +1755,9 @@ check_settings <- function(settings,
   nms <- c("method", "target", "run", "n_obs", "n_int",
            "initial_n_ess", "n_t", "max_cache", "int_parents",
            "success", "epsilon", "c", "mu_0", "nu_0", "b_0", "a_0", "delta",
-           "ucb_criteria", "bcb_combine", "bcb_criteria", "score", "restrict",
-           "alpha", "max.sx", "max_parents", "threshold", "eta", "minimal",
-           "nodes", "nnodes", "type", "temp_dir", "aps_dir", "mds_dir",
+           "ucb_criteria", "bcb_combine", "bcb_criteria", "bcb_engine", "score",
+           "restrict", "alpha", "max.sx", "max_parents", "threshold", "eta", "minimal",
+           "nodes", "nnodes", "type", "data_dir", "temp_dir", "aps_dir", "mds_dir",
            "id", "rounds0", "data_obs")
   settings <- settings[union(nms, c("bn.fit"))]
 
