@@ -514,12 +514,15 @@ load_bn.fit <- function(x,
 
 dnet2ce_lb <- function(dnet){
 
-  jpt <- get_jpt(bn.fit = dnet)
   bn_list <- add_j_m_pt(bn.fit = dnet)
   marginals <- sapply(bn_list, `[[`, "mpt")
   min(do.call(c, lapply(bn_list, function(node){
 
     unlist(lapply(node$parents, function(x){
+
+      ## compute local jpt
+      jpt <- get_jpt(bn.fit = dnet,
+                     nodes = unique(c(node$node, x, bn_list[[x]]$parents)))
 
       pt <- query_jpt(jpt = jpt, target = node$node,
                       given = x, adjust = bn_list[[x]]$parents)
@@ -535,7 +538,8 @@ dnet2ce_lb <- function(dnet){
 # Extract information from bn.fit for data_row
 
 bn.fit2data_row <- function(bn.fit,
-                            data_row){
+                            data_row,
+                            effects_array = bn.fit2effects(bn.fit = bn.fit)){
 
   in_deg <- sapply(bn.fit, function(x) length(x$parents))
   out_deg <- sapply(bn.fit, function(x) length(x$children))
@@ -569,7 +573,6 @@ bn.fit2data_row <- function(bn.fit,
   if ("bn.fit.gnet" %in% class(bn.fit)){
 
     ## effects on target
-    effects_array <- bn.fit2effects(bn.fit = bn.fit)
     effects <- effects_array[setdiff(names(bn.fit), data_row$target),
                              data_row$target, 1]
     effects <- sort(abs(effects[effects != 0]), decreasing = TRUE)
@@ -590,7 +593,6 @@ bn.fit2data_row <- function(bn.fit,
 
     ## effects on target
     success <- 1  # TODO: generalize
-    effects_array <- bn.fit2effects(bn.fit = bn.fit)
     effects <- effects_array[setdiff(names(bn.fit), data_row$target),
                              data_row$target, success]
     effects <- sort(abs(effects[effects != 0]), decreasing = TRUE)
