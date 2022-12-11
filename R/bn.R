@@ -1301,12 +1301,13 @@ process_dnet <- function(bn.fit,
   }
   bn_list <- add_j_m_pt(bn.fit = bn.fit)
 
+  ## restrict levels by merging levels
+  merge_order <- match.arg(merge_order)
+  bool_update <- FALSE
+
   debug_cli(debug >= 2, cli::cli_alert_info,
             c("restricting {sum(sapply(bn.fit, function(x) dim(x$prob)[1] < min_levels || dim(x$prob)[1] > max_levels))} ",
-              "nodes to between {min_levels} and {max_levels} levels"))
-
-  ## restrict levels by mergin levels
-  merge_order <- match.arg(merge_order)
+              "nodes to between {min_levels} and {max_levels} levels in {merge_order} order"))
 
   ## check each node
   for (i in bnlearn:::node.ordering(bn.fit)){
@@ -1316,15 +1317,17 @@ process_dnet <- function(bn.fit,
         length(node$mpt) <= max_levels &&
         all(node$mpt > 0)) next
 
+    bool_update <- TRUE
+
     ## determine order to assign
     ord <- switch(merge_order,
                   random = sample(length(node$mpt)),
                   order(node$mpt, decreasing = (merge_order ==
                                                   "decreasing")))
 
-    ## initialize groups with levels with highest marginal probability,
-    ## only allowing non-zero marginals
-    groups <- lapply(tail(ord, min(max_levels, sum(node$mpt > 0))), function(x) x)
+    ## initialize groups with levels with the highest/lowest/random
+    ## non-zero marginal probability
+    groups <- lapply(tail(ord[node$mpt[ord] > 0], max_levels), function(x) x)
     if (length(groups) < min_levels)
       groups <- list(Reduce(union, groups))  # single group
 
@@ -1445,8 +1448,11 @@ process_dnet <- function(bn.fit,
   }  # end for i in nodes
 
   ## update bn.fit
-  bn.fit <- bn_list2bn.fit(bn_list)
+  if (bool_update){
 
+    bn.fit <- bn_list2bn.fit(bn_list)
+    bn_list <- add_j_m_pt(bn.fit = bn.fit)
+  }
   ## restrict in-degree and out-degree
   in_deg <- sapply(bn.fit, function(x) length(x$parents))
   out_deg <- sapply(bn.fit, function(x) length(x$children))
@@ -1527,9 +1533,10 @@ process_dnet <- function(bn.fit,
     }
   }
   ## rename categorical levels of bn.fit
-  if (rename)
-    bn.fit <- rename_bn.fit(bn.fit = bn.fit, nodes = names(bn.fit), categories = TRUE)
+  if (rename){
 
+    bn.fit <- rename_bn.fit(bn.fit = bn.fit, nodes = "V", categories = TRUE)
+  }
   return(bn.fit)
 }
 
