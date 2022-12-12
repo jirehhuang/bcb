@@ -1401,8 +1401,8 @@ check_settings <- function(settings,
     ## default to leaf which has the most parents
     nodes <- rev(bnlearn::node.ordering(bn.fit))
     nodes <- nodes[sapply(nodes, function(x) length(bn.fit[[x]]$children)) == 0]
-    settings$target <- nodes[[which.max(sapply(x,
-                                               function(node) length(bn.fit[[x]]$parents)))]]
+    settings$target <- nodes[[which.max(sapply(nodes,
+                                               function(x) length(bn.fit[[x]]$parents)))]]
     debug_cli(debug >= 3, "",
               "automatically selected target = {settings$target}")
   }
