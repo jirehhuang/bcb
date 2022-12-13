@@ -895,8 +895,8 @@ reshape_dim <- function(pt, new_dimnames, repl = TRUE){
   new_dim <- sapply(new_dimnames, length)
   if (repl){
 
-    debug_cli(prod(new_dim) > 1e8, cli::cli_abort,
-              "probability table will have {prod(new_dim)} > 1e8 elements")
+    debug_cli(prod(new_dim) > 2e8, cli::cli_abort,
+              "probability table will have {prod(new_dim)} > 2e8 elements")
 
     ## replicate to match
     dims <- which(dim(pt) == 1)
@@ -933,14 +933,18 @@ validate_cpt <- function(cpt,
       any(is.na(sums)) ||
       any(sums == 0)){
 
-    browser()
-
     ## TODO: conditional probabilities when probability of condition is 0
 
-    sums <- ifelse(sums == 0,
-                   1, sums)
-  }
-  if (any(sums != 1)){
+    debug_cli(FALSE, cli::cli_alert_warning,
+              "cpt has sums = {sums}")
+
+    # browser()
+
+    # sums <- ifelse(is.na(sums) | sums == 0, 1, sums)
+
+    attr(cpt, "invalid") <- TRUE
+
+  } else{  # if (all(sums > 0)){
 
     cpt <- exp(log(cpt) - reshape_dim(log(sums), dimnames(cpt)))
   }
