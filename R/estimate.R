@@ -160,7 +160,7 @@ compute_bda <- function(data,
 
               ## empirical joint count table
               ejct <- do.call(table, sapply(nodes[c(ik, j)],
-                                            function(x) Xy[, x, drop = FALSE],
+                                            function(x) Xy[, x, drop = TRUE],
                                             simplify = FALSE))
               for (along in which(dim(ejct) == 1)){
 
@@ -178,17 +178,29 @@ compute_bda <- function(data,
 
               ## empirical joint probability table, with added uniform
               ## prior with effective sample size 1 for smoothness
-              n_prior <- 1  # TODO: include smoothness intput as parameter
+              n_prior <- 1  # TODO: include smoothness input as parameter
               ejpt <- (ejct + n_prior / prod(dim(ejct))) / (n + n_prior)
 
               ## empirical conditional probability table
               ecpt <- query_jpt(jpt = ejpt, target = nodes[j],
                                 given = nodes[i], adjust = nodes[k])
 
+              ## estimate mu with no prior to avoid unnecessary bias
+              ejpt0 <- (ejct + 0 / prod(dim(ejct))) / (n + 0)
+              ecpt0 <- query_jpt(jpt = ejpt0, target = nodes[j],
+                                 given = nodes[i], adjust = nodes[k])
+
+              if (!is.null(attr(ecpt0, "invalid"))){
+
+                debug_cli(debug >= 4, cli::cli_alert,
+                          "invalid ecpt; requiring n_prior = {n_prior}")
+
+                ecpt0 <- ecpt
+              }
               for (b in seq_len(length(i_values))){
 
                 temp[[j]][[sprintf("mu%g_bda", b)]][l] <-
-                  ecpt[settings$success, b]
+                  ecpt0[settings$success, b]
 
                 ep <- jpt2p(jpt = ejpt, nodes = nodes[c(j, ik)],
                             levels = c(settings$success, b))
