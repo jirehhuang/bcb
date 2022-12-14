@@ -22,7 +22,7 @@ gen_data_grid <- function(data_grid = build_data_grid(),
 
       data_grid <- read.table(dg_path, stringsAsFactors = FALSE)
     }
-    data_grid$n_dat <- n_dat
+    data_grid$n_dat <- n_dat  # override with input n_dat
   }
   data_grid <- check_data_grid(data_grid)
   data_grid$seed <- seed0 + data_grid$id
@@ -336,6 +336,10 @@ gen_data_grid <- function(data_grid = build_data_grid(),
   data_rows <- mclapply(seq_len(nrow(data_grid)), mc.cores = n_cores,
                         mc.preschedule = FALSE, net_fn)
   data_grid <- as.data.frame(data.table::rbindlist(data_rows))
+  if (!is.null(n_dat) && is.numeric(n_dat)){
+
+    data_grid$n_dat <- n_dat  # override with input n_dat
+  }
   write.table(x = data_grid, file = dg_path)
 
   ## expand data.grid so one dataset per thread
