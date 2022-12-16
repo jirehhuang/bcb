@@ -474,7 +474,7 @@ check_method_grid <- function(method_grid){
     method_grid$max_parents <- 5
   if (is.null(method_grid$minimal))
     method_grid$minimal <- TRUE
-  method_grid[setdiff(nms, names(method_grid))] <- 0
+  method_grid[setdiff(nms, names(method_grid))] <- NA
 
   ## rearrange columns
   method_grid <- method_grid[, nms, drop = FALSE]
