@@ -147,6 +147,9 @@ get_mds <- function(dir = FALSE){
 compile_mds <- function(mds_dir = get_mds(dir = TRUE),
                         debug = 0){
 
+  ## TODO: temporarily deactivated mds altogether
+  return(NULL)
+
   debug_cli(debug >= 2, cli::cli_alert_info,
             "compiling {.pkg mds} using make")
 
@@ -180,6 +183,9 @@ compile_mds <- function(mds_dir = get_mds(dir = TRUE),
 recompile_mds <- function(mds_dir = get_mds(dir = TRUE),
                           mds0_dir = sprintf("%s0", mds_dir),
                           debug = 0){
+
+  ## TODO: temporarily deactivated mds altogether
+  return(NULL)
 
   ## TODO: mds0 should be modified, not the original
 
