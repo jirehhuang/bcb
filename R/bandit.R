@@ -604,20 +604,15 @@ update_rounds <- function(t,
 
       if (!is.null(attr(rounds$ps, "endspace"))){
 
+        ## endspace from iterativeMCMC()
         rounds$blmat[t+1,] <- 1 - attr(rounds$ps, "endspace")
 
       } else{
 
-        ## TODO: figure out best way to expand search space
-        ## iterativeMCMC can expand or reduce search space
-
-        ## keep the same as before
-        # rounds$blmat[t+1,] <- rounds$blmat[t,]
-
         ## expand if high edge support probability
+        ## something like the orderMCMC() version of endspace
         rounds$blmat[t+1,] <- 1 - es2mpg(es = rounds$bma[t,],
-                                         prob = 0.1)  # TODO: specify
-        rounds$blmat[t+1,] <- pmin(rounds$blmat[t+1,], rounds$blmat[t,])
+                                         prob = settings$plus1post)
       }
     }
   }
