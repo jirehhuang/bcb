@@ -581,7 +581,9 @@ update_rounds <- function(t,
                             interventions = interventions,
                             blmat = rounds$blmat[t,],
                             iterative = (settings$restrict != "none") &&
-                              (t %% settings$plus1every == 0),
+                              is.finite(settings$plus1every) &&
+                              (t == (settings$n_obs + 1) ||
+                                 t %% settings$plus1every == 0),
                             debug = debug)
     } else{
 
