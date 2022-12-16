@@ -7,6 +7,11 @@ bidag_ps <- function(data,
                      iterative = FALSE,
                      debug = 0){
 
+  list2env(settings[c("plus1post", "plus1it", "bidag_type",
+                      "min_iterations", "max_iterations",
+                      "stepsave", "burnin")], envir = environment())
+  stepsave <- settings$stepsave
+
   debug_cli(debug >= 2, cli::cli_alert_info,
             "estimating parent set probabilities for {settings$nnodes} nodes using MCMC")
 
@@ -36,17 +41,18 @@ bidag_ps <- function(data,
   if (iterative){
 
     mult <- 3.5
-    iterations <- max(1000,
-                      ceiling(mult * p^2 / log(p)))
+    iterations <- min(max_iterations,
+                      max(min_iterations,
+                          ceiling(mult * p^2 / log(p))))
 
     iter <- bidag::iterativeMCMC(scorepar = scorepar,
                                  MAP = FALSE,
-                                 posterior = 0.05,  # TODO: adjust
-                                 plus1it = 1 + iterative,
+                                 posterior = plus1post,
+                                 plus1it = plus1it,
                                  chainout = TRUE,
                                  scoreout = TRUE,
                                  iterations = iterations,
-                                 stepsave = 1,
+                                 stepsave = stepsave,
                                  hardlimit = max(max(colSums(startspace)),
                                                  settings$max_parents),
                                  startspace = startspace,
@@ -55,27 +61,41 @@ bidag_ps <- function(data,
     startspace <- iter$endspace
     scoretable <- iter$scoretable
 
+    debug_cli(debug >= 2, cli::cli_alert,
+              "new startspace contains {sum(startspace)} connections")
   } else{
 
     iter <- NULL
   }
-  mult <- 6
-  iterations <- max(1000,
-                    ceiling(mult * p^2 / log(p)))
-  burnin <- 0.2  # TODO: specify
+  mult <- switch(bidag_type,
+                 order = 6,
+                 partition = 20)
+  iterations <- min(max_iterations,
+                    max(min_iterations,
+                        ceiling(mult * p^2 / log(p))))
 
-  mcmc <- bidag::orderMCMC(scorepar = scorepar,
-                           MAP = FALSE,
-                           plus1 = TRUE,
-                           chainout = TRUE,
-                           iterations = iterations,
-                           stepsave = 1,
-                           hardlimit = max(max(colSums(startspace)),
-                                           settings$max_parents),
-                           startspace = startspace,
-                           scoretable = scoretable,
-                           verbose = debug >= 3)
+  if (bidag_type == "order"){
 
+    mcmc <- bidag::orderMCMC(scorepar = scorepar,
+                             MAP = FALSE,
+                             plus1 = TRUE,
+                             chainout = TRUE,
+                             iterations = iterations,
+                             stepsave = stepsave,
+                             hardlimit = max(max(colSums(startspace)),
+                                             settings$max_parents),
+                             startspace = startspace,
+                             scoretable = scoretable,
+                             verbose = debug >= 3)
+  } else{
+
+    mcmc <- bidag::partitionMCMC(scorepar = scorepar,
+                                 iterations = iterations,
+                                 stepsave = stepsave,
+                                 startspace = startspace,
+                                 scoretable = scoretable,
+                                 verbose = debug >= 3)
+  }
   ## sampled DAGs
   incidence0 <- mcmc$traceadd$incidence
   incidence0 <- incidence0[-seq_len(burnin * length(incidence0))]

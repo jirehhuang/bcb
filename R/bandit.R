@@ -580,7 +580,8 @@ update_rounds <- function(t,
                             settings = settings,
                             interventions = interventions,
                             blmat = rounds$blmat[t,],
-                            iterative = t %% 100 == 0 && settings$restrict != "none",
+                            iterative = (settings$restrict != "none") &&
+                              (t %% settings$plus1every == 0),
                             debug = debug)
     } else{
 
@@ -1702,9 +1703,77 @@ check_settings <- function(settings,
       settings$c <- 1
       debug_cli(debug >= 3, "", "default c = {settings$c} for bcb")
     }
+
+    ## check plus1every
+    if (is.null(settings$plus1every) ||
+        is.na(settings$plus1every) ||
+        settings$plus1every < 1){
+      settings$plus1every <- 10
+      debug_cli(debug >= 3, "", "default plus1every = {settings$plus1every} for bcb")
+    }
+
+    ## check plus1post
+    if (is.null(settings$plus1post) ||
+        is.na(settings$plus1post) ||
+        settings$plus1post < 0 ||
+        settings$plus1post > 1){
+      settings$plus1post <- 0.05
+      debug_cli(debug >= 3, "", "default plus1post = {settings$plus1post} for bcb")
+    }
+
+    ## check plus1it
+    if (is.null(settings$plus1it) ||
+        is.na(settings$plus1it) ||
+        settings$plus1it < 1){
+      settings$plus1it <- 2
+      debug_cli(debug >= 3, "", "default plus1it = {settings$plus1it} for bcb")
+    }
+
+    ## check bidag_type
+    if (is.null(settings$bidag_type) ||
+        is.na(settings$bidag_type) ||
+        !settings$bidag_type %in% c("order", "partition")){
+      settings$bidag_type <- "order"
+      debug_cli(debug >= 3, "", "default bidag_type = {settings$bidag_type} for bcb")
+    }
+
+    ## check min_iterations
+    if (is.null(settings$min_iterations) ||
+        is.na(settings$min_iterations) ||
+        settings$min_iterations < 1){
+      settings$min_iterations <- 1e4
+      debug_cli(debug >= 3, "", "default min_iterations = {settings$min_iterations} for bcb")
+    }
+
+    ## check max_iterations
+    if (is.null(settings$max_iterations) ||
+        is.na(settings$max_iterations) ||
+        settings$max_iterations < 1){
+      settings$max_iterations <- Inf
+      debug_cli(debug >= 3, "", "default max_iterations = {settings$max_iterations} for bcb")
+    }
+
+    ## check stepsave
+    if (is.null(settings$stepsave) ||
+        is.na(settings$stepsave) ||
+        settings$stepsave < 1){
+      settings$stepsave <- NULL
+      debug_cli(debug >= 3, "", "default stepsave = {settings$stepsave} for bcb")
+    }
+
+    ## check burnin
+    if (is.null(settings$burnin) ||
+        is.na(settings$burnin) ||
+        settings$burnin < 0 ||
+        settings$burnin > 1){
+      settings$burnin <- 0.2
+      debug_cli(debug >= 3, "", "default burnin = {settings$burnin} for bcb")
+    }
   }
   for (i in c("epsilon", "c", "mu_0", "nu_0", "b_0", "a_0",
-              "bcb_combine", "bcb_criteria", "bcb_engine")){
+              "bcb_combine", "bcb_criteria", "bcb_engine",
+              "plus1every", "plus1post", "plus1it", "bidag_type",
+              "min_iterations", "max_iterations", "burnin")){
     if (is.null(settings[[i]]))
       settings[[i]] <- NA
   }
@@ -1849,9 +1918,12 @@ check_settings <- function(settings,
   nms <- c("method", "target", "run", "n_obs", "n_int",
            "initial_n_ess", "n_t", "max_cache", "int_parents",
            "success", "epsilon", "c", "mu_0", "nu_0", "b_0", "a_0", "delta",
-           "ucb_criteria", "bcb_combine", "bcb_criteria", "bcb_engine", "score",
-           "restrict", "alpha", "max.sx", "max_parents", "threshold", "eta", "minimal",
-           "nodes", "nnodes", "type", "data_dir", "temp_dir", "aps_dir", "mds_dir",
+           "ucb_criteria", "bcb_combine", "bcb_criteria", "bcb_engine",
+           "plus1every", "plus1post", "plus1it", "bidag_type",
+           "min_iterations", "max_iterations", "stepsave", "burnin",
+           "score", "restrict", "alpha", "max.sx", "max_parents",
+           "threshold", "eta", "minimal", "nodes", "nnodes", "type",
+           "data_dir", "temp_dir", "aps_dir", "mds_dir",
            "id", "rounds0", "data_obs")
   settings <- settings[union(nms, c("bn.fit"))]
 
