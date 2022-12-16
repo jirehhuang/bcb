@@ -26,7 +26,8 @@ bidag_ps <- function(data,
 
                                        as.data.frame(lapply(data, as.integer)) - 1L
 
-                                     } else data)
+                                     } else data,
+                                     bdepar = list(chi = 1, edgepf = 2))
   scorepar$settings <- settings
   scorepar$settings$data <- data
   scorepar$settings$interventions <- interventions
