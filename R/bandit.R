@@ -654,6 +654,12 @@ update_rounds <- function(t,
 
       rounds$arp <- dag2arp(dag = row2mat(row = 0, nodes = settings$nodes),
                             nodes = settings$nodes)
+    } else if (bcb_engine == "mcmc" &&
+               settings$type == "bn.fit.gnet"){
+
+      ## TODO: Gaussian MCMC arp probabilities; probably in bidag_ps()
+      browser()
+
     } else{
 
       ## compute arp probabilities
@@ -1120,6 +1126,7 @@ initialize_rounds <- function(settings,
 
         if (class(bn.fit)[2] == "bn.fit.gnet"){
 
+          ## TODO: Gaussian implementation
           browser()
 
           mean(data[[settings$target]][not_na & target == arm$node])
@@ -1379,13 +1386,15 @@ check_settings <- function(settings,
   settings$nnodes <- length(settings$nodes)
 
   ## check type
-  if (is.null(settings$type)){
+  if (is.null(settings$type) ||
+      is.na(settings$type)){
     settings$type <- class(bn.fit)[2]
     debug_cli(debug >= 3, "", "bn.fit type = {settings$type}")
   }
 
   ## check method
   if (is.null(settings$method) ||
+      is.na(settings$method) ||
       !((settings$method <- tolower(settings$method)) %in%
         avail_methods)){
     settings$method <- "cache"
@@ -1394,6 +1403,7 @@ check_settings <- function(settings,
 
   ## check target
   if (is.null(settings$target) ||
+      is.na(settings$target) ||
       settings$target == ""){
 
     ## default to leaf which has the most parents
@@ -1407,6 +1417,7 @@ check_settings <- function(settings,
 
   ## check num
   if (is.null(settings$run) ||
+      is.na(settings$run) ||
       settings$run < 1){
     settings$run <- 1
     debug_cli(debug >= 3, "", "default num = {settings$run}")
@@ -1414,6 +1425,7 @@ check_settings <- function(settings,
 
   ## check n_obs
   if (is.null(settings$n_obs) ||
+      is.na(settings$n_obs) ||
       settings$n_obs < 1){
     settings$n_obs <- 1
     debug_cli(debug >= 3, "", "default n_obs = {settings$n_obs}")
@@ -1423,6 +1435,7 @@ check_settings <- function(settings,
   if (settings$method == "cache"){
     settings$n_int <- 0
   } else if (is.null(settings$n_int) ||
+             is.na(settings$n_int) ||
              settings$n_int < 0){
     settings$n_int <- 100
     debug_cli(debug >= 3, "", "default n_int = {settings$n_int}")
@@ -1441,6 +1454,7 @@ check_settings <- function(settings,
 
   ## check n_t
   if (is.null(settings$n_t) ||
+      is.na(settings$n_t) ||
       settings$n_t < 1 ||
       settings$n_t > settings$n_int){
     settings$n_t <- 1
@@ -1449,6 +1463,7 @@ check_settings <- function(settings,
 
   ## check max_cache
   if (is.null(settings$max_cache) ||
+      is.na(settings$max_cache) ||
       settings$max_cache < 1){
     settings$max_cache <- Inf
     debug_cli(debug >= 3, "", "default max_cache = {settings$max_cache}")
@@ -1456,6 +1471,7 @@ check_settings <- function(settings,
 
   ## check int_parents
   if (is.null(settings$int_parents) ||
+      is.na(settings$int_parents) ||
       !settings$int_parents %in% c(0, 1, 2)){
     settings$int_parents <- 1
     debug_cli(debug >= 3, "", "default int_parents = {settings$int_parents}")
@@ -1463,13 +1479,15 @@ check_settings <- function(settings,
 
   ## check success
   if (is.null(settings$success) ||
+      is.na(settings$success) ||
       !(settings$success %in% seq_len(2))){
     settings$success <- 1
     debug_cli(debug >= 3, "", "default success = {settings$success}")
   }
 
   ## check score
-  if (is.null(settings$score)){
+  if (is.null(settings$score) ||
+      is.na(settings$score)){
     if (class(bn.fit)[2] == "bn.fit.gnet")
       settings$score <- "bge"
     else if (class(bn.fit)[2] == "bn.fit.dnet")
@@ -1479,6 +1497,7 @@ check_settings <- function(settings,
 
   ## check restrict
   if (is.null(settings$restrict) ||
+      is.na(settings$restrict) ||
       !settings$restrict %in% avail_restrict ||
       settings$method == "bcb-gies"){
     settings$restrict <- "none"
@@ -1487,6 +1506,7 @@ check_settings <- function(settings,
 
   ## check alpha
   if (is.null(settings$alpha) ||
+      is.na(settings$alpha) ||
       !is.numeric(settings$alpha)){
     settings$alpha <- bnlearn:::check.alpha(settings$alpha, bn.fit)
     debug_cli(debug >= 3, "", "default alpha = {settings$alpha}")
@@ -1494,13 +1514,16 @@ check_settings <- function(settings,
 
   ## check max.sx
   if (is.null(settings$max.sx) ||
+      is.na(settings$max.sx) ||
       !is.numeric(settings$max.sx)){
     settings$max.sx <- settings$nnodes - 2
     debug_cli(debug >= 3, "", "default max.sx = {settings$max.sx}")
   }
 
   ## check max_parents
-  if (is.null(settings$max_parents) || settings$max_parents < 0){
+  if (is.null(settings$max_parents) ||
+      is.na(settings$max_parents) ||
+      settings$max_parents < 0){
     settings$max_parents <- min(5, settings$nnodes - 1)
     debug_cli(debug >= 3, "", "default max_parents = {settings$max_parents}")
   }
@@ -1508,6 +1531,7 @@ check_settings <- function(settings,
 
   ## check threshold
   if (is.null(settings$threshold) ||
+      is.na(settings$threshold) ||
       settings$threshold < 0 || settings$threshold > 1){
     settings$threshold <- ifelse(settings$method == "bcb-mds", 1, 0.999)
     debug_cli(debug >= 3, "", "default threshold = {settings$threshold} for method = {settings$method}")
@@ -1517,6 +1541,7 @@ check_settings <- function(settings,
 
   ## check eta
   if (is.null(settings$eta) ||
+      is.na(settings$eta) ||
       settings$eta < 0 || settings$eta > 1){
     settings$eta <- 0
     debug_cli(debug >= 3, "", "default eta = {settings$eta}")
@@ -1545,6 +1570,7 @@ check_settings <- function(settings,
 
   ## check ucb_criteria
   if (is.null(settings$ucb_criteria) ||
+      is.na(settings$ucb_criteria) ||
       !is.character(settings$ucb_criteria) ||
       !settings$ucb_criteria %in% avail_ucb_criteria){
     settings$ucb_criteria <- "c"
@@ -1575,25 +1601,32 @@ check_settings <- function(settings,
 
     ## check mu_0
     if (is.null(settings$mu_0) ||
+        is.na(settings$mu_0) ||
         settings$mu_0 != 0){
       settings$mu_0 <- 0  # TODO: remove to require symmetric criteria
       debug_cli(debug >= 3, "", "default mu_0 = {settings$mu_0} for ts")
     }
 
     ## check nu_0
-    if (is.null(settings$nu_0) || settings$nu_0 <= 0){
+    if (is.null(settings$nu_0) ||
+        is.na(settings$nu_0) ||
+        settings$nu_0 <= 0){
       settings$nu_0 <- 1
       debug_cli(debug >= 3, "", "default nu_0 = {settings$nu_0} for ts")
     }
 
     ## check b_0
-    if (is.null(settings$b_0) || settings$b_0 <= 0){
+    if (is.null(settings$b_0) ||
+        is.na(settings$b_0) ||
+        settings$b_0 <= 0){
       settings$b_0 <- 1
       debug_cli(debug >= 3, "", "default b_0 = {settings$b_0} for ts")
     }
 
     ## check a_0
-    if (is.null(settings$a_0) || settings$a_0 <= 0){
+    if (is.null(settings$a_0) ||
+        is.na(settings$a_0) ||
+        settings$a_0 <= 0){
       settings$a_0 <- 1
       debug_cli(debug >= 3, "", "default a_0 = {settings$a_0} for ts")
     }
@@ -1671,6 +1704,7 @@ check_settings <- function(settings,
 
     ## check bcb_combine
     if (is.null(settings$bcb_combine) ||
+        is.na(settings$bcb_combine) ||
         !is.character(settings$bcb_combine) ||
         !settings$bcb_combine %in% avail_bcb_combine){
       settings$bcb_combine <- "conjugate"
@@ -1679,6 +1713,7 @@ check_settings <- function(settings,
 
     ## check bcb_criteria
     if (is.null(settings$bcb_criteria) ||
+        is.na(settings$bcb_criteria) ||
         !is.character(settings$bcb_criteria) ||
         !settings$bcb_criteria %in% avail_bcb_criteria){
       settings$bcb_criteria <- "bcb"
@@ -1687,6 +1722,7 @@ check_settings <- function(settings,
 
     ## check bcb_engine
     if (is.null(settings$bcb_engine) ||
+        is.na(settings$bcb_engine) ||
         !is.character(settings$bcb_engine) ||
         !settings$bcb_engine %in% avail_bcb_engine){
       settings$bcb_engine <- "exact"
@@ -1777,6 +1813,7 @@ check_settings <- function(settings,
 
   ## check data_dir
   if (is.null(settings$data_dir) ||
+      is.na(settings$data_dir) ||
       !is.character(settings$data_dir) ||
       !dir.exists(settings$data_dir)){
 
@@ -1786,7 +1823,9 @@ check_settings <- function(settings,
   }
 
   ## check temp_dir
-  if (is.null(settings$temp_dir) || ! dir.exists(settings$temp_dir)){
+  if (is.null(settings$temp_dir) ||
+      is.na(settings$temp_dir) ||
+      !dir.exists(settings$temp_dir)){
     # settings$temp_dir <- file.path(path.expand("~"),
     #                                "Documents/ucla/research/projects/current",
     #                                "simulations", "temp")
@@ -1797,7 +1836,8 @@ check_settings <- function(settings,
   dir_check(settings$temp_dir)
 
   ## check id
-  if (is.null(settings$id)){
+  if (is.null(settings$id) ||
+      is.na(settings$id)){
     settings$id <- random_id(n = 12)
     debug_cli(debug >= 3, "", "generated id = {settings$id}")
   }
@@ -1868,7 +1908,8 @@ check_settings <- function(settings,
 
     settings$data_obs <- ribn(settings$bn.fit, n = 0)
 
-  } else if (is.character(settings$data_obs)){
+  } else if (is.character(settings$data_obs) &&
+             !is.na(settings$data_obs)){
 
     if (file.exists(settings$data_obs) &&
         (file.exists(fp <-
@@ -1878,7 +1919,8 @@ check_settings <- function(settings,
 
       settings$data_obs <- read.table(fp)[seq_len(settings$n_obs),]
     }
-  } else if (is.null(settings$data_obs)){
+  } else if (is.null(settings$data_obs) ||
+             is.na(settings$data_obs)){
 
     settings["data_obs"] <- list(NULL)
   }
