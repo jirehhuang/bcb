@@ -4,11 +4,11 @@
 
 
 library(bcb)
+network <- "dkpar_3_6_3"
 path0 <- ifelse(get_projects_dir(envir = environment()) == getwd(),
                 projects_dir, file.path(projects_dir, "current",
-                                        "simulations"))
-network <- "dkpar_3_6_3"
-n_cores <- 4
+                                        "simulations", network))
+n_cores <- 1
 debug <- 1
 start_time <- Sys.time()
 
@@ -37,4 +37,4 @@ for (x in c("d", "g")){
 time <- prettyunits::pretty_sec(as.numeric(Sys.time() - start_time,
                                            unit = "secs"))
 debug_cli_sprintf(TRUE, "",
-                  "executed in {time}")  # 2h 55m 56.3s with 4 cores on cluster
+                  "executed in {time}")

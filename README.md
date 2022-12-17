@@ -55,12 +55,12 @@ Appendix C.
 source("generate_dkpar.R")
 ```
 
-`generate_dkpar.R` creates two folders, randomly generating 100 discrete
-Bayesian networks in `dkpar_3_6_3-d_0` and 100 Gaussian Bayesian
-networks in `dkpar_3_6_3-g_0`, as well as 10 observational datasets for
-each network. The script executed on a i5-9600k using a single CPU core
-in about 40 minutes. The generated networks and data are available at
-[\[Google
+`generate_dkpar.R` creates two folders nested in a folder `dkpar_3_6_3`,
+randomly generating 100 discrete Bayesian networks in `dkpar_3_6_3-d_0`
+and 100 Gaussian Bayesian networks in `dkpar_3_6_3-g_0`, as well as 10
+observational datasets for each network. The script executed on a
+i5-9600k using a single CPU core in about 40 minutes. The generated
+networks and data are available at [\[Google
 Drive\]](https://drive.google.com/drive/folders/1aAtAxcLeztgWNFPy2KceRJ5V9gUt79u8).
 
 #### 2. Executing Algorithms
@@ -124,12 +124,13 @@ source("test_bda.R")
 source("analyze_bda.R")
 ```
 
-`test_bda.R` creates folders `test_bda-{d, g}`, investigating 24000
-randomly generated scenarios for each distributional setting. In each
-folder, an RDS file is compiled containing the simulation results. The
-script executed in about 167 days of single thread CPU time using the
-UCLA Hoffman2 computing cluster. `analyze_bda.R` creates the backdoor
-adjustment coverage probabilities for the discrete
-(`bda_coverage-d.{eps, png}`) and Gaussian (`bda_coverage-g.{eps, png}`)
-simulations. The results are available at [\[Google
+`test_bda.R` creates folders `test_bda-{d, g}` nested in a folder
+`test_bda`, investigating 24000 randomly generated scenarios for each
+distributional setting. In each folder, an RDS file is compiled
+containing the simulation results. The script executed in about 167 days
+of single thread CPU time using the UCLA Hoffman2 computing cluster.
+`analyze_bda.R` creates the backdoor adjustment coverage probabilities
+for the discrete (`bda_coverage-d.{eps, png}`) and Gaussian
+(`bda_coverage-g.{eps, png}`) simulations. The results are available at
+[\[Google
 Drive\]](https://drive.google.com/drive/folders/1BvlbSjHGmVEo4wim4tHMzCj4fVBf2gOA).

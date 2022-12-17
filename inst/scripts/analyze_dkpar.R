@@ -10,10 +10,10 @@
 library(bcb)
 library(ggplot2)
 library(ggpubr)
+network <- "dkpar_3_6_3"
 path0 <- ifelse(get_projects_dir(envir = environment()) == getwd(),
                 projects_dir, file.path(projects_dir, "current",
-                                        "simulations"))
-network <- "dkpar_3_6_3"
+                                        "simulations", network))
 wh <- c(1.3, 0.6) * 139.68
 
 

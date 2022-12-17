@@ -4,10 +4,10 @@
 
 
 library(bcb)
+network <- "dkpar_3_6_3"
 path0 <- ifelse(get_projects_dir(envir = environment()) == getwd(),
                 projects_dir, file.path(projects_dir, "current",
-                                        "simulations"))
-network <- "dkpar_3_6_3"
+                                        "simulations", network))
 n_cores <- 1
 debug <- 1
 start_time <- Sys.time()
@@ -74,4 +74,4 @@ gen_data_grid(data_grid = data_grid,
 time <- prettyunits::pretty_sec(as.numeric(Sys.time() - start_time,
                                            unit = "secs"))
 debug_cli_sprintf(TRUE, "",
-                  "executed in {time}")  # 40m 9.2s on i5-9600k
+                  "executed in {time}")

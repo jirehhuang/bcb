@@ -11,7 +11,7 @@ library(bcb)
 library(ggplot2)
 path0 <- ifelse(get_projects_dir(envir = environment()) == getwd(),
                 projects_dir, file.path(projects_dir, "current",
-                                        "simulations"))
+                                        "simulations", "test_bda"))
 wh <- c(1.3, 0.6) * 139.68
 
 

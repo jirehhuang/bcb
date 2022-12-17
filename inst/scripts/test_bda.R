@@ -6,7 +6,7 @@
 library(bcb)
 path0 <- ifelse(get_projects_dir(envir = environment()) == getwd(),
                 projects_dir, file.path(projects_dir, "current",
-                                        "simulations"))
+                                        "simulations", "test_bda"))
 debug <- 1
 
 
