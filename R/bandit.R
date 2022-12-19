@@ -1765,8 +1765,8 @@ check_settings <- function(settings,
     ## check bidag_type
     if (is.null(settings$bidag_type) ||
         is.na(settings$bidag_type) ||
-        !settings$bidag_type %in% c("partition", "order")){
-      settings$bidag_type <- "partition"
+        !settings$bidag_type %in% c("order", "partition")){
+      settings$bidag_type <- "order"
       debug_cli(debug >= 3, "", "default bidag_type = {settings$bidag_type} for bcb")
     }
 
