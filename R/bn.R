@@ -1132,6 +1132,7 @@ add_j_m_pt <- function(bn.fit,
 
     return(bn.fit)
   }
+  bn.fit <- bn_list2bn.fit(bn.fit)  # ensure of class bn.fit
   if (setequal(names(bn.fit), nodes)){
 
     ## attempt using bn.fit2jpt()
@@ -1180,7 +1181,7 @@ add_j_m_pt <- function(bn.fit,
       node <- node[names(node)]
       node$jpt <- tryCatch({
 
-        get_jpt(bn.fit = bn_list2bn.fit(bn.fit),
+        get_jpt(bn.fit = bn.fit,
                 nodes = c(node$node, node$parents))
       },
       error = function(err){
