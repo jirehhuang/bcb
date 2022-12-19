@@ -255,9 +255,9 @@ average_compiled <- function(compiled,
       })
     }), along = 2)
     exp_x_ci <- t(apply(exp_x, 1, quantile,
-                        probs = c(0.025, 0.05, 0.25, 0.5, 0.75, 0.95, 0.975)))
+                        probs = c(0, 0.025, 0.05, 0.25, 0.5, 0.75, 0.95, 0.975, 1)))
     colnames(exp_x_ci) <- sprintf("%s_%s", x,
-                                  c("025", "050", "250", "500", "750", "950", "975"))
+                                  c("min", "025", "050", "250", "500", "750", "950", "975", "max"))
     averaged$selected <- cbind(averaged$selected, exp_x_ci)
   }
 
