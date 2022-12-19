@@ -609,8 +609,8 @@ update_rounds <- function(t,
 
       } else{
 
-        ## expand if high edge support probability
-        ## something like the orderMCMC() version of endspace
+        ## set search space to areas of high edge support probability
+        ## something like a simple version of endspace
         rounds$blmat[t+1,] <- 1 - es2mpg(es = rounds$bma[t,],
                                          prob = settings$plus1post)
       }
@@ -1741,7 +1741,7 @@ check_settings <- function(settings,
     if (is.null(settings$plus1every) ||
         is.na(settings$plus1every) ||
         settings$plus1every < 1){
-      settings$plus1every <- 10
+      settings$plus1every <- settings$n_obs + settings$n_int + 1  # only at first iteration
       debug_cli(debug >= 3, "", "default plus1every = {settings$plus1every} for bcb")
     }
 
@@ -1782,7 +1782,7 @@ check_settings <- function(settings,
     if (is.null(settings$max_iterations) ||
         is.na(settings$max_iterations) ||
         settings$max_iterations < 1){
-      settings$max_iterations <- Inf
+      settings$max_iterations <- 1e9
       debug_cli(debug >= 3, "", "default max_iterations = {settings$max_iterations} for bcb")
     }
 
