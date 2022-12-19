@@ -240,20 +240,26 @@ average_compiled <- function(compiled,
     names(averaged) <- nms
   }
 
-  ## add median and quantiles for expected_cumulative
-  exp_cum <- abind::abind(lapply(compiled, function(net_rounds){
+  ## add median and quantiles
+  for (x in c("expected_cumulative", "sae_bma")){
 
-    max_mu <- max(abs(net_rounds[[1]]$mu_true))
-    sapply(net_rounds, function(roundsj){
+    exp_x <- abind::abind(lapply(compiled, function(net_rounds){
 
-      roundsj$selected$expected_cumulative / max_mu
-    })
-  }), along = 2)
-  exp_cum_ci <- t(apply(exp_cum, 1, quantile,
-                        probs = c(0.025, 0.05, 0.5, 0.95, 0.975)))
-  colnames(exp_cum_ci) <- sprintf("expected_cumulative_%s",
-                                  c("025", "050", "500", "950", "975"))
-  averaged$selected <- cbind(averaged$selected, exp_cum_ci)
+      ## normalizing factor
+      nf <- ifelse(x == "expected_cumulative",
+                   max(abs(net_rounds[[1]]$mu_true)), 1)
+
+      sapply(net_rounds, function(roundsj){
+
+        roundsj$selected[[x]] / nf
+      })
+    }), along = 2)
+    exp_x_ci <- t(apply(exp_x, 1, quantile,
+                        probs = c(0.025, 0.05, 0.25, 0.5, 0.75, 0.95, 0.975)))
+    colnames(exp_x_ci) <- sprintf("%s_%s", x,
+                                  c("025", "050", "250", "500", "750", "950", "975"))
+    averaged$selected <- cbind(averaged$selected, exp_x_ci)
+  }
 
   ## adjust format
   if (across_networks){
