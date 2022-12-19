@@ -4,7 +4,7 @@
 
 
 
-# Compute back-door adjustment estimates
+# Compute backdoor adjustment estimates
 # Some parts modified from calc_bida_post()
 
 compute_bda <- function(data,
@@ -20,7 +20,7 @@ compute_bda <- function(data,
   parents <- seq_len(settings$max_parents)
 
   debug_cli(debug >= 2, cli::cli_alert_info,
-            c("computing back-door adjustments with ",
+            c("computing backdoor adjustments with ",
               ifelse(settings$type == "bn.fit.gnet",
                      "Gaussian linear model",
                      "discrete multinomial model")))
@@ -79,6 +79,10 @@ compute_bda <- function(data,
     pars <- as.matrix(rounds$ps[[i]][, parents, drop = FALSE])
     temp <- bda[[i]]
     i_values <- rounds$node_values[[i]]
+
+    debug_cli(debug >= 4, cli::cli_alert,
+              c("computing estimates for ", sum(rounds$ps[[i]][, "prob"] > 0),
+                " adjustment sets for node {nodes[i]}"))
 
     for (l in rounds$ps[[i]][, "ordering"]){
 
@@ -586,7 +590,7 @@ compute_mu_se <- function(t,
                           rounds,
                           target,
                           dag = NULL,
-                          type = c("bda", "est"),  # back-door adjustment or joint est
+                          type = c("bda", "est"),  # backdoor adjustment or joint est
                           post = avail_bda,  # posterior distr (bma or around dag)
                           est = post){  # where to store in rounds
 
@@ -731,7 +735,7 @@ bool_bda <- function(t,
 
       debug_cli(debug >= 3 && sum(bool_data) > settings$n_obs, "",
                 c("using {sum(bool_data) - settings$n_obs} rows of ",
-                  "experimental data for back-door adjustment"))
+                  "experimental data for backdoor adjustment"))
 
     } else if (settings$type == "bn.fit.dnet"){
 
