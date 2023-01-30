@@ -582,7 +582,7 @@ update_rounds <- function(t,
                             blmat = rounds$blmat[t,],
                             iterative = (settings$restrict != "none") &&
                               is.finite(settings$plus1every) &&
-                              (t == (settings$n_obs + 1) ||
+                              (t == settings$n_obs ||
                                  t %% settings$plus1every == 0),
                             debug = debug)
     } else{
@@ -606,6 +606,7 @@ update_rounds <- function(t,
 
         ## endspace from iterativeMCMC()
         rounds$blmat[t+1,] <- 1 - attr(rounds$ps, "endspace")
+        attr(rounds$blmat, "last_endspace") <- t+1
 
       } else{
 
