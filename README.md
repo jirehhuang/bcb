@@ -1,4 +1,4 @@
-BCB
+bcb
 ================
 Jireh Huang
 (<jirehhuang@ucla.edu>)
@@ -11,9 +11,13 @@ Jireh Huang and Qing Zhou
 
 On R version 3.6.0 or more recent, first install the
 [phsl](https://github.com/jirehhuang/phsl) package according to the
-instructions provided by the author. Unfortunately, some functionality
-of the bcb package is not compatible with Windows due to the integration
-of [BIDA](https://github.com/jopensar/BIDA) and
+instructions provided by the author. The MCMC implementation requires
+the installation of [bidag](https://github.com/jirehhuang/bidag), a
+modified fork of
+[BiDAG](https://cran.r-project.org/web/packages/BiDAG/index.html).
+Unfortunately, some functionality of the bcb package is not compatible
+with Windows due to the integration of
+[BIDA](https://github.com/jopensar/BIDA) and
 [modular-dag-sampling](https://github.com/ttalvitie/modular-dag-sampling),
 copies of which are included in the `inst` folder with permission from
 the respective authors.
@@ -23,14 +27,6 @@ with its dependencies.
 
 ``` r
 devtools::install_github("jirehhuang/bcb", dependencies = TRUE)
-```
-
-Alternatively, download the source package from [\[Google
-Drive\]](https://drive.google.com/drive/folders/10F-s6wyE_RQ3TKUnDe2y3r-9nVHCB6Ml)
-and run the following code in R to install the package from source.
-
-``` r
-install.packages("bcb_1.0.tar.gz", repos = NULL, dependencies = TRUE, type = "source")
 ```
 
 ## Reproducing Numerical Results
@@ -47,7 +43,17 @@ setwd("inst/scripts")
 ### Main Experiments
 
 The main experiments are described and presented in Section 6 and
-Appendix C.
+Appendix C. These results were obtained using a previous version of the
+package available at [\[Google
+Drive\]](https://drive.google.com/drive/folders/10F-s6wyE_RQ3TKUnDe2y3r-9nVHCB6Ml),
+compiled directly after the following
+[\[commit\]](https://github.com/jirehhuang/bcb/commit/039aa34096065292762fc2a9e3c7abc3ab11f3e2).
+After downloading, run the following code in R to install the package
+from source.
+
+``` r
+install.packages("bcb_1.0.tar.gz", repos = NULL, dependencies = TRUE, type = "source")
+```
 
 #### 1. Generating Networks and Data
 
@@ -106,13 +112,35 @@ source("analyze_dkpar.R")
 ```
 
 `analyze_dkpar.R` creates the cumulative regret
-(`cumulative.{eps, png}`), head start for competing algorithms in the
-discrete setting (`hs-d.{eps, png}`), and edge support sum of absolute
-errors (`essae.{eps, png}`) figures. The analysis results contain the
-necessary files to execute `analyze_dkpar.R` and are available at
-[\[Google
+(`cumulative.{eps, png}`), cumulative regret with error bars
+(`cumulative_err.{eps, png}`), head start for competing algorithms in
+the discrete setting (`hs-d.{eps, png}`), and edge support sum of
+absolute errors (`essae.{eps, png}`) figures. The analysis results
+contain the necessary files to execute `analyze_dkpar.R` and are
+available at [\[Google
 Drive\]](https://drive.google.com/drive/folders/1BNCybuaKkQZkNtUkVc67KTqkz5FbE1eH)
 and are most manageable in terms of file size.
+
+### MCMC Experiments
+
+The experiments using Markov Chain Monte Carlo (MCMC) to approximate the
+structure posterior are provided in Section 6. The procedure for
+reproducing these results is similar to that of the main experiments.
+The results are available at [\[Google
+Drive\]](https://drive.google.com/drive/folders/1TnH_GDVpB7oALLT9K_L5kgsSbxFMkPuG?usp=sharing).
+
+``` r
+source("run_dkpar2.R")
+source("compile_dkpar2.R")
+source("analyze_dkpar2.R")
+```
+
+``` r
+source("generate_child.R")
+source("run_child.R")
+source("compile_child.R")
+source("analyze_child.R")
+```
 
 ### Additional Experiments
 
