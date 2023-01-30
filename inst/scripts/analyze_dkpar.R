@@ -128,6 +128,34 @@ cumulative_d <- ggplot(data = df,
   facet_wrap(~Alg) +
   theme(legend.key.width = unit(2, "cm"))
 
+## Discrete cumulative regret with error bars
+Method_k <- c("Alg", "Alg*", sprintf("BBB-Alg(k=%g)", c(0, 3, 5)))
+width0 <- 0.7
+dodge_width0 <- 0.9
+shapes <- c(25, 24, 21, 22, 23)
+cumulative_err_d <-
+  ggplot(data = df[df$t %in% c(seq(500, 5000, 1500)) &
+                     df$Method_k %in% Method_k,],
+         aes(x = as.factor(t), y = expected_cumulative_500,
+             ymin = expected_cumulative_025, ymax = expected_cumulative_975,
+             group = Method_k, color = Method_k,
+             fill = Method_k, shape = Method_k)) +
+  geom_line(aes(lty = Method_k),
+            size = 0.5,
+            position = position_dodge(width = dodge_width0)) +
+  geom_errorbar(size = 1, width = width0,
+                position = position_dodge(width = dodge_width0)) +
+  geom_point(size = 1.5, stroke = 1, fill = "white",
+             position = position_dodge(width = dodge_width0)) +
+  theme_fixed(bool_axis_text = FALSE) +
+  labs(x = element_blank(), y = "Discrete Cumulative") +
+  scale_fill_manual(values = colors, breaks = labels2) +
+  scale_color_manual(values = colors, breaks = labels2) +
+  scale_linetype_manual(values = ltys, breaks = labels2) +
+  scale_shape_manual(values = shapes, breaks = Method_k) +
+  facet_wrap(~Alg) +
+  theme(legend.key.width = unit(1, "cm"))
+
 ## Discrete simple regret
 simple_d <- ggplot(data = df,
                    aes(x = t, y = greedy_regret, group = Method_k,
@@ -237,6 +265,41 @@ sapply(c("eps", "png"), function(x){
   ggsave(filename = sprintf("%s/cumulative.%s", path, x),
          plot = cumulative_dg, device = x, dpi = 1600,
          width = wh[1], height = wh[2] * 1.5, units = "mm")
+})
+
+## Gaussian cumulative regret with error bars
+cumulative_err_g <-
+  ggplot(data = df[df$t %in% c(seq(500, 5000, 1500)) &
+                     df$Method_k %in% Method_k,],
+         aes(x = as.factor(t), y = expected_cumulative_500,
+             ymin = expected_cumulative_025, ymax = expected_cumulative_975,
+             group = Method_k, color = Method_k,
+             fill = Method_k, shape = Method_k)) +
+  geom_line(aes(lty = Method_k),
+            size = 0.5,
+            position = position_dodge(width = dodge_width0)) +
+  geom_errorbar(size = 1, width = width0,
+                position = position_dodge(width = dodge_width0)) +
+  geom_point(size = 1.5, stroke = 1, fill = "white",
+             position = position_dodge(width = dodge_width0)) +
+  theme_fixed() +
+  labs(x = "Time Step", y = "Gaussian Cumulative") +
+  scale_fill_manual(values = colors, breaks = labels2) +
+  scale_color_manual(values = colors, breaks = labels2) +
+  scale_linetype_manual(values = ltys, breaks = labels2) +
+  scale_shape_manual(values = shapes, breaks = Method_k) +
+  facet_wrap(~Alg) +
+  theme(legend.key.width = unit(1, "cm"))
+
+## Combined cumulative regret
+cumulative_err_dg <- ggpubr::ggarrange(plotlist = list(cumulative_err_d, cumulative_err_g), ncol = 1,
+                                   common.legend = TRUE, legend = "bottom")
+
+sapply(c("eps", "png"), function(x){
+
+  ggsave(filename = sprintf("%s/cumulative_err.%s", path0, x),
+         plot = cumulative_err_dg, device = x, dpi = 1600,
+         width = wh[1], height = wh[2] * 2, units = "mm")
 })
 
 ## Gaussian simple regret
