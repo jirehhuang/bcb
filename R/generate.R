@@ -170,7 +170,8 @@ gen_data_grid <- function(data_grid = build_data_grid(),
         } else if (data_row$data_type == "discrete"){
 
           if (data_row$normalize ||
-              grepl("parallel|chain|sink|rand|par", data_row$network)){
+              grepl("parallel|chain|sink|rand|par", data_row$network) &&
+              !grepl(paste(avail_bnrepository, collapse = "|"), data_row$network)){
 
             bn.fit <- process_dnet(bn.fit,
                                    min_levels = 1,
