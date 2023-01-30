@@ -34,6 +34,7 @@ methods <- c(sprintf("bcb-bucb%s", c(seq(1, 60, 10))),
 df <- df0[df0$method %in% methods,]
 df$Alg <- ifelse(grepl("bucb", df$method), "Bayes-UCB",
                  ifelse(grepl("ts", df$method), "TS", "UCB"))
+df$Alg <- sprintf("Alg: %s", df$Alg)
 df$Method <- ifelse(grepl("bcb", df$method),
                     sprintf("BBB-Alg(%g)",
                             method_grid$n_obs[as.numeric(gsub("[^\\d]+", "",
@@ -101,7 +102,7 @@ hs_grid <- ggpubr::ggarrange(plotlist = Alg_hs_list,
 
 sapply(c("eps", "png"), function(x){
 
-  ggsave(filename = sprintf("%s/hs-d.%s", path, x),
+  ggsave(filename = sprintf("%s/hs-d.%s", path0, x),
          plot = hs_grid, device = x, dpi = 1600,
          width = wh[1], height = wh[2] * 1.2, units = "mm")
 })
@@ -183,7 +184,7 @@ essae_d <- ggplot(data = df[grepl("bcb", df$method),],
   facet_wrap(~Alg) +
   theme(legend.key.width = unit(2, "cm")) +
   scale_y_continuous(breaks = seq(0, 18, 3)) +
-  coord_cartesian(xlim = c(120, 5000-120), ylim = c(0.6, 15-0.6))
+  coord_cartesian(xlim = c(70, 5000-70), ylim = c(0, 15-0))
 
 ## Discrete ESSAE for optimal arm
 essae_arm0_d <- ggplot(data = df[grepl("bcb", df$method),],
@@ -198,7 +199,7 @@ essae_arm0_d <- ggplot(data = df[grepl("bcb", df$method),],
   facet_wrap(~Alg) +
   theme(legend.key.width = unit(2, "cm")) +
   scale_y_continuous(labels = scales::number_format(accuracy = 0.01)) +
-  coord_cartesian(xlim = c(120, 5000-120), ylim = c(0, 4))
+  coord_cartesian(xlim = c(70, 5000-70), ylim = c(0, 4))
 
 ## Execution time (conservative)
 time_d <- sum(df0$time * 100 *
@@ -222,6 +223,7 @@ methods <- c(sprintf("bcb-bucb%s", c(seq(1, 60, 10))),
 df <- df0[df0$method %in% methods,]
 df$Alg <- ifelse(grepl("bucb", df$method), "Bayes-UCB",
                  ifelse(grepl("ts", df$method), "TS", "UCB"))
+df$Alg <- sprintf("Alg: %s", df$Alg)
 df$Method <- ifelse(grepl("bcb", df$method),
                     sprintf("BBB-Alg(%g)",
                             method_grid$n_obs[as.numeric(gsub("[^\\d]+", "",
@@ -262,7 +264,7 @@ cumulative_dg <- ggpubr::ggarrange(plotlist = list(cumulative_d, cumulative_g), 
 
 sapply(c("eps", "png"), function(x){
 
-  ggsave(filename = sprintf("%s/cumulative.%s", path, x),
+  ggsave(filename = sprintf("%s/cumulative.%s", path0, x),
          plot = cumulative_dg, device = x, dpi = 1600,
          width = wh[1], height = wh[2] * 1.5, units = "mm")
 })
@@ -331,10 +333,9 @@ essae_g <- ggplot(data = df[grepl("bcb", df$method),],
   scale_color_manual(values = colors, breaks = labels2) +
   scale_linetype_manual(values = ltys, breaks = labels2) +
   facet_wrap(~Alg) +
-  theme(legend.key.width = unit(2, "cm"),
-        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  theme(legend.key.width = unit(2, "cm")) +
   scale_y_continuous(breaks = seq(0, 12, 2)) +
-  coord_cartesian(xlim = c(120, 5000-120), ylim = c(0.4, 10-0.4))
+  coord_cartesian(xlim = c(70, 5000-70), ylim = c(0, 10-0))
 
 ## Combined ESSAE
 essae_dg <- ggpubr::ggarrange(plotlist = list(essae_d, essae_g), ncol = 1,
@@ -342,7 +343,7 @@ essae_dg <- ggpubr::ggarrange(plotlist = list(essae_d, essae_g), ncol = 1,
 
 sapply(c("eps", "png"), function(x){
 
-  ggsave(filename = sprintf("%s/essae.%s", path, x),
+  ggsave(filename = sprintf("%s/essae.%s", path0, x),
          plot = essae_dg, device = x, dpi = 1600,
          width = wh[1], height = wh[2] * 1.5, units = "mm")
 })
@@ -361,7 +362,7 @@ essae_arm0_g <- ggplot(data = df[grepl("bcb", df$method),],
   theme(legend.key.width = unit(2, "cm"),
         axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
   scale_y_continuous(labels = scales::number_format(accuracy = 0.01)) +
-  coord_cartesian(xlim = c(120, 5000-120), ylim = c(0, 1))
+  coord_cartesian(xlim = c(70, 5000-70), ylim = c(0, 1))
 
 ## Combined ESSAE for optimal arm
 essae_arm0_g <- ggpubr::ggarrange(plotlist = list(essae_arm0_d, essae_arm0_g), ncol = 1,
@@ -389,3 +390,4 @@ df %>%
                                grepl("bcb-", method) ~ "BBB-Alg",
                                TRUE ~ "Alg")) %>%
   group_by(dist_group, alg_group) %>%
+  summarize(mean = mean(time))
