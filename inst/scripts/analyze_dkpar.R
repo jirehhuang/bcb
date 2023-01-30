@@ -372,5 +372,20 @@ time_g <- sum(df0$time * 100 *
                 ifelse(grepl("bcb", df0$method), 5, 10))
 
 
-## Total execution time (conservative)
-time_dg <- prettyunits::pretty_sec(time_d + time_g)
+######################################################################
+## Computation time
+######################################################################
+
+## Total (conservative)
+prettyunits::pretty_sec(time_d + time_g)
+
+## Per iteration for different methods
+df %>%
+  mutate(dist_group = "Gaussian") %>%
+  full_join(readRDS(file.path(file.path(path0, sprintf("%s-d_done", network)),
+                              "concise", "df_2.rds")) %>%
+              mutate(dist_group = "Discrete")) %>%
+  mutate(alg_group = case_when(grepl("cn-", method) ~ "Alg*",
+                               grepl("bcb-", method) ~ "BBB-Alg",
+                               TRUE ~ "Alg")) %>%
+  group_by(dist_group, alg_group) %>%
