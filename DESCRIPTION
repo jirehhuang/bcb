@@ -14,7 +14,7 @@ Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.1.1
 Depends: R (>= 3.6.0)
 Imports: Rcpp, sys, cli, data.table, stringr, parallel, DirichletReg, phsl, bnlearn, pcalg, sparsebnUtils, sfsmisc (>=
-        1.0-26), methods, NlcOptim, expm, pracma
+        1.0-26), methods, NlcOptim, expm, pracma, BiDAG, bidag
 LinkingTo: Rcpp, RcppArmadillo
 Suggests: testthat (>= 3.0.0)
 Config/testthat/edition: 3
