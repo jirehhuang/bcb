@@ -46,19 +46,19 @@ bidag_ps <- function(data,
                       max(min_iterations,
                           ceiling(mult * p^2 / log(p))))
 
-    iter <- bidag::iterativeMCMC(scorepar = scorepar,
-                                 MAP = FALSE,
-                                 posterior = plus1post,
-                                 plus1it = plus1it,
-                                 chainout = TRUE,
-                                 scoreout = TRUE,
-                                 iterations = iterations,
-                                 stepsave = stepsave,
-                                 hardlimit = max(max(colSums(startspace)),
-                                                 settings$max_parents),
-                                 startspace = startspace,
-                                 scoretable = scoretable,
-                                 verbose = debug >= 3)
+    iter <- bidag2::iterativeMCMC(scorepar = scorepar,
+                                  MAP = FALSE,
+                                  posterior = plus1post,
+                                  plus1it = plus1it,
+                                  chainout = TRUE,
+                                  scoreout = TRUE,
+                                  iterations = iterations,
+                                  stepsave = stepsave,
+                                  hardlimit = max(max(colSums(startspace)),
+                                                  settings$max_parents),
+                                  startspace = startspace,
+                                  scoretable = scoretable,
+                                  verbose = debug >= 3)
     startspace <- iter$endspace
     scoretable <- iter$scoretable
 
@@ -77,25 +77,25 @@ bidag_ps <- function(data,
 
   if (bidag_type == "order"){
 
-    mcmc <- bidag::orderMCMC(scorepar = scorepar,
-                             MAP = FALSE,
-                             plus1 = TRUE,
-                             chainout = TRUE,
-                             iterations = iterations,
-                             stepsave = stepsave,
-                             hardlimit = max(max(colSums(startspace)),
-                                             settings$max_parents),
-                             startspace = startspace,
-                             scoretable = scoretable,
-                             verbose = debug >= 3)
+    mcmc <- bidag2::orderMCMC(scorepar = scorepar,
+                              MAP = FALSE,
+                              plus1 = TRUE,
+                              chainout = TRUE,
+                              iterations = iterations,
+                              stepsave = stepsave,
+                              hardlimit = max(max(colSums(startspace)),
+                                              settings$max_parents),
+                              startspace = startspace,
+                              scoretable = scoretable,
+                              verbose = debug >= 3)
   } else{
 
-    mcmc <- bidag::partitionMCMC(scorepar = scorepar,
-                                 iterations = iterations,
-                                 stepsave = stepsave,
-                                 startspace = startspace,
-                                 scoretable = scoretable,
-                                 verbose = debug >= 3)
+    mcmc <- bidag2::partitionMCMC(scorepar = scorepar,
+                                  iterations = iterations,
+                                  stepsave = stepsave,
+                                  startspace = startspace,
+                                  scoretable = scoretable,
+                                  verbose = debug >= 3)
   }
   ## sampled DAGs
   incidence0 <- mcmc$traceadd$incidence

@@ -9,7 +9,7 @@
 
 
 library(bcb)
-library(bidag)
+library(bidag2)
 path0 <- ifelse(get_projects_dir(envir = environment()) == getwd(),
                 projects_dir, file.path(projects_dir, "current",
                                         "simulations", "mcmc"))

@@ -5,14 +5,15 @@ Jireh Huang
 
 # Bayesian Causal Bandits with Backdoor Adjustment Prior
 
-Jireh Huang and Qing Zhou
+[Jireh Huang](https://www.linkedin.com/in/jirehhuang/) and [Qing
+Zhou](http://www.stat.ucla.edu/~zhou/)
 
 ## Installation
 
 On R version 3.6.0 or more recent, first install the
 [phsl](https://github.com/jirehhuang/phsl) package according to the
 instructions provided by the author. The MCMC implementation requires
-the installation of [bidag](https://github.com/jirehhuang/bidag), a
+the installation of [bidag2](https://github.com/jirehhuang/bidag2), a
 modified fork of
 [BiDAG](https://cran.r-project.org/web/packages/BiDAG/index.html).
 Unfortunately, some functionality of the bcb package is not compatible
